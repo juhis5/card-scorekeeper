@@ -32,6 +32,7 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 - **Firestore security rules** changes have emulator tests (own-vs-other score edits, host override, expired room, room-scoped reads).
 - Critical flow has/updates an e2e (two clients: a score syncs live between them).
 - Tests are deterministic (no real network/clock/Firebase — mock the boundary / use the emulator), meaningful, one behavior each.
+- **No flaky tests.** No `retry`, `.skip`/`.only`, arbitrary sleeps, or loosened assertions to mask an intermittent failure — a flaky or order-dependent test is a **Block** (see `tdd`). Verify suspect tests with `vitest run --repeat=20 --sequence.shuffle`.
 
 ### 3. Skills adherence — check the diff against each relevant skill
 - **`vue-pinia`**: `<script setup lang="ts">`, setup stores + `storeToRefs`, typed emits / `defineModel`, small single-job components, dependencies point inward (`lib/` pure — no Vue/Firebase/IO in it), store depends on the `GameRepository` **interface** not Firestore directly.
@@ -42,6 +43,8 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 - **`error-ux`**: all four states; the **two offline modes** handled and distinguished (never-connected → local game banner; blip mid-game → reconnecting); manual scoring always reachable.
 - **`pwa`**: shell precache intact so **offline cold-start still loads and a local game is playable**; Firestore/Gemini not SW-cached (Firestore uses its own `persistentLocalCache`).
 - **backend (`firestore-realtime`, `vercel-gemini`, `vercel-deploy`)**: Firestore rules are the security boundary (not the UI); public web config (`VITE_FIREBASE_*`) vs server-only secrets (`GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`) kept separate; photo-count room+token gate + per-room/global rate limits present; total recomputed server-side; listeners unsubscribed.
+- **`routing`**: routes lazy-loaded + named; guards thin (delegate to stores, no logic/mutation/network in a guard — offline nav must not block); focus moved + announced on navigation.
+- **`i18n`**: no hardcoded user-facing strings (all via `t()` keys); numbers/dates via Intl; `<html lang>` = the active locale.
 - **domain (`rules.ts`)**: card values (number=face, J/Q/K=10, Ace=15, Joker=25), the 5 contracts, low-total-wins, tie handling — all correct and unit-tested.
 
 ### 4. Maintainability & aesthetics — no shortcut hacks

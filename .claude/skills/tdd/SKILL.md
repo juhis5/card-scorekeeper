@@ -44,6 +44,21 @@ Don't chase a coverage number. Coverage is a signal (untested logic branch = wri
 - Fast unit tests in `happy-dom`; keep the emulator + E2E suites small and separate.
 - Test behavior and public contracts, not private internals.
 
+## Flaky tests — a flake is a bug; fix it, never skip it
+
+A test that passes *sometimes* is worse than one that fails — it trains everyone to ignore red. **When a test is flaky (fails intermittently, or "passes on re-run"), stop and fix the root cause.** Do NOT: re-run until green, add `retry`, `.skip`/`.only`, an arbitrary `setTimeout`/sleep, or loosen the assertion to make it pass. Those hide the bug; they don't fix it.
+
+Common FE causes → the real fix:
+- **Racing async/DOM** (asserting before Vue updated): `await flushPromises()` / `await nextTick()`, and Testing Library's `await findBy*` / `await waitFor(...)` instead of immediate `getBy*`; `await` every `user-event`.
+- **Real timers** for debounce/throttle/delays: `vi.useFakeTimers()` + `vi.advanceTimersByTime()` — never wait wall-clock.
+- **Non-determinism** (`Date.now()`, `new Date()`, `Math.random()`, locale/timezone): inject or mock — `vi.setSystemTime(...)`, seed randomness, pin `TZ`/locale. (Room codes, UUIDs, timestamps — inject them.)
+- **Test-order / shared state** bleeding between tests: fresh Pinia per test, `vi.clearAllMocks()` + reset stores/DOM in `beforeEach`, no module-level mutable state. Prove it: run shuffled (`vitest --sequence.shuffle`).
+- **Unmocked I/O** (real network / Firebase): mock at the boundary; use the emulator deterministically — never hit a live service. Firestore snapshot timing is a classic flake source — drive it through a mocked/emulated repository, not the live SDK.
+- **Leaked subscriptions/timers/listeners** across tests: unmount components, unsubscribe `onSnapshot` (`onScopeDispose`), clear timers.
+- **Animations/transitions** racing assertions: disable in tests or await completion.
+
+Reproduce before declaring it fixed: run it many times, shuffled — `vitest run <file> --repeat=20 --sequence.shuffle`. Green 20/20 shuffled = fixed. If you genuinely can't fix it now it's a **blocker**, not a merge-through: quarantine only with a tracked issue + owner + deadline, never a silent `.skip`. Default: fix it now.
+
 ## Wiring
 
 - `vitest.config.ts`: `environment: 'happy-dom'`, `globals: true`.

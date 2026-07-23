@@ -56,6 +56,16 @@ Current Gemini Flash model (e.g. `gemini-2.5-flash` — verify current name/pric
 - Counting cards from a photo is harder than reading text (overlap, glare, half-hidden cards). Treat every result as needing a glance — the card-by-card breakdown + confirm/edit step in the UI exists for exactly this. Manual typing stays right next to it as the always-works fallback.
 - On Gemini/quota error, return a clean error status so the UI falls back to manual entry.
 
+## Downscale the image in the browser before upload
+
+A raw phone photo is 5–12 MB → slow uploads on mobile data, possible payload-limit rejections at the function, and wasted Gemini tokens/quota. **Resize + compress client-side before the `/api` call.**
+
+- Draw to a `<canvas>` (or `createImageBitmap` + `OffscreenCanvas`) at **~1600px on the long edge**, export JPEG at **quality ~0.8**, then base64. Target well under ~1.5 MB.
+- **Respect EXIF orientation** (iOS photos rotate) — `createImageBitmap(file, { imageOrientation: 'from-image' })`.
+- 1600px is plenty to read cards laid flat and non-overlapping; bigger just costs tokens.
+- Keep it a testable composable (`useImageDownscale`), pure-ish (in → out), unit-tested (see `tdd`).
+- Server-side size cap stays as defence-in-depth (the 413 check) — client downscale is the optimisation, not the trust boundary.
+
 ## Security reminders
 
 - Never log the image, tokens, or keys. Key + admin creds only in the function env, only server-side.

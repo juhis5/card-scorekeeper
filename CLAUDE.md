@@ -11,6 +11,7 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - **Non-interactive:** `create-vue` prompts by default (an autonomous agent hangs). Pass flags — run `pnpm create vue@latest --help` for current names (typescript, pinia, vitest, playwright, eslint, prettier); don't hardcode from memory.
 - Pin `"packageManager": "pnpm@11.17.0"` in `package.json` (pnpm is installed via corepack).
 - After the skeleton: set up **Tailwind v4**, then `pnpm dlx shadcn-vue@latest init` and `add` components as needed (see `component-library`); fold its generated theme CSS into `design-system`'s dark-first values.
+- Also add `vue-router` (see `routing`) + `vue-i18n` (see `i18n`), and wire git hooks: `husky` + `lint-staged` (pre-commit) + `commitlint` (commit-msg) + pre-push typecheck/test (see `git-workflow`).
 - Keep the committed `.prettierrc.json` as the formatting source of truth; merge create-vue's config, don't double-add deps.
 - After the first `pnpm install`, open `/hooks` once so the Prettier auto-format hook loads (this repo had no settings.json at session start).
 
@@ -18,6 +19,7 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 
 - Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.
 - UI: **Tailwind v4 + shadcn-vue** (Reka UI) — copy-in accessible components you own.
+- Routing: **Vue Router**. i18n: **vue-i18n** (fi/en, device-default — no hardcoded strings).
 - Package manager: **pnpm**. Always install the **latest stable** versions — version numbers in docs/skills are floors, not pins.
 - **Frontend hosting: Vercel** (git push → auto-deploy), same workflow as schedule-app. Firestore is host-agnostic, so live sync works fine from Vercel. (All-Firebase via Firebase Hosting is the alternative if we ever want single-vendor.)
 - Realtime backend: **Firebase / Firestore** (Spark free tier). Client SDK, no server for core play.
@@ -40,6 +42,8 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - `tdd` — pragmatic test-first (rules/stats strict, components behavior, rules on emulator, a few E2E).
 - `design-system` — Tailwind v4 + shadcn theme tokens, dark-first theming + light, styling conventions. The visual layer.
 - `component-library` — shadcn-vue (Reka UI + Tailwind v4): setup, which primitive to use, own & tweak, keep a11y.
+- `routing` — Vue Router: lazy routes, named, thin guards, offline-safe nav, focus on nav.
+- `i18n` — vue-i18n (fi/en): no hardcoded strings, Intl formatting, typed messages.
 - `error-ux` — loading/empty/error/offline states, toasts, validation, confirms.
 - `a11y-mobile` — semantic HTML, focus, labels, live regions (score announcements), contrast, tap targets.
 - `pwa` — installable app + offline shell that makes offline host mode load (vite-plugin-pwa).
@@ -47,6 +51,7 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - `vercel-gemini` — the optional room-gated photo card-count function.
 - `vercel-deploy` — vercel.json, /api runtime, Firebase public/secret env split, last-mile deploy steps.
 - `review-checklist` — the merge gate: skills followed, no regressions, tests sufficient, security/a11y, no hacks. Used by `/feature` + standalone.
+- `git-workflow` — Conventional Commits, branch naming, git hooks (husky/lint-staged/commitlint), CI.
 
 ## Commands
 

@@ -1,0 +1,27 @@
+# CI — mirrors the local git hooks (see the git-workflow skill).
+# Activates once the app is scaffolded (scripts + pnpm-lock.yaml exist).
+# Versions are directional — verify latest.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # reads the "packageManager" field
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test:run
+      - run: pnpm build # runs vue-tsc (typecheck) + build
+      # When Firestore rules change, add a job that runs them on the emulator:
+      # - run: pnpm test:rules   (needs firebase-tools + Java; see firestore-realtime / tdd)

@@ -75,6 +75,8 @@ src/
   stores/         Pinia setup stores (room, identity, stats)
   composables/    useX.ts
   lib/            firebase init, types, scoring rules (the 5 contracts constant) + utils.ts (cn)
+  router/         routes + guards (see routing)
+  locales/        i18n messages fi/en (see i18n)
   App.vue
   main.ts
 ```
