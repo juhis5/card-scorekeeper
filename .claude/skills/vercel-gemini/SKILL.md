@@ -7,7 +7,7 @@ description: How to write the serverless function that hides the Gemini key and 
 
 Optional shortcut for the "snap your leftover cards" feature. Manual scoring is the primary path and needs **no** key, no function — this whole skill applies only if photo-count is being built.
 
-The function is the **only** place the Gemini key exists. It can run on Firebase Cloud Functions or a Vercel/Netlify function (same account as the frontend host). The browser never sees the key.
+The function is the **only** place the Gemini key exists. It's a **Vercel serverless function** (`/api`, same repo + host as the frontend — no separate backend repo), matching schedule-app's pattern. The browser never sees the key.
 
 ## Why not a shared passphrase (the wrinkle vs schedule-app)
 

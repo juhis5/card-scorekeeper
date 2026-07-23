@@ -5,9 +5,10 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 ## Stack
 
 - Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.
-- Package manager: **pnpm**.
+- Package manager: **pnpm**. Always install the **latest stable** versions — version numbers in docs/skills are floors, not pins.
+- **Frontend hosting: Vercel** (git push → auto-deploy), same workflow as schedule-app. Firestore is host-agnostic, so live sync works fine from Vercel. (All-Firebase via Firebase Hosting is the alternative if we ever want single-vendor.)
 - Realtime backend: **Firebase / Firestore** (Spark free tier). Client SDK, no server for core play.
-- Optional photo-count: one serverless function (Firebase Functions or Vercel/Netlify) holding the Gemini key, gated by room + session token. Not needed for manual scoring.
+- Optional photo-count: one **Vercel serverless function** (`/api`) holding the Gemini key, gated by room + session token. Not needed for manual scoring.
 
 ## Golden rules
 
@@ -26,4 +27,5 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 ## Commands
 
 - `pnpm dev` — local dev server. `pnpm build` — typecheck (`vue-tsc`) + build. `pnpm preview` — serve build.
+- `vercel dev` — run the app + `/api` photo-count function together locally.
 - Firebase emulator suite for testing Firestore rules before deploy.
