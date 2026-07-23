@@ -36,6 +36,7 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - `vue-pinia` — Vue 3.5 / Pinia 3 conventions, lightweight architecture (GameRepository seam), mobile-first.
 - `clean-code` — naming, function size, typing, Prettier/ESLint. Read before writing any code.
 - `tdd` — pragmatic test-first (rules/stats strict, components behavior, rules on emulator, a few E2E).
+- `design-system` — CSS-var tokens (color/type/space/radius/motion), dark-first theming + light, component look. The visual layer.
 - `error-ux` — loading/empty/error/offline states, toasts, validation, confirms.
 - `a11y-mobile` — semantic HTML, focus, labels, live regions (score announcements), contrast, tap targets.
 - `pwa` — installable app + offline shell that makes offline host mode load (vite-plugin-pwa).
