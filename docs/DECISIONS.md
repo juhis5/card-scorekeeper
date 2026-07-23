@@ -10,3 +10,10 @@ One line per decision made without the human (asleep during the overnight build)
 - 2026-07-23 — Core UI (slice 3) built offline-first against LocalGameRepository before the
   Firestore path (slice 4). — The GameRepository seam makes online a swap, not a rewrite; a
   playable local game is the lowest-risk way to validate the domain + UI before adding network.
+- 2026-07-24 — Tie handling: players with equal lowest total are co-winners, sharing placement 1
+  (standard competition ranking, e.g. 1,1,3). — PLAN says "lowest total wins" but is silent on
+  ties; co-winners is the least surprising rule for a friendly game and keeps placement usable
+  for head-to-head stats.
+- 2026-07-24 — Contract data split: `lib/rules.ts` holds the 5 contracts as structured meld
+  requirements + a stable i18n key per round; human-readable descriptions live in locale files.
+  — Keeps `rules.ts` free of English prose (i18n skill) while the rules themselves stay in code.

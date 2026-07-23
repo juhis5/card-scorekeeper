@@ -2,6 +2,13 @@
   "app": {
     "title": "Rommi Scorekeeper"
   },
+  "contract": {
+    "round1": "Two sets of three",
+    "round2": "One set of three and one flush",
+    "round3": "Three sets of three",
+    "round4": "One flush and two sets of three",
+    "round5": "Two flushes and one set of three"
+  },
   "home": {
     "heading": "Rommi Scorekeeper",
     "tagline": "Low score wins. Scores sync live."

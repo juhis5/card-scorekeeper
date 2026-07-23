@@ -21,7 +21,8 @@ design-system dark tokens, deleted the Scaffolding section from CLAUDE.md, commi
 
 ## Slice 1 — Domain foundation (`lib/`) — STRICT TDD
 
-**Status: TODO** · depends: 0
+**Status: DONE** — `lib/rules.ts` + `lib/types.ts` pure & TDD'd (26 tests: card values, 54
+example, all 5 contracts, tie ranking 1/1/3, contractKey↔locale linkage). Fresh review: no blocks.
 Pure domain, no Vue/network. `src/lib/types.ts` (domain types mirroring the PLAN data model:
 Player, RoundScore, GameState, GameResult, contracts, card enums). `src/lib/rules.ts`:
 

@@ -2,6 +2,13 @@
   "app": {
     "title": "Rommi-pisteet"
   },
+  "contract": {
+    "round1": "Kaksi kolmen sarjaa",
+    "round2": "Yksi kolmen sarja ja yksi värisuora",
+    "round3": "Kolme kolmen sarjaa",
+    "round4": "Yksi värisuora ja kaksi kolmen sarjaa",
+    "round5": "Kaksi värisuoraa ja yksi kolmen sarja"
+  },
   "home": {
     "heading": "Rommi-pisteet",
     "tagline": "Pienin pistemäärä voittaa. Pisteet päivittyvät suorassa lähetyksessä."
