@@ -9,6 +9,19 @@ room code and everyone sees scores update live.
 > counting) as a first-class input. Desktop should still work in a browser, but it is
 > not a design target — nothing is optimised for wide screens, mouse, or keyboard.
 
+## Decisions locked
+
+Finalised during planning. **This section wins** over the "Recommended/Alternative/Hosting" framing below; `CLAUDE.md` + `.claude/skills/` are the source of truth for *how*.
+
+- **Stack:** Vite + Vue 3.5 + TypeScript (strict) + Pinia + **pnpm**.
+- **Realtime backend:** **Firebase / Firestore** (Spark free tier). **Supabase is NOT used** — kept below only as the alternative that was weighed.
+- **Frontend hosting:** **Vercel** (Firestore is host-agnostic; consistency with schedule-app). The optional photo-count function is a **Vercel** `/api` function — not Firebase Cloud Functions.
+- **UI:** Tailwind v4 + shadcn-vue (Reka UI); **dark-default** theme (light via toggle). Vue Router; vue-i18n (fi/en, device-default — no hardcoded strings).
+- **Offline host mode:** required (see the section above) — `GameRepository` seam, single-device local game, reconnect pushes final result only.
+- **Vision (optional):** Gemini Flash, free-tier key, room + session-token gated; image downscaled client-side.
+- **Testing/quality:** Vitest + @vue/test-utils + Playwright + Firebase emulator (rules), pragmatic TDD; PWA shell (makes offline load); Prettier + ESLint; Conventional Commits + git hooks + CI.
+- **Identity / stats / rules:** per the Confirmed decisions section (device UUID, five contracts, low-total-wins).
+
 ## What it does
 
 1. **Host** starts a new game → app generates a short room code.
@@ -49,7 +62,7 @@ free tier.
 ### One extra piece: the photo-count vision function
 The optional photo-count feature (see scoring below) needs a vision model, and the API
 key must stay hidden — same constraint as the schedule app. So the card game gains one
-small serverless function (on Firebase Cloud Functions, or a Vercel/Netlify function)
+small serverless function (a **Vercel** `/api` function — see Decisions locked)
 that holds the Gemini key and reads the hand photo. If you skip photo counting, you
 don't need this function at all — manual scoring needs only Firebase.
 
@@ -65,7 +78,9 @@ which casual multiplayer use won't approach. Two honest caveats:
 - **Tiers change.** Verify the current Firebase free-tier limits before relying on
   specific numbers — this doc is directional.
 
-## Alternative: Supabase
+## Alternative: Supabase (considered, NOT chosen)
+
+> **Decided: Firebase** (see *Decisions locked*). This section is kept only to record the alternative that was weighed — do not build on Supabase.
 
 If you'd rather have SQL (rooms/players/scores as real tables) and EU data:
 
@@ -121,8 +136,9 @@ protection model above.
 
 ## Hosting the frontend
 
-- The app itself (Vue) can host on Firebase Hosting, Vercel, or Netlify — all free
-  tiers. Firebase Hosting pairs naturally if you're already using Firebase.
+- **Decided: Vercel** (Firestore is host-agnostic, so live sync works from any host;
+  keeps one deploy workflow across both apps). Firebase Hosting / Netlify were the
+  other free options considered.
 
 ## Protecting your Gemini free tier
 
