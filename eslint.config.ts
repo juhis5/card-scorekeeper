@@ -38,5 +38,15 @@ export default defineConfigWithVueTs(
     },
   },
 
+  {
+    // shadcn-vue copy-in primitives are named after their HTML/Reka concept (Button, Input,
+    // Table, ...) by convention across the whole ecosystem — not our naming to change.
+    name: 'app/ui-primitives',
+    files: ['src/components/ui/**/*.vue'],
+    rules: {
+      'vue/multi-word-component-names': 'off',
+    },
+  },
+
   skipFormatting,
 )

@@ -11,7 +11,57 @@
   },
   "home": {
     "heading": "Rommi Scorekeeper",
-    "tagline": "Low score wins. Scores sync live."
+    "tagline": "Low score wins. Scores sync live.",
+    "form": {
+      "heading": "New local game",
+      "hostNameLabel": "Your name",
+      "hostNamePlaceholder": "e.g. Juho",
+      "otherPlayersHeading": "Other players",
+      "otherPlayersEmpty": "No other players yet — add at least one to start.",
+      "nameLabel": "Player {number} name",
+      "removeLabel": "Remove player {number}",
+      "addPlayerButton": "Add player",
+      "startButton": "Start game"
+    },
+    "errors": {
+      "hostNameRequired": "Enter your name to continue.",
+      "otherPlayersRequired": "Add at least one other player.",
+      "startFailed": "Couldn't start the game. Try again."
+    }
+  },
+  "room": {
+    "heading": "Rommi scoreboard",
+    "roundBanner": "Round {round} of {total} — {contract}",
+    "table": {
+      "player": "Player",
+      "total": "Total",
+      "leaderLabel": "Leader"
+    },
+    "score": {
+      "sectionHeading": "Round {round} scores",
+      "inputLabel": "{name}'s round {round} score",
+      "scoredLabel": "Scored",
+      "invalidError": "Enter a whole number of 0 or more."
+    },
+    "next": {
+      "button": "Next round"
+    },
+    "finish": {
+      "button": "Finish game"
+    },
+    "winner": {
+      "single": "{name} wins!",
+      "tie": "{names} tie for the win!"
+    },
+    "live": {
+      "scoreEntered": "{name} scored {points} points.",
+      "scoreEnteredLeading": "{name} scored {points} points — now leading."
+    },
+    "empty": {
+      "heading": "No local game in progress",
+      "body": "Start a new game from the home screen.",
+      "backHome": "Back to home"
+    }
   },
   "notFound": {
     "heading": "Page not found",

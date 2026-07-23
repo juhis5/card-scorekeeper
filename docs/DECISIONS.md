@@ -38,10 +38,25 @@ One line per decision made without the human (asleep during the overnight build)
   notification. — iOS Safari is a target platform; a persistence throw must not make the offline
   host unplayable.
 
+- 2026-07-24 — Slice 3 scoped to the playable local game flow only; the visible theme toggle and
+  locale switcher UI are deferred to the polish slice (8). — Dark theme + device locale already
+  default correctly from the scaffold (no-flash script + i18n detection), so a visible switcher is
+  polish, not core play. Keeps slice 3 focused and reviewable. Online join + connectivity probe
+  stay in slice 4 (slice 3 always starts a LOCAL game).
+
 ## Carried-forward TODOs (flagged by implementers, not yet wired)
 
-- Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap / first start-join — nothing
-  wires it yet, so `deviceUuid` stays `''` until then.
+- ~~Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap~~ — DONE in slice 3 (wired in
+  main.ts before router, so identity is set before the first nav guard).
 - Slice 4: the game store's only entry is `start()` (host: calls `createGame`). The online JOINER
   path needs a new store action (e.g. `join(repo, code)` that subscribes/addPlayer without
   createGame). The interface itself is stable; the store gains an action (not zero change).
+- Slice 5: reload/resume of an in-progress LOCAL game. `LocalGameRepository` persists to
+  localStorage, but the game store doesn't re-subscribe on mount — a hard reload mid-game loses
+  the in-memory store (repo data survives, nothing reads it back). RoomView degrades gracefully
+  (empty state → back home, no crash). Wire resume where offline robustness lives (slice 5).
+- Slice 6 (stats): local non-host players get a fresh synthetic `crypto.randomUUID()` per game
+  (slice 3), so their stats won't accumulate across local games. PLAN didn't pin local-player
+  identity; reconcile when building stats (device-UUID model assumes real devices).
+- Slice 8 (polish): slice 3 UI is behavior-tested + static-checked (tokens/a11y/i18n) but not yet
+  visually verified in a real browser at a phone viewport — do the cross-platform visual pass here.

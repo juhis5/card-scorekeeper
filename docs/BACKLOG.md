@@ -49,7 +49,12 @@ interface + `lib/`.
 
 ## Slice 3 — Core UI flow (offline-first, playable single-device)
 
-**Status: TODO** · depends: 2
+**Status: DONE** — full local game playable offline (setup → 5 rounds → winner, incl. ties).
+Home/GameSetup + RoomView + ScoreBoard/ContractBanner/PlayerScoreRow/RoundScoreInput/WinnerBanner,
+shadcn button/input/label/table/card. 80 tests, shuffle-stable. a11y (semantic table, live regions,
+44px, numeric inputmode), dark-first tokens, all-i18n. Fresh review: no blocks; 4 fixes applied
+(invalid-score feedback on the golden manual path, empty-state test, aria wiring, dead key).
+Not yet visually verified in a real browser — deferred to slice 8.
 Views + components wired to the game store via `LocalGameRepository`: Home (start game / join),
 Room/Scoreboard, round-score entry (`inputmode="numeric"`), contract banner ("Round 3 of 5 — …"),
 standings sorted ascending (leader = lowest), automatic winner declaration after round 5.

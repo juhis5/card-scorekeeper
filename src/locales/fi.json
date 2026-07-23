@@ -11,7 +11,57 @@
   },
   "home": {
     "heading": "Rommi-pisteet",
-    "tagline": "Pienin pistemäärä voittaa. Pisteet päivittyvät suorassa lähetyksessä."
+    "tagline": "Pienin pistemäärä voittaa. Pisteet päivittyvät suorassa lähetyksessä.",
+    "form": {
+      "heading": "Uusi paikallinen peli",
+      "hostNameLabel": "Oma nimesi",
+      "hostNamePlaceholder": "esim. Juho",
+      "otherPlayersHeading": "Muut pelaajat",
+      "otherPlayersEmpty": "Ei vielä muita pelaajia — lisää vähintään yksi aloittaaksesi.",
+      "nameLabel": "Pelaajan {number} nimi",
+      "removeLabel": "Poista pelaaja {number}",
+      "addPlayerButton": "Lisää pelaaja",
+      "startButton": "Aloita peli"
+    },
+    "errors": {
+      "hostNameRequired": "Anna nimesi jatkaaksesi.",
+      "otherPlayersRequired": "Lisää vähintään yksi muu pelaaja.",
+      "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen."
+    }
+  },
+  "room": {
+    "heading": "Rommi-pistetaulukko",
+    "roundBanner": "Kierros {round}/{total} — {contract}",
+    "table": {
+      "player": "Pelaaja",
+      "total": "Yhteensä",
+      "leaderLabel": "Johdossa"
+    },
+    "score": {
+      "sectionHeading": "Kierroksen {round} pisteet",
+      "inputLabel": "{name}: kierroksen {round} pisteet",
+      "scoredLabel": "Syötetty",
+      "invalidError": "Anna kokonaisluku, joka on 0 tai suurempi."
+    },
+    "next": {
+      "button": "Seuraava kierros"
+    },
+    "finish": {
+      "button": "Päätä peli"
+    },
+    "winner": {
+      "single": "{name} voittaa!",
+      "tie": "{names} jakavat voiton!"
+    },
+    "live": {
+      "scoreEntered": "{name} sai {points} pistettä.",
+      "scoreEnteredLeading": "{name} sai {points} pistettä — johtaa nyt."
+    },
+    "empty": {
+      "heading": "Ei käynnissä olevaa paikallista peliä",
+      "body": "Aloita uusi peli etusivulta.",
+      "backHome": "Takaisin etusivulle"
+    }
   },
   "notFound": {
     "heading": "Sivua ei löytynyt",
