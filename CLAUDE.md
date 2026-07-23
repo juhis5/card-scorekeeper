@@ -2,6 +2,17 @@
 
 Mobile-first web app: a host creates a room code, players join, scores sync **live** via Firestore. Low total wins after a fixed 5-round contract progression. Optional photo card-count via a Gemini serverless function. Persistent per-device stats. Full spec: `docs/PLAN.md`.
 
+## ⚠️ Scaffolding — one-time, DELETE this section once the app skeleton exists
+
+This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .gitignore .prettierrc.json .prettierignore`.
+
+- **One agent scaffolds this repo, alone.** No parallel agents here until the skeleton + first `pnpm install` exist — they race `package.json`/lockfile/config.
+- `create-vue` balks on a non-empty dir → scaffold into a **temp dir and copy generated files in**, keeping the committed ones. Avoid `--force`.
+- **Non-interactive:** `create-vue` prompts by default (an autonomous agent hangs). Pass flags — run `pnpm create vue@latest --help` for current names (typescript, pinia, vitest, playwright, eslint, prettier); don't hardcode from memory.
+- Pin `"packageManager": "pnpm@11.17.0"` in `package.json` (pnpm is installed via corepack).
+- Keep the committed `.prettierrc.json` as the formatting source of truth; merge create-vue's config, don't double-add deps.
+- After the first `pnpm install`, open `/hooks` once so the Prettier auto-format hook loads (this repo had no settings.json at session start).
+
 ## Stack
 
 - Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.
@@ -22,9 +33,15 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 
 ## Skills (in `.claude/skills/`)
 
-- `vue-pinia` — Vue 3.5 / Pinia 3 conventions + mobile-first rules. Read before any `.vue`/store/composable.
-- `firestore-realtime` — live sync, room-code flow, device-UUID identity, security rules, stats layer.
+- `vue-pinia` — Vue 3.5 / Pinia 3 conventions, lightweight architecture (GameRepository seam), mobile-first.
+- `clean-code` — naming, function size, typing, Prettier/ESLint. Read before writing any code.
+- `tdd` — pragmatic test-first (rules/stats strict, components behavior, rules on emulator, a few E2E).
+- `error-ux` — loading/empty/error/offline states, toasts, validation, confirms.
+- `a11y-mobile` — semantic HTML, focus, labels, live regions (score announcements), contrast, tap targets.
+- `pwa` — installable app + offline shell that makes offline host mode load (vite-plugin-pwa).
+- `firestore-realtime` — live sync, room-code flow, device-UUID identity, security rules, offline host mode, stats.
 - `vercel-gemini` — the optional room-gated photo card-count function.
+- `vercel-deploy` — vercel.json, /api runtime, Firebase public/secret env split, last-mile deploy steps.
 
 ## Commands
 
