@@ -79,6 +79,15 @@ src/
   main.ts
 ```
 
+## Architecture — lightweight layering, small components
+
+**Not** formal Clean Architecture (no use-case classes, no DI container, no per-entity ports) — that ceremony doesn't pay off at this size. Keep the one principle that does: **the domain doesn't depend on the framework or I/O.**
+
+- **Dependencies point inward.** `lib/` (pure domain — `rules.ts`, scoring, stats) imports nothing app-specific — no Vue, no Firebase/Gemini/`fetch`. Stores depend on `lib/` + adapter interfaces. Components depend on stores. Never the reverse.
+- **Invert I/O at the boundary.** The room/game store depends on a `GameRepository` **interface**, not on Firestore directly. That is exactly what makes offline mode a clean swap — a local repository vs a Firestore repository, with no change to the domain or UI. See `firestore-realtime`.
+- **Small components.** One responsibility each. When a component grows a second job, extract a child component or a composable. No business logic in templates — name it in a `computed` or move it to `lib/`. Compose small pieces instead of building big smart components.
+- **Don't abstract early.** One implementation? A plain function is fine. Introduce an interface only when there's a real second implementation (offline vs online here) or a real test seam — not speculatively.
+
 ## TypeScript
 
 - `strict: true`. No `any`. Domain types in `src/lib/types.ts` mirroring the data model in docs/PLAN.md.

@@ -79,6 +79,28 @@ Model host/player identity with the `device_uuid` (or a Firebase Anonymous Auth 
 
 That feature calls Gemini through the serverless function, gated by room code + session token — see the `vercel-gemini` skill. The function uses the **Admin SDK** (server-side) to verify the room; clients never use Admin credentials.
 
+## Offline host mode (required)
+
+The host must be able to run a full game with the backend unreachable. Because `lib/rules.ts` is pure (no network), offline is a data-layer swap, not a rewrite.
+
+- **Repository seam.** The room/game store depends on a `GameRepository` interface, never on Firestore directly:
+  ```ts
+  interface GameRepository {
+    createGame(config: GameConfig): Promise<GameId>
+    subscribe(onChange: (state: GameState) => void): Unsubscribe
+    setRoundScore(playerId: string, round: number, points: number): Promise<void>
+    finishGame(): Promise<GameResult>
+  }
+  ```
+  Two implementations, identical domain + UI above them:
+  - `FirestoreGameRepository` — online, live multi-device sync via `onSnapshot` + writes.
+  - `LocalGameRepository` — in-memory state persisted to localStorage; no network. `subscribe` re-emits local state on each mutation.
+- **Mode chosen on "start game".** Probe backend reachability (Firebase init / a lightweight connectivity check). Reachable → Firestore repo, generate a room code, players join. Unreachable → Local repo: **single-device host game** — the host enters everyone's scores, no room code, no remote join (the confirmed scope).
+- **Transient drops during an online game** are separate: enable Firestore offline persistence (`persistentLocalCache` in the modern SDK) so a synced game survives brief disconnects — cached reads, queued writes flushed on reconnect. This is "connection blipped mid-game", distinct from "never connected".
+- **Photo card-count is online-only** (needs Gemini). Detect offline and hide/disable the camera shortcut; manual entry (always available) is the offline path — make that obvious.
+- **Reconnect = push final result only (confirmed).** An offline game stays local its whole life. When connectivity returns, upload only the finished `game_result` + per-player `game_player` rows (keyed by device UUID) so stats/head-to-head stay complete. No live-room promotion, no mid-game merge, no conflict resolution. If still offline at game end, queue the result in localStorage and flush on the next launch that has a connection.
+- **What offline can't do:** remote players joining, live cross-device sync, photo-count. Everything else — rounds, contracts, scoring, standings, winner — works fully offline because the rules are pure.
+
 ## Free-tier hygiene
 
 - Unsubscribe listeners. Batch writes. Don't store per-keystroke updates.

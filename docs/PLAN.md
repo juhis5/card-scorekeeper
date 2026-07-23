@@ -23,6 +23,17 @@ thing that actually shapes the tech choice is **live sync**: when one person upd
 score, others should see it immediately. That rules out plain databases with no
 real-time layer (Neon, Turso) unless you hand-roll websockets or polling.
 
+## Offline host mode (required)
+
+The app must be playable by the **host on a single device with the backend unreachable**. Because the scoring rules are pure (no network), offline play is a swap of the data layer, not a rewrite of the game:
+
+- **On "start game", probe connectivity.** Reachable → normal synced room (players join by code, live sync). Unreachable → **local host game**: the host runs the scoreboard on their phone and enters everyone's scores; no room code, no remote players.
+- A **repository interface** abstracts the data layer so the domain and UI don't change between modes (local vs Firestore) — see the `firestore-realtime` skill.
+- **Firestore offline persistence** covers brief disconnects during an online game (queued writes, cached reads) — separate from "never connected".
+- **Photo card-count is online-only** (needs Gemini); offline falls back to manual entry, which is always available.
+- **Reconnect = push final result only.** Offline games stay local; when back online, only the finished `game_result` + `game_player` rows upload so stats stay complete. No mid-game merge or conflict resolution.
+- Offline cannot do: remote join, live cross-device sync, photo-count. Everything else works.
+
 ## Recommended stack: Firebase
 
 Firebase is built for exactly this live-sync, room-based pattern and has a generous
