@@ -11,7 +11,7 @@ Concrete and enforced, not vibes. Prettier owns formatting; ESLint owns correctn
 
 - **Prettier is the single source of truth for formatting.** Never argue with it, never hand-format. A repo-root `.prettierrc` config plus a `.prettierignore` define the style. It also runs automatically after edits (see the repo's `.claude/settings.json` hook) — so committed code is always formatted.
 - **ESLint** (flat config, `eslint-plugin-vue` + `typescript-eslint`) catches real problems: unused vars, `no-explicit-any`, unreachable code, missing `await`, Vue-specific pitfalls. Fix warnings; don't silence them with `// eslint-disable` unless you write why on the same line.
-- Install latest stable: `pnpm add -D prettier eslint eslint-plugin-vue typescript-eslint @vue/eslint-config-typescript @vue/eslint-config-prettier`.
+- Install latest stable: `pnpm add -D prettier prettier-plugin-tailwindcss eslint eslint-plugin-vue typescript-eslint @vue/eslint-config-typescript @vue/eslint-config-prettier`. `prettier-plugin-tailwindcss` auto-sorts Tailwind classes (it's in `.prettierrc.json`).
 - Scripts: `"lint": "eslint . --fix"`, `"format": "prettier --write ."`.
 
 ## Naming
@@ -60,4 +60,4 @@ Concrete and enforced, not vibes. Prettier owns formatting; ESLint owns correctn
 - `<script setup>` order: imports → props/emits/models → composables/stores → local state → computed → functions → lifecycle/watchers.
 - No logic in templates beyond simple expressions — move it to a `computed` with a name.
 - One responsibility per component; extract a child or composable when it grows two.
-- Scoped styles; no global leakage. Reuse design tokens/vars, don't re-hardcode colors and sizes.
+- Style with Tailwind utility classes bound to theme tokens (`bg-background`, `text-foreground`, `p-4`) — see `design-system`. No arbitrary values (`mt-[13px]`); use the scale. Reserve `<style scoped>` for the rare thing utilities can't express. Prefer shadcn-vue primitives over hand-built ones (see `component-library`).

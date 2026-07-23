@@ -10,12 +10,14 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - `create-vue` balks on a non-empty dir → scaffold into a **temp dir and copy generated files in**, keeping the committed ones. Avoid `--force`.
 - **Non-interactive:** `create-vue` prompts by default (an autonomous agent hangs). Pass flags — run `pnpm create vue@latest --help` for current names (typescript, pinia, vitest, playwright, eslint, prettier); don't hardcode from memory.
 - Pin `"packageManager": "pnpm@11.17.0"` in `package.json` (pnpm is installed via corepack).
+- After the skeleton: set up **Tailwind v4**, then `pnpm dlx shadcn-vue@latest init` and `add` components as needed (see `component-library`); fold its generated theme CSS into `design-system`'s dark-first values.
 - Keep the committed `.prettierrc.json` as the formatting source of truth; merge create-vue's config, don't double-add deps.
 - After the first `pnpm install`, open `/hooks` once so the Prettier auto-format hook loads (this repo had no settings.json at session start).
 
 ## Stack
 
 - Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.
+- UI: **Tailwind v4 + shadcn-vue** (Reka UI) — copy-in accessible components you own.
 - Package manager: **pnpm**. Always install the **latest stable** versions — version numbers in docs/skills are floors, not pins.
 - **Frontend hosting: Vercel** (git push → auto-deploy), same workflow as schedule-app. Firestore is host-agnostic, so live sync works fine from Vercel. (All-Firebase via Firebase Hosting is the alternative if we ever want single-vendor.)
 - Realtime backend: **Firebase / Firestore** (Spark free tier). Client SDK, no server for core play.
@@ -36,7 +38,8 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - `vue-pinia` — Vue 3.5 / Pinia 3 conventions, lightweight architecture (GameRepository seam), mobile-first.
 - `clean-code` — naming, function size, typing, Prettier/ESLint. Read before writing any code.
 - `tdd` — pragmatic test-first (rules/stats strict, components behavior, rules on emulator, a few E2E).
-- `design-system` — CSS-var tokens (color/type/space/radius/motion), dark-first theming + light, component look. The visual layer.
+- `design-system` — Tailwind v4 + shadcn theme tokens, dark-first theming + light, styling conventions. The visual layer.
+- `component-library` — shadcn-vue (Reka UI + Tailwind v4): setup, which primitive to use, own & tweak, keep a11y.
 - `error-ux` — loading/empty/error/offline states, toasts, validation, confirms.
 - `a11y-mobile` — semantic HTML, focus, labels, live regions (score announcements), contrast, tap targets.
 - `pwa` — installable app + offline shell that makes offline host mode load (vite-plugin-pwa).

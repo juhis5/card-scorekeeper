@@ -70,11 +70,11 @@ export const useRoomStore = defineStore('room', () => {
 
 ```
 src/
-  components/     PascalCase .vue
+  components/     PascalCase .vue  (ui/ = owned shadcn-vue primitives)
   views/          route-level components (Home, Room, Stats)
   stores/         Pinia setup stores (room, identity, stats)
   composables/    useX.ts
-  lib/            firebase init, types, scoring rules (the 5 contracts constant)
+  lib/            firebase init, types, scoring rules (the 5 contracts constant) + utils.ts (cn)
   App.vue
   main.ts
 ```
@@ -111,6 +111,7 @@ Phones held one-handed at a card table are the only real target.
 
 - `pnpm` for everything. `vue-tsc` in the build so type errors fail the build.
 - Minimal dependencies. Firebase modular SDK is the one big one — import only the pieces used (`firebase/app`, `firebase/firestore`).
+- UI is built on **shadcn-vue** (Reka UI + Tailwind v4) — copy-in, accessible components in `src/components/ui/`. See `component-library` + `design-system`.
 
 ## This project (card-scorekeeper)
 
