@@ -31,12 +31,12 @@ Run this loop:
 
 ## 4. Review the Sonnet code (you, Opus)
 - For each teammate result: read the diff, then run `pnpm build` and `pnpm test:run` yourself. Prettier runs automatically on edits via the repo hook.
-- Check against the skills: tests exist and are meaningful (not asserting trivia), clean code, no `any`, no secrets in the client, mobile-first respected.
+- Apply the **`review-checklist`** skill as the rubric: tests meaningful, every relevant skill followed, no `any`, no secrets in the client, no shortcut hacks, mobile-first + a11y respected.
 - Send fixes **back to the same teammate** via `SendMessage` (keeps their context) rather than silently fixing. Iterate until typecheck + tests are green.
 
 ## 5. Fresh-context review
 - With everything green, capture the full `git diff` of the feature and write a short **intent statement**: what the feature is and why it changed what it changed.
-- Spawn a **new** teammate (`general-purpose`, fresh context) passed **only** the diff + the intent — no plan, no conversation history. Prompt it to review for correctness, missed edge cases, security, and whether the code actually matches the stated intent, and to return concrete findings.
+- Spawn a **new** teammate (`general-purpose`, fresh context) passed **only** the diff + the intent — no plan, no conversation history. Tell it to apply the **`review-checklist`** skill as its rubric (correctness, regressions, test sufficiency, every project skill, security, a11y, maintainability/no-hacks) and whether the code matches the stated intent, and to return concrete findings ranked by severity.
 - Relay its findings to the user. Apply the agreed ones (back through the relevant teammate).
 
 ## Rules

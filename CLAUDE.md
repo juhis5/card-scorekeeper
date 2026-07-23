@@ -46,6 +46,7 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - `firestore-realtime` — live sync, room-code flow, device-UUID identity, security rules, offline host mode, stats.
 - `vercel-gemini` — the optional room-gated photo card-count function.
 - `vercel-deploy` — vercel.json, /api runtime, Firebase public/secret env split, last-mile deploy steps.
+- `review-checklist` — the merge gate: skills followed, no regressions, tests sufficient, security/a11y, no hacks. Used by `/feature` + standalone.
 
 ## Commands
 
