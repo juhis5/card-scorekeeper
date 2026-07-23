@@ -20,7 +20,8 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 - Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.
 - UI: **Tailwind v4 + shadcn-vue** (Reka UI) — copy-in accessible components you own.
 - Routing: **Vue Router**. i18n: **vue-i18n** (fi/en, device-default — no hardcoded strings).
-- Package manager: **pnpm**. Always install the **latest stable** versions — version numbers in docs/skills are floors, not pins.
+- Runtime: **Node 24** (current LTS; pinned in `.nvmrc`, matches local + CI). Not 22.
+- Package manager: **pnpm**. Always install the **latest stable** versions — version numbers in docs/skills are floors, not pins. Full policy + what's pinned: `docs/TOOLCHAIN.md`.
 - **Frontend hosting: Vercel** (git push → auto-deploy), same workflow as schedule-app. Firestore is host-agnostic, so live sync works fine from Vercel. (All-Firebase via Firebase Hosting is the alternative if we ever want single-vendor.)
 - Realtime backend: **Firebase / Firestore** (Spark free tier). Client SDK, no server for core play.
 - Optional photo-count: one **Vercel serverless function** (`/api`) holding the Gemini key, gated by room + session token. Not needed for manual scoring.
