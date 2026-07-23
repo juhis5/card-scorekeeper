@@ -1,0 +1,13 @@
+{
+  "app": {
+    "title": "Rommi Scorekeeper"
+  },
+  "home": {
+    "heading": "Rommi Scorekeeper",
+    "tagline": "Low score wins. Scores sync live."
+  },
+  "notFound": {
+    "heading": "Page not found",
+    "backHome": "Back to home"
+  }
+}

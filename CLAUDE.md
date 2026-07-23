@@ -2,19 +2,6 @@
 
 Mobile-first web app: a host creates a room code, players join, scores sync **live** via Firestore. Low total wins after a fixed 5-round contract progression. Optional photo card-count via a Gemini serverless function. Persistent per-device stats. Full spec: `docs/PLAN.md`.
 
-## ⚠️ Scaffolding — one-time, DELETE this section once the app skeleton exists
-
-This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .gitignore .prettierrc.json .prettierignore`.
-
-- **One agent scaffolds this repo, alone.** No parallel agents here until the skeleton + first `pnpm install` exist — they race `package.json`/lockfile/config.
-- `create-vue` balks on a non-empty dir → scaffold into a **temp dir and copy generated files in**, keeping the committed ones. Avoid `--force`.
-- **Non-interactive:** `create-vue` prompts by default (an autonomous agent hangs). Pass flags — run `pnpm create vue@latest --help` for current names (typescript, pinia, vitest, playwright, eslint, prettier); don't hardcode from memory.
-- Pin `"packageManager": "pnpm@11.17.0"` in `package.json` (pnpm is installed via corepack).
-- After the skeleton: set up **Tailwind v4**, then `pnpm dlx shadcn-vue@latest init` and `add` components as needed (see `component-library`); fold its generated theme CSS into `design-system`'s dark-first values.
-- Also add `vue-router` (see `routing`) + `vue-i18n` (see `i18n`), and wire git hooks: `husky` + `lint-staged` (pre-commit) + `commitlint` (commit-msg) + pre-push typecheck/test (see `git-workflow`).
-- Keep the committed `.prettierrc.json` as the formatting source of truth; merge create-vue's config, don't double-add deps.
-- After the first `pnpm install`, open `/hooks` once so the Prettier auto-format hook loads (this repo had no settings.json at session start).
-
 ## Stack
 
 - Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.

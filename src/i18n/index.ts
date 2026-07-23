@@ -1,0 +1,40 @@
+import { createI18n } from 'vue-i18n'
+import en from '@/locales/en.json'
+import fi from '@/locales/fi.json'
+
+// `./messages.d.ts` augments vue-i18n's `DefineLocaleMessage` with `MessageSchema` so every
+// `t()`/`$t()` call below is type-checked and autocompleted against `en.json`.
+
+export const SUPPORTED_LOCALES = ['en', 'fi'] as const
+export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
+
+const LOCALE_STORAGE_KEY = 'locale'
+
+function isSupportedLocale(value: string | null): value is SupportedLocale {
+  return SUPPORTED_LOCALES.includes(value as SupportedLocale)
+}
+
+/** Device-default locale: a persisted choice wins, else the browser language, else `en`. */
+function detectLocale(): SupportedLocale {
+  const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
+  if (isSupportedLocale(stored)) return stored
+
+  const deviceLanguage = navigator.language.slice(0, 2)
+  return isSupportedLocale(deviceLanguage) ? deviceLanguage : 'en'
+}
+
+export const i18n = createI18n({
+  legacy: false,
+  locale: detectLocale(),
+  fallbackLocale: 'en',
+  messages: { en, fi },
+})
+
+/** Persist a locale choice and reflect it on `<html lang>` for a11y. */
+export function setLocale(locale: SupportedLocale): void {
+  i18n.global.locale.value = locale
+  localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+  document.documentElement.lang = locale
+}
+
+document.documentElement.lang = i18n.global.locale.value

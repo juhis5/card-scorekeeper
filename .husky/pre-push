@@ -1,0 +1,1 @@
+pnpm exec vue-tsc --build && pnpm test:run

@@ -26,3 +26,10 @@ pnpm-debug.log*
 
 # test
 coverage/
+__screenshots__/
+test-results/
+playwright-report/
+
+# build/lint caches
+*.tsbuildinfo
+.eslintcache

@@ -1,0 +1,13 @@
+{
+  "app": {
+    "title": "Rommi-pisteet"
+  },
+  "home": {
+    "heading": "Rommi-pisteet",
+    "tagline": "Pienin pistemäärä voittaa. Pisteet päivittyvät suorassa lähetyksessä."
+  },
+  "notFound": {
+    "heading": "Sivua ei löytynyt",
+    "backHome": "Takaisin etusivulle"
+  }
+}

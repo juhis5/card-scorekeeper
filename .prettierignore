@@ -4,3 +4,8 @@ dist-ssr
 coverage
 pnpm-lock.yaml
 .vercel
+
+# project docs/config are hand-formatted; don't let `pnpm format` reformat them
+.claude
+docs
+CLAUDE.md
