@@ -7,9 +7,9 @@
   "exclude": [],
 
   "compilerOptions": {
-    // Vitest runs in a different environment than the application code.
-    // Adjust lib and types accordingly.
-    "lib": [],
+    // Tests run under happy-dom, which emulates the browser DOM, so component tests need the
+    // same DOM lib as the app. Inherit `lib` from tsconfig.app.json (es2022 + dom + dom.iterable)
+    // instead of overriding it — only `types` differs for the Vitest/node test environment.
     "types": ["node", "vitest/globals"],
 
     // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
