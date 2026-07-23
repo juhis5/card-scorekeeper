@@ -35,7 +35,10 @@ Player, RoundScore, GameState, GameResult, contracts, card enums). `src/lib/rule
 
 ## Slice 2 — Repository seam + local repo + game store — STRICT TDD (logic)
 
-**Status: TODO** · depends: 1
+**Status: DONE** — `GameRepository` interface + `LocalGameRepository` (shape-validated storage,
+best-effort persist) + identity & game stores; store is repo-agnostic (no firebase import).
+63 tests, shuffle-stable. Fresh review: no blocks; 2 should-fixes + iOS-persist nit applied.
+Host seated as player 1 (invariant). Also fixed `tsconfig.vitest` DOM lib (unblocks slice 3).
 `GameRepository` interface (per firestore-realtime skill). `LocalGameRepository` (in-memory +
 localStorage, `subscribe` re-emits on mutation; no network). `identity` store (device UUID +
 editable display name, persisted via pinia-plugin-persistedstate). `game`/`room` store: setup
