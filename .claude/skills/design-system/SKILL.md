@@ -37,9 +37,38 @@ Styling engine is **Tailwind v4**; the palette lives in **shadcn-vue's CSS-varia
   --color-primary: var(--primary); --color-primary-foreground: var(--primary-foreground);
   --color-destructive: var(--destructive); --color-border: var(--border); --color-ring: var(--ring);
 }
+
+/* Motion — shared across themes */
+:root { --dur-fast: 120ms; --dur: 200ms; }
+@theme { --ease-standard: cubic-bezier(0.2, 0, 0.2, 1); }   /* generates the `ease-standard` utility */
 ```
 
 The CLI writes this scaffolding (v4 uses **oklch** by default — hex or oklch both fine). Our job: **set the values dark-first, keep the token names.** Every pair passes the `a11y-mobile` contrast bar (≥ 4.5:1 text) in **both** themes.
+
+## Token map (nothing was lost adopting Tailwind)
+
+Colors weren't dropped — they were renamed to shadcn's semantic tokens; scales became Tailwind's built-in ones:
+
+| Earlier hand-rolled draft | Now (shadcn token → utility) |
+|---|---|
+| `--bg` | `--background` → `bg-background` |
+| `--surface` | `--card` → `bg-card` |
+| `--surface-2` (elevated) | `--muted` → `bg-muted` |
+| `--text` | `--foreground` → `text-foreground` |
+| `--text-muted` | `--muted-foreground` → `text-muted-foreground` |
+| `--primary` / `--primary-contrast` | `--primary` / `--primary-foreground` |
+| `--border` / `--focus` | `--border` / `--ring` |
+| `--danger` | `--destructive` |
+| `--space-*`, `--text-*`, radius scales | Tailwind's built-in scale (`p-4`, `text-lg`, `rounded-lg`); custom values go in `@theme` |
+
+Elevation is still three levels: `background` (base) → `card` → `muted`.
+
+## Motion tokens
+
+Named motion lives in the CSS block above:
+- **Easing:** `--ease-standard` is registered in `@theme`, so use the `ease-standard` utility.
+- **Duration:** `--dur-fast` / `--dur` are plain vars (Tailwind has no named-duration utility) — use `duration-[var(--dur)]`, or Tailwind's numeric `duration-200`.
+- Gate non-essential motion so it respects `prefers-reduced-motion` (see `a11y-mobile`), e.g. the live score-change highlight → `class="transition-colors duration-[var(--dur)] ease-standard motion-reduce:transition-none"`.
 
 ## Theming behavior (dark default)
 
