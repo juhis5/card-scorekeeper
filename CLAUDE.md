@@ -27,7 +27,8 @@ This repo is **not empty**. Do not clobber: `.git/ .claude/ docs/ CLAUDE.md .git
 
 ## Golden rules
 
-- **Mobile-first, one-handed at a card table.** Single column readable for 2–6 players on a phone, ≥44px tap targets, primary actions in the thumb zone. Live updates only — never a manual refresh button.
+- **Mobile-first, one-handed at a card table.** Single column readable for 2–6 players on a phone, ≥44px tap targets, primary actions in the thumb zone. Live updates only — never a manual refresh button. Mobile-first, not mobile-only.
+- **Target platforms.** Must work on **Android (Chrome), iOS (Safari), and desktop browsers** (Chromium/Firefox/Safari). Responsive ~360px→desktop (cap + center, no overflow on wide screens); camera (photo-count) falls back to a file picker on desktop; usable by touch **and** mouse/keyboard. Test on the three.
 - **Firestore rules are the security boundary**, not the UI. Any player edits their own score; the host edits anyone's — enforced in `firestore.rules`.
 - **Firebase web config is public** (`VITE_FIREBASE_*`) — fine. The **Gemini key is not** — it lives only in the serverless function env.
 - **Fixed rules live in code**, not the DB: the 5 contracts and card values (number=face, J/Q/K=10, Ace=15, Joker=25) go in `src/lib/rules.ts`. Low score wins.

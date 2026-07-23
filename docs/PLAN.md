@@ -17,6 +17,7 @@ Finalised during planning. **This section wins** over the "Recommended/Alternati
 - **Realtime backend:** **Firebase / Firestore** (Spark free tier). **Supabase is NOT used** — kept below only as the alternative that was weighed.
 - **Frontend hosting:** **Vercel** (Firestore is host-agnostic; consistency with schedule-app). The optional photo-count function is a **Vercel** `/api` function — not Firebase Cloud Functions.
 - **UI:** Tailwind v4 + shadcn-vue (Reka UI); **dark-default** theme (light via toggle). Vue Router; vue-i18n (fi/en, device-default — no hardcoded strings).
+- **Target platforms:** must work on **Android (Chrome), iOS (Safari), and desktop browsers** — mobile-first, not mobile-only. Responsive ~360px→desktop (no overflow on wide screens); camera (photo-count) → file-upload fallback on desktop.
 - **Offline host mode:** required (see the section above) — `GameRepository` seam, single-device local game, reconnect pushes final result only.
 - **Vision (optional):** Gemini Flash, free-tier key, room + session-token gated; image downscaled client-side.
 - **Testing/quality:** Vitest + @vue/test-utils + Playwright + Firebase emulator (rules), pragmatic TDD; PWA shell (makes offline load); Prettier + ESLint; Conventional Commits + git hooks + CI.

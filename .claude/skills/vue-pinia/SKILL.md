@@ -101,13 +101,15 @@ src/
 
 ## Mobile-first (hard requirement — see docs/PLAN.md)
 
-Phones held one-handed at a card table are the only real target.
+Phones held one-handed at a card table are the **primary** target — but the app must also run correctly on desktop browsers (see Target platforms below). Mobile-first, not mobile-only.
 
 - Single-column layout; scoreboard readable for a typical group (2–6) on a 360–390px screen.
 - Tap targets ≥ 44×44px. Primary actions (enter score, next round, snap hand) in the thumb zone at the bottom.
 - Respect notches: `padding: env(safe-area-inset-*)`.
 - Camera is first-class for photo card-count: `<input type="file" accept="image/*" capture="environment">`.
 - Live scores must update without any refresh — never add a manual "refresh" button.
+- Also confirm it stays usable up to desktop widths — cap + center content, never overflow on wide screens. Mobile-first, not mobile-only.
+- **Target platforms:** must work on **Android (Chrome), iOS (Safari), and desktop browsers** (Chromium/Firefox/Safari). Camera (photo-count) degrades to a file picker on desktop; usable by touch **and** mouse/keyboard (no hover-only actions — see `a11y-mobile`).
 
 ## Tooling
 
