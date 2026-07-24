@@ -122,7 +122,10 @@ start→finish; the two offline modes are visually distinguished.
 
 ## Slice 6 — Persistent stats + head-to-head — STRICT TDD (derivation)
 
-**Status: 6-backend DONE / 6-ui TODO** · depends: 4 (5 helps but not required)
+**Status: DONE** · depends: 4 (5 helps but not required)
+6-ui DONE: `useStatsStore` (uid-keyed, two-pass chunked query, graceful-degrade to error) +
+StatsView + StatSummary/StatTile/HeadToHeadList + `/stats` route + header/Home nav + identity
+caveats + i18n. 242 tests, shuffle-stable. Fresh review: no blocks (3 cosmetic nits → polish).
 6-backend DONE: `lib/stats.ts` pure derivation (win-rate, best/worst final+round, averages,
 head-to-head — TDD); both repos persist at finish (Firestore `game_result`/`game_player`
 uid-keyed; local queues + reconnect-flush pushes host's own row); append-only rules with

@@ -7,6 +7,9 @@
       "dismiss": "Sulje"
     }
   },
+  "nav": {
+    "stats": "Tilastot"
+  },
   "contract": {
     "round1": "Kaksi kolmen sarjaa",
     "round2": "Yksi kolmen sarja ja yksi värisuora",
@@ -18,6 +21,7 @@
     "heading": "Rommi-pisteet",
     "tagline": "Pienin pistemäärä voittaa. Pisteet päivittyvät suorassa lähetyksessä.",
     "orDivider": "tai",
+    "statsLink": "Katso tilastosi",
     "form": {
       "heading": "Uusi peli",
       "hostNameLabel": "Oma nimesi",
@@ -95,5 +99,39 @@
   "notFound": {
     "heading": "Sivua ei löytynyt",
     "backHome": "Takaisin etusivulle"
+  },
+  "stats": {
+    "heading": "Omat tilastosi",
+    "loading": "Ladataan tilastojasi…",
+    "caveats": {
+      "heading": "Tietoa tilastoista",
+      "body": "Tilastot seuraavat tätä laitetta: uusi laite tai tyhjennetty selaimen tallennustila aloittaa alusta; jaettu laite sekoittaa pelaajien tilastot keskenään; eivätkä tilastot synkronoidu laitteidesi välillä."
+    },
+    "empty": {
+      "message": "Ei vielä päättyneitä pelejä — pelaa peli!"
+    },
+    "error": {
+      "message": "Tilastojen lataus epäonnistui. Tarkista yhteytesi ja yritä uudelleen.",
+      "retry": "Yritä uudelleen"
+    },
+    "summary": {
+      "heading": "Yhteenveto",
+      "gamesPlayed": "Pelattuja pelejä",
+      "wins": "Voittoja",
+      "winRate": "Voittoprosentti",
+      "averageFinalScore": "Keskimääräinen loppupistemäärä",
+      "bestFinalScore": "Paras loppupistemäärä",
+      "worstFinalScore": "Huonoin loppupistemäärä",
+      "bestRound": "Paras yksittäinen kierros",
+      "worstRound": "Huonoin yksittäinen kierros",
+      "noValue": "–"
+    },
+    "headToHead": {
+      "heading": "Keskinäiset ottelut",
+      "opponent": "Vastustaja",
+      "recordHeader": "V–H–T",
+      "recordCompact": "{wins} V – {losses} H – {ties} T",
+      "empty": "Ei vielä yhteisiä pelejä muiden pelaajien kanssa."
+    }
   }
 }

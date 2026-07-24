@@ -7,6 +7,9 @@
       "dismiss": "Dismiss"
     }
   },
+  "nav": {
+    "stats": "Stats"
+  },
   "contract": {
     "round1": "Two sets of three",
     "round2": "One set of three and one flush",
@@ -18,6 +21,7 @@
     "heading": "Rommi Scorekeeper",
     "tagline": "Low score wins. Scores sync live.",
     "orDivider": "or",
+    "statsLink": "View your stats",
     "form": {
       "heading": "New game",
       "hostNameLabel": "Your name",
@@ -95,5 +99,39 @@
   "notFound": {
     "heading": "Page not found",
     "backHome": "Back to home"
+  },
+  "stats": {
+    "heading": "Your stats",
+    "loading": "Loading your stats…",
+    "caveats": {
+      "heading": "About these stats",
+      "body": "Stats follow this device: a new device or cleared browser storage starts fresh; a shared device blends players; and stats don't sync across your devices."
+    },
+    "empty": {
+      "message": "No finished games yet — play a game!"
+    },
+    "error": {
+      "message": "Couldn't load your stats. Check your connection and try again.",
+      "retry": "Retry"
+    },
+    "summary": {
+      "heading": "Summary",
+      "gamesPlayed": "Games played",
+      "wins": "Wins",
+      "winRate": "Win rate",
+      "averageFinalScore": "Average final score",
+      "bestFinalScore": "Best final score",
+      "worstFinalScore": "Worst final score",
+      "bestRound": "Best single round",
+      "worstRound": "Worst single round",
+      "noValue": "–"
+    },
+    "headToHead": {
+      "heading": "Head-to-head",
+      "opponent": "Opponent",
+      "recordHeader": "W–L–T",
+      "recordCompact": "{wins} W – {losses} L – {ties} T",
+      "empty": "No shared games yet with other players."
+    }
   }
 }

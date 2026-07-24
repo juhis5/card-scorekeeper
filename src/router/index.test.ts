@@ -25,4 +25,18 @@ describe('router guard: requiresIdentity', () => {
 
     expect(router.currentRoute.value.name).toBe('room')
   })
+
+  it('redirects to home when navigating to stats with no device identity yet', async () => {
+    await router.push({ name: 'stats' })
+
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('allows navigation to stats once a device identity exists', async () => {
+    useIdentityStore().ensureDeviceUuid(() => 'device-1')
+
+    await router.push({ name: 'stats' })
+
+    expect(router.currentRoute.value.name).toBe('stats')
+  })
 })

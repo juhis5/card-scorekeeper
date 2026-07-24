@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterView, useRoute } from 'vue-router'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { X } from '@lucide/vue'
+import { ChartColumn, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { useServiceWorker } from '@/composables/useServiceWorker'
 
@@ -35,6 +35,24 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
   >
     <div aria-live="polite" role="status" class="sr-only">{{ routeAnnouncement }}</div>
     <div aria-live="polite" role="status" class="sr-only">{{ updateAnnouncement }}</div>
+
+    <!-- Persistent chrome (see the routing skill): reachable from every route, incl. mid-game,
+         since stats are a device-wide record, not tied to any one room. -->
+    <header class="mx-auto flex w-full max-w-md items-center justify-between px-4 pt-2">
+      <RouterLink
+        :to="{ name: 'home' }"
+        class="text-foreground focus-visible:ring-ring flex h-11 items-center rounded-sm text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {{ t('app.title') }}
+      </RouterLink>
+      <RouterLink
+        :to="{ name: 'stats' }"
+        class="text-primary focus-visible:ring-ring flex h-11 items-center gap-1 rounded-sm px-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+      >
+        <ChartColumn aria-hidden="true" class="size-4" />
+        {{ t('nav.stats') }}
+      </RouterLink>
+    </header>
 
     <div
       v-if="needRefresh"

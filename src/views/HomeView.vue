@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { RouterLink } from 'vue-router'
 import GameSetup from '@/components/GameSetup.vue'
 import JoinGame from '@/components/JoinGame.vue'
 
@@ -27,5 +28,11 @@ const { t } = useI18n()
       <span aria-hidden="true" class="bg-border h-px flex-1" />
     </div>
     <JoinGame />
+    <RouterLink
+      :to="{ name: 'stats' }"
+      class="text-muted-foreground hover:text-foreground flex h-11 items-center justify-center self-center text-sm underline underline-offset-4"
+    >
+      {{ t('home.statsLink') }}
+    </RouterLink>
   </main>
 </template>

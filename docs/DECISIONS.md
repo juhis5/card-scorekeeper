@@ -292,3 +292,8 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   own `vitest.integration.config.ts`, OUT of `test:run`/CI/hooks. The join-order correctness it
   demonstrates is ALSO covered by a deterministic store-level `callOrder` unit test. Per tdd's flake
   rules this is the "quarantine with documented root cause" path, not a silent skip.
+
+## Polish-slice nits (swept in slice 8)
+
+- `src/stores/stats.ts` — replace the ad-hoc `as { finishedAt: string }` cast with `as GameResult`
+  (the domain type already has the field) for clean-code consistency. (Nit, 6-ui review.)

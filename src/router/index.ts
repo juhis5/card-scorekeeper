@@ -11,7 +11,7 @@ declare module 'vue-router' {
     /** Redirect home when no device identity exists yet — set by useIdentityStore in main.ts. */
     requiresIdentity?: boolean
     /** i18n key for this route's heading, announced via a polite live region on navigation. */
-    announceKey?: 'home.heading' | 'room.heading' | 'notFound.heading'
+    announceKey?: 'home.heading' | 'room.heading' | 'stats.heading' | 'notFound.heading'
   }
 }
 
@@ -32,6 +32,15 @@ const router = createRouter({
       name: 'room',
       component: () => import('@/views/RoomView.vue'),
       meta: { requiresIdentity: true, announceKey: 'room.heading' },
+    },
+    {
+      path: '/stats',
+      name: 'stats',
+      component: () => import('@/views/StatsView.vue'),
+      // Guards on the identity store's deviceUuid, same as /room — belt-and-suspenders: main.ts
+      // already assigns it before the router's first navigation, and useStatsStore itself keys
+      // on the separate Firebase Anonymous Auth uid (see its doc comment), not this deviceUuid.
+      meta: { requiresIdentity: true, announceKey: 'stats.heading' },
     },
     {
       path: '/:pathMatch(.*)*',
