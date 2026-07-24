@@ -7,10 +7,16 @@ Not pushed (no remote). `main` untouched.
 
 **State: all core priorities (1–3) + the optional photo-count (4) shipped, green, and self-reviewed.**
 
-- **418 automated tests green:** 300 unit/component (`pnpm test:run`, happy-dom, no network) · 72
-  serverless-function tests (`pnpm test:api`, SDKs mocked) · 46 Firestore-rules tests on the emulator
-  (`pnpm test:rules`) · 1 two-client live-sync Playwright e2e (`pnpm test:e2e`, chromium+firefox).
+- **418 automated tests green across the always-on suites** = 300 unit/component (`pnpm test:run`,
+  happy-dom, no network) + 72 serverless-function tests (`pnpm test:api`, SDKs mocked) + 46
+  Firestore-rules tests on the emulator (`pnpm test:rules`). Plus a two-client live-sync Playwright
+  e2e (`pnpm test:e2e`, chromium+firefox) and a quarantined emulator integration test — both run
+  separately, not in the 418.
 - `pnpm build` (vue-tsc typecheck + vite build) and `pnpm lint` clean.
+- **The offline local game was also played end-to-end in a desktop browser** (blank config → Start →
+  degrade-to-local → `/room/local` → 5 rounds with the correct contracts + live-sorted standings +
+  polite announcements → Finish → correct winner), with zero console errors — verifying the composed
+  golden-rule path the unit/component tests can't (real router + dynamic import + served bundle).
 - 19 Conventional-Commit commits, one per slice (+ a couple of config/docs commits).
 
 ## What shipped, per slice
@@ -87,8 +93,10 @@ None of these block the build; they need things not available in an autonomous s
    Android (Chrome) — the pure logic is tested; the DOM/camera bits are mocked.
 5. **Vercel build/deploy** (the `/api` `_lib` routing, the `../../src/lib` import under the function
    bundler, ESM) is unverified until a first real `vercel` deploy.
-6. **Cross-platform visual pass** on the three target platforms is a human step (agents did real-Chrome
-   passes for offline cold-start, the online e2e flow, and the theme/locale toggles).
+6. **Cross-platform visual pass** — the core offline game flow IS verified in **desktop Chrome**
+   (a full local game to a winner, plus offline cold-start, the online e2e flow, and theme/locale
+   toggles across the build). Still a human step: **real Android (Chrome) and real iPhone (Safari)** —
+   touch targets, camera, and Safari-specific behavior on actual devices.
 7. Cosmetic: light-mode `<meta name="theme-color">` stays dark-tinted; the shadcn Sheet's built-in
    "Close" label is hardcoded English but unreachable (the sheet hides it). Both noted in DECISIONS.
 
