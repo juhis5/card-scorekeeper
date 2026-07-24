@@ -168,10 +168,15 @@ unit-tested with mocks; frontend confirm/edit flow works; manual entry still the
 
 ## Slice 8 — Polish, cross-platform pass, deploy docs
 
-**Status: TODO** · depends: all above
-Final `vercel.json` (SPA routing, /api runtime), README run instructions, cross-platform +
-responsive review (Android Chrome / iOS Safari / desktop; 360px→wide, no overflow), reduced-motion
-on score flashes / win celebration, final a11y + review-checklist pass. Feeds `docs/BUILD_REPORT.md`.
+**Status: DONE** · depends: all above
+Theme toggle + locale switcher shipped; reduced-motion gated (unlayered media query — only the Sheet
+had motion); CI now runs `test:rules` on the emulator; `vercel.json` in place (slice 7a); stats nit
+swept. `docs/BUILD_REPORT.md` written. Full regression green: 300 unit/component + 72 api + 46 rules
++ 1 two-client e2e; build + lint clean. Cross-platform/real-device visual + camera pass + live-key
+deploy are documented human next steps in BUILD_REPORT (can't be done in an autonomous sandbox).
+
+**BUILD COMPLETE** — priorities 1–3 solid + optional 4 shipped, all green and self-reviewed on
+`feat/initial-build`. See `docs/BUILD_REPORT.md`.
 
 ---
 
