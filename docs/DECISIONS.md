@@ -297,3 +297,9 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
 
 - `src/stores/stats.ts` — replace the ad-hoc `as { finishedAt: string }` cast with `as GameResult`
   (the domain type already has the field) for clean-code consistency. (Nit, 6-ui review.)
+
+- 2026-07-24 — Photo-count gate (slice 7) uses the caller's FIREBASE ID TOKEN (verified by the
+  Admin SDK) + room membership, NOT the skill's self-asserted `sessionToken` field. — Consistent
+  with the anon-auth decision and not forgeable (same lesson as the stats-forgery fix): the client
+  sends its Firebase ID token, the function verifies it → uid → checks the room exists/active/
+  not-expired AND `players/{uid}` exists in it. A self-asserted token field would be spoofable.
