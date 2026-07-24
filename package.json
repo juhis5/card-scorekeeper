@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:api": "vitest run --config vitest.api.config.ts",
     "test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'",
     "test:integration": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.integration.config.ts'",
     "e2e": "playwright test",
@@ -22,11 +23,13 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@google/genai": "^2.13.0",
     "@lucide/vue": "^1.25.0",
     "@vueuse/core": "^14.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.16.0",
+    "firebase-admin": "^14.2.0",
     "pinia": "^4.0.2",
     "pinia-plugin-persistedstate": "^4.7.1",
     "reka-ui": "^2.10.1",

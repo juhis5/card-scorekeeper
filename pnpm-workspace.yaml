@@ -1,5 +1,10 @@
 allowBuilds:
   '@firebase/util': true
+  # The `prepare` script (scripts/prepare.js) is a source-repo build step whose file isn't even
+  # present in the published tarball — the package ships prebuilt dist/ output (verified: dist/
+  # already contains node/index.mjs + node/node.d.ts as installed). Nothing to build; denied like
+  # sharp below, for the same "nothing here calls it" reason.
+  '@google/genai': false
   protobufjs: true
   re2: true
   # sharp is pulled in only as vite-plugin-pwa's OPTIONAL peer `@vite-pwa/assets-generator` (its

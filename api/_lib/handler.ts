@@ -1,0 +1,124 @@
+/**
+ * Orchestrates the `/api/count` request: wires the pure gate/rate-limit/extraction logic plus the
+ * two SDK boundaries (`verifyIdToken`/`getRoomSnapshot` from the Admin SDK, `geminiClient` from
+ * the Gemini SDK) together. Every dependency is injected via `CountHandlerDeps`, so this whole
+ * function is unit-testable with fakes — no real Firebase project or Gemini API key needed (see
+ * the tdd skill). `api/count.ts` is the thin Vercel adapter that wires the real SDKs and calls
+ * this.
+ *
+ * Gate order (cheapest checks first, per the vercel-gemini skill's "layered protection"):
+ *   1. method + request shape (no I/O)               → 405 / 400
+ *   2. Firebase ID token (Admin SDK verify)            → 401
+ *   3. room exists/active + caller is a member         → 403
+ *   4. per-room, then global rate limit                → 429
+ *   5. image size cap                                  → 413
+ *   6. Gemini call + output validation                 → 502 / 422
+ *   7. success — server-recomputed cards + total       → 200
+ */
+import { parseBearerToken, parseCountRequestBody } from './request'
+import { authenticateRequest, evaluateRoomGate, type RoomSnapshot } from './gate'
+import { checkRateLimit, type RateLimitConfig, type RateLimitStore } from './rate-limit'
+import { exceedsSizeCap } from './image'
+import { parseModelOutput, buildExtractionResult } from './extraction'
+import type { GeminiClient } from './gemini'
+import type { CountResponseBody } from './types'
+
+/** A hand-count happens a few times per round; 30 calls per 15 minutes comfortably covers every
+ * player photographing their hand every round of a single game, without leaving headroom for
+ * draining the shared free-tier quota (see docs/PLAN.md "Protecting your Gemini free tier"). */
+const PER_ROOM_RATE_LIMIT: RateLimitConfig = { windowMs: 15 * 60 * 1000, maxRequests: 30 }
+
+/** Backstop across every room so nobody beats the per-room cap by spinning up many fake rooms. */
+const GLOBAL_RATE_LIMIT: RateLimitConfig = { windowMs: 60 * 60 * 1000, maxRequests: 300 }
+const GLOBAL_RATE_LIMIT_KEY = 'global'
+
+/** Minimal request shape this handler needs — deliberately not `@vercel/node`'s `VercelRequest`,
+ * so tests can pass plain objects. The real Vercel Node runtime provides exactly this shape
+ * (pre-parsed JSON `body`, lower-cased `headers`) without needing that package. */
+export interface CountApiRequest {
+  method?: string
+  headers: Record<string, string | string[] | undefined>
+  body: unknown
+}
+
+export interface CountApiResult {
+  status: number
+  body: CountResponseBody | { error: string }
+}
+
+export interface CountHandlerDeps {
+  verifyIdToken: (idToken: string) => Promise<{ uid: string }>
+  getRoomSnapshot: (roomCode: string, uid: string) => Promise<RoomSnapshot>
+  rateLimitStore: RateLimitStore
+  geminiClient: GeminiClient
+  /** Injected clock — deterministic tests for the rate-limit/room-expiry checks. */
+  now: () => number
+}
+
+export async function handleCountRequest(
+  req: CountApiRequest,
+  deps: CountHandlerDeps,
+): Promise<CountApiResult> {
+  if (req.method !== 'POST') {
+    return { status: 405, body: { error: 'method_not_allowed' } }
+  }
+
+  const parsedBody = parseCountRequestBody(req.body)
+  if (!parsedBody) {
+    return { status: 400, body: { error: 'invalid_request' } }
+  }
+
+  const token = parseBearerToken(req.headers.authorization)
+  const authResult = await authenticateRequest(token, deps.verifyIdToken)
+  if (!authResult.ok) {
+    return { status: 401, body: { error: 'unauthenticated' } }
+  }
+
+  const nowMs = deps.now()
+  const room = await deps.getRoomSnapshot(parsedBody.roomCode, authResult.uid)
+  const gateResult = evaluateRoomGate(room, nowMs)
+  if (!gateResult.ok) {
+    return { status: 403, body: { error: `room_${gateResult.reason}` } }
+  }
+
+  const perRoomAllowed = await checkRateLimit(
+    deps.rateLimitStore,
+    `room:${parsedBody.roomCode}`,
+    PER_ROOM_RATE_LIMIT,
+    nowMs,
+  )
+  if (!perRoomAllowed) {
+    return { status: 429, body: { error: 'room_rate_limited' } }
+  }
+
+  const globalAllowed = await checkRateLimit(
+    deps.rateLimitStore,
+    GLOBAL_RATE_LIMIT_KEY,
+    GLOBAL_RATE_LIMIT,
+    nowMs,
+  )
+  if (!globalAllowed) {
+    return { status: 429, body: { error: 'global_rate_limited' } }
+  }
+
+  if (exceedsSizeCap(parsedBody.image)) {
+    return { status: 413, body: { error: 'image_too_large' } }
+  }
+
+  let rawText: string
+  try {
+    rawText = await deps.geminiClient.extractCards(parsedBody.image, parsedBody.mimeType)
+  } catch {
+    // Upstream Gemini failure (quota, network, ...) — distinct from a shape problem below, so the
+    // UI could in principle distinguish "try again" from "type it in" (both fall back to manual
+    // entry today either way).
+    return { status: 502, body: { error: 'model_unavailable' } }
+  }
+
+  const cards = parseModelOutput(rawText)
+  if (!cards) {
+    return { status: 422, body: { error: 'malformed_model_output' } }
+  }
+
+  return { status: 200, body: buildExtractionResult(cards) }
+}

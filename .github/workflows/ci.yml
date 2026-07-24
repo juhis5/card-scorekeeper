@@ -22,6 +22,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test:run
+      - run: pnpm test:api # /api/count — fully mocked (Admin SDK + Gemini), no emulator/creds
       - run: pnpm build # runs vue-tsc (typecheck) + build
       # When Firestore rules change, add a job that runs them on the emulator:
       # - run: pnpm test:rules   (needs firebase-tools + Java; see firestore-realtime / tdd)

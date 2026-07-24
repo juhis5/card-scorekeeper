@@ -142,7 +142,16 @@ a game writes permanent records; stats + head-to-head compute correctly; offline
 
 ## Slice 7 — OPTIONAL photo card-count (`/api` + frontend) — do only after 1–6 solid
 
-**Status: TODO** · depends: 6 · OPTIONAL
+**Status: 7a DONE / 7b TODO** · depends: 6 · OPTIONAL
+7a DONE: `api/count.ts` (+ `api/_lib/*`) — Vercel Node fn; ID-token + room-membership gate;
+per-room + global rate limits (injectable store, in-memory placeholder — NOT prod-scale, flagged);
+server-side total recompute via direct `rules.ts` import; `@google/genai` `gemini-2.5-flash`,
+temp 0, enum-constrained rank output; secrets server-only (no leak into client `dist/`, verified);
+72 node-env api tests + `vercel.json` + CI `test:api`. Fresh security review: no blocks (gate
+traced un-bypassable). 7b TODO: frontend — `useImageDownscale`, camera/file-picker, confirm/edit
+UI (never auto-commits), online-only, i18n. Deploy-time gaps for BUILD_REPORT: KV-backed rate
+limiter, live Admin/Gemini wiring unexecuted, Vercel build unverified.
+--- original scope ---
 Vercel `/api` serverless function holding the **Gemini key (server-only)**: room + session-token
 gate (verify room via Admin SDK), per-room + global rate limits, **server-side total recompute**,
 model-output validation. TDD the pure parts (gate → 403, over cap → 429, bad output rejected;
