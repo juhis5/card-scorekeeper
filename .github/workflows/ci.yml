@@ -24,5 +24,25 @@ jobs:
       - run: pnpm test:run
       - run: pnpm test:api # /api/count — fully mocked (Admin SDK + Gemini), no emulator/creds
       - run: pnpm build # runs vue-tsc (typecheck) + build
-      # When Firestore rules change, add a job that runs them on the emulator:
-      # - run: pnpm test:rules   (needs firebase-tools + Java; see firestore-realtime / tdd)
+
+  # Firestore rules are the security boundary — run the emulator rules suite in CI so a rules
+  # regression can't merge (see firestore-realtime / tdd). Separate job: it needs Java for the
+  # emulator (firebase-tools is a devDep, pulled by the install below).
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21' # matches local (see docs/TOOLCHAIN.md); emulator JAR needs a JDK
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:rules # firebase emulators:exec 'vitest run --config vitest.rules.config.ts'
+      # NOTE: test:e2e (Playwright + emulator + app server) and test:integration are intentionally
+      # NOT in CI — run locally (see docs/BUILD_REPORT.md). test:e2e's live-sync spec excludes
+      # Playwright-WebKit (documented flake); test:integration is a documented emulator cold-boot flake.
