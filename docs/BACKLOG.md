@@ -142,7 +142,13 @@ a game writes permanent records; stats + head-to-head compute correctly; offline
 
 ## Slice 7 — OPTIONAL photo card-count (`/api` + frontend) — do only after 1–6 solid
 
-**Status: 7a DONE / 7b TODO** · depends: 6 · OPTIONAL
+**Status: DONE** · depends: 6 · OPTIONAL
+7b DONE: `useImageDownscale` (EXIF-safe, ~1600px/0.8), `usePhotoCount` (never-throws error map,
+Bearer ID token), `PhotoCountSheet` (hint→capture→edit→confirm), camera/file-picker, gated
+online+own-row; photo NEVER auto-commits (routes through the same validated manual `handleCommit`);
+any failure → manual fallback. 286 tests. Fresh review: no blocks (4 fixes applied incl. an
+invalid-confirmed-total test). Real camera/canvas/EXIF need a manual device pass (BUILD_REPORT).
+--- original scope ---
 7a DONE: `api/count.ts` (+ `api/_lib/*`) — Vercel Node fn; ID-token + room-membership gate;
 per-room + global rate limits (injectable store, in-memory placeholder — NOT prod-scale, flagged);
 server-side total recompute via direct `rules.ts` import; `@google/genai` `gemini-2.5-flash`,

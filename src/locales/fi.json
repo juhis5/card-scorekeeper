@@ -76,6 +76,21 @@
       "scoredLabel": "Syötetty",
       "invalidError": "Anna kokonaisluku, joka on 0 tai suurempi."
     },
+    "photoCount": {
+      "trigger": "Kuvaa kortit",
+      "title": "Laske korttisi",
+      "hint": "Levitä kortit tasaisesti ja päällekkäin menemättä parhaan tuloksen saamiseksi.",
+      "takePhoto": "Ota tai valitse kuva",
+      "reading": "Luetaan kortteja…",
+      "error": "Kortteja ei voitu lukea — kirjoita summa itse.",
+      "retry": "Yritä uudelleen",
+      "retake": "Ota kuva uudelleen",
+      "cardValueLabel": "{card}: arvo",
+      "totalLabel": "Yhteensä",
+      "resultAnnouncement": "Löytyi {count} korttia, summa {total} pistettä. Tarkista ja vahvista.",
+      "confirm": "Käytä tätä summaa",
+      "cancel": "Peruuta"
+    },
     "next": {
       "button": "Seuraava kierros"
     },

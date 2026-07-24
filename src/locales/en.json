@@ -76,6 +76,21 @@
       "scoredLabel": "Scored",
       "invalidError": "Enter a whole number of 0 or more."
     },
+    "photoCount": {
+      "trigger": "Snap cards",
+      "title": "Count your cards",
+      "hint": "Lay your cards flat and non-overlapping for the best read.",
+      "takePhoto": "Take or choose a photo",
+      "reading": "Reading your cards…",
+      "error": "Couldn't read the cards — type the total instead.",
+      "retry": "Try again",
+      "retake": "Retake photo",
+      "cardValueLabel": "{card} value",
+      "totalLabel": "Total",
+      "resultAnnouncement": "Found {count} cards, total {total} points. Review and confirm.",
+      "confirm": "Use this total",
+      "cancel": "Cancel"
+    },
     "next": {
       "button": "Next round"
     },

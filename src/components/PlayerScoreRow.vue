@@ -10,6 +10,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check } from '@lucide/vue'
+import PhotoCountSheet from '@/components/PhotoCountSheet.vue'
 import RoundScoreInput from '@/components/RoundScoreInput.vue'
 import type { ContractRoundNumber, Player } from '@/lib/types'
 
@@ -17,10 +18,17 @@ const {
   player,
   round,
   isScored = false,
+  canUsePhotoCount = false,
+  roomCode = null,
 } = defineProps<{
   player: Player
   round: ContractRoundNumber
   isScored?: boolean
+  /** Gates the "Snap cards" affordance — only true when this device is online AND this is its
+   * own editable row (see RoomView: photo-count is online-only, and each device only ever edits
+   * its own seat). */
+  canUsePhotoCount?: boolean
+  roomCode?: string | null
 }>()
 
 const emit = defineEmits<{ commit: [playerId: string, points: number] }>()
@@ -33,6 +41,11 @@ const inputId = computed(() => `round-score-${player.id}`)
 const errorId = computed(() => `${inputId.value}-error`)
 const label = computed(() => t('room.score.inputLabel', { name: player.name, round }))
 const hasError = computed(() => errorMessage.value !== '')
+const photoCountId = computed(() => `photo-count-${player.id}`)
+/** `canUsePhotoCount` alone already implies `roomCode !== null` in practice (it's only ever true
+ * online, and `isOnline` is derived from a non-null room code — see stores/game.ts), but this
+ * checks both explicitly rather than assuming that invariant holds across a future refactor. */
+const canSnapCards = computed(() => canUsePhotoCount && roomCode !== null)
 
 /** A leftover-card score is always a whole, non-negative number of points. */
 function isValidScore(value: number): boolean {
@@ -52,6 +65,14 @@ function handleCommit(): void {
   errorMessage.value = ''
   emit('commit', player.id, points.value)
 }
+
+/** The photo is only ever a SUGGESTION (see CLAUDE.md) — confirming feeds the number through the
+ * exact same commit path manual entry uses (including its validation/error display), rather than
+ * writing to the store directly. */
+function handlePhotoConfirm(total: number): void {
+  points.value = total
+  handleCommit()
+}
 </script>
 
 <template>
@@ -70,6 +91,12 @@ function handleCommit(): void {
         {{ t('room.score.scoredLabel') }}
       </span>
     </div>
+    <PhotoCountSheet
+      v-if="canSnapCards"
+      :id="photoCountId"
+      :room-code="roomCode ?? ''"
+      @confirm="handlePhotoConfirm"
+    />
     <p v-if="hasError" :id="errorId" role="alert" class="text-destructive text-sm">
       {{ errorMessage }}
     </p>

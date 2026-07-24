@@ -216,6 +216,8 @@ onMounted(() => {
             :player="standing.player"
             :round="currentRound"
             :is-scored="scoredPlayerIdsThisRound.has(standing.player.id)"
+            :can-use-photo-count="isOnline && standing.player.id === myPlayerId"
+            :room-code="roomCode"
             @commit="handleScoreCommit"
           />
         </ul>
