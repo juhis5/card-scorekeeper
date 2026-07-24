@@ -39,11 +39,13 @@ class FakeGameRepository implements GameRepository {
    * recovers from). */
   callOrder: string[] = []
   state: GameState = { status: 'waiting', currentRound: 1, players: [], roundScores: [] }
+  /** Lets a test simulate an online host (non-null room code) without a real repository. */
+  roomCodeToReturn: string | null = null
 
   async createGame(config: GameConfig): Promise<CreatedGame> {
     this.callOrder.push('createGame')
     this.lastCreateGameConfig = config
-    return { gameId: 'fake-game', roomCode: null }
+    return { gameId: 'fake-game', roomCode: this.roomCodeToReturn, hostPlayerId: 'fake-host' }
   }
 
   async addPlayer(input: AddPlayerInput): Promise<string> {
@@ -103,6 +105,37 @@ describe('useGameStore.start', () => {
   })
 })
 
+describe('useGameStore identity, host side', () => {
+  it('marks this device as host and records the seated hostPlayerId after start()', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    await game.start(repository, HOST_CONFIG)
+
+    expect(game.isHost).toBe(true)
+    expect(game.myPlayerId).toBe('fake-host')
+  })
+
+  it('is not online when the repository assigns no room code (local mode)', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    await game.start(repository, HOST_CONFIG)
+
+    expect(game.isOnline).toBe(false)
+  })
+
+  it('is online once the repository assigns a room code', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    repository.roomCodeToReturn = 'ABCDE'
+
+    await game.start(repository, HOST_CONFIG)
+
+    expect(game.isOnline).toBe(true)
+  })
+})
+
 describe('useGameStore.join', () => {
   const JOIN_CODE = 'ABCDE'
   const ALICE_INPUT: AddPlayerInput = { name: 'Alice', deviceUuid: 'device-a' }
@@ -143,6 +176,17 @@ describe('useGameStore.join', () => {
     const playerId = await game.join(repository, JOIN_CODE, ALICE_INPUT)
 
     expect(playerId).toBe('player-Alice')
+  })
+
+  it('marks this device as a non-host, records the returned playerId, and is online', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    const playerId = await game.join(repository, JOIN_CODE, ALICE_INPUT)
+
+    expect(game.isHost).toBe(false)
+    expect(game.myPlayerId).toBe(playerId)
+    expect(game.isOnline).toBe(true)
   })
 
   it('reflects state the repository emits after joining', async () => {
@@ -231,6 +275,23 @@ describe('useGameStore standings', () => {
   })
 })
 
+describe('useGameStore.roundScores', () => {
+  it('exposes the roundScores the repository emits, for deriving "who scored this round"', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+
+    repository.emit({
+      status: 'playing',
+      currentRound: 1,
+      roundScores: [{ round: 1, playerId: 'a', points: 12 }],
+      players: [{ id: 'a', name: 'Alice', totalScore: 12 }],
+    })
+
+    expect(game.roundScores).toEqual([{ round: 1, playerId: 'a', points: 12 }])
+  })
+})
+
 describe('useGameStore.setRoundScore', () => {
   it('forwards the call to the repository and reflects the state it emits back', async () => {
     const game = useGameStore()
@@ -290,6 +351,36 @@ describe('useGameStore.leave', () => {
 
     expect(game.standings).toEqual([])
     expect(repository.leaveCalls).toBe(1)
+  })
+
+  it('resets isHost and myPlayerId so a stale identity never leaks into the next game', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+
+    game.leave()
+
+    expect(game.isHost).toBe(false)
+    expect(game.myPlayerId).toBeNull()
+  })
+
+  it("clears a finished game's players/roundScores/status, not just the identity flags", async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+    repository.emit({
+      status: 'finished',
+      currentRound: 5,
+      roundScores: [{ round: 1, playerId: 'a', points: 12 }],
+      players: [{ id: 'a', name: 'Alice', totalScore: 12 }],
+    })
+
+    game.leave()
+
+    expect(game.status).toBe('waiting')
+    expect(game.currentRound).toBe(1)
+    expect(game.roundScores).toEqual([])
+    expect(game.standings).toEqual([])
   })
 })
 

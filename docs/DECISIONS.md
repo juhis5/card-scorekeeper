@@ -87,39 +87,90 @@ in the working tree — resume brief (do NOT restart from scratch; finish what's
   `src/lib/game-mode.ts` (+test, the Local-vs-Firestore repo factory), and the `CreatedGame`
   extension with `hostPlayerId` in `src/lib/repository.ts` + both repos (`local-repository.ts`,
   `firestore-repository.ts`) + `local-repository.test.ts`.
-- BROKEN: `pnpm build` fails — `src/stores/game.test.ts:46` has a fake `CreatedGame` missing the
-  now-required `hostPlayerId`. First fix to make the tree build again.
-- NOT DONE (finish per the online-ui delegation spec, items 4–7): store `isHost`/`myPlayerId`
-  (set from `hostPlayerId` on start / from join's return); HomeView start-probe → online/offline +
-  a join-by-code entry; RoomView online adaptations (show room code, self-only score entry,
-  host-only Next/Finish, don't gate on status==='playing'); i18n for all new strings.
-- THEN: slice 4b-ii (two-client live-sync Playwright e2e on the emulator + auth emulator).
+- ~~BROKEN: `pnpm build` fails — `src/stores/game.test.ts:46` has a fake `CreatedGame` missing the
+  now-required `hostPlayerId`.~~ FIXED.
+- ~~NOT DONE (finish per the online-ui delegation spec, items 4–7)~~ DONE (2026-07-24, resumed
+  session): store `isHost`/`myPlayerId`/`isOnline`/`roundScores`; HomeView start-probe →
+  online/offline + a `JoinGame` join-by-code entry; RoomView online adaptations (room code,
+  self-only score entry, host-only Next/Finish, no gating on `status==='playing'`); i18n for all
+  new strings. 141 tests green (`test:run`, and shuffled), `build`/`lint` clean. See the dated
+  entries just below for the non-obvious calls made finishing this. **THEN:** slice 4b-ii
+  (two-client live-sync Playwright e2e on the emulator + auth emulator) is still NOT done.
 
-Resume order after reset: finish 4b-i → review → 4b-ii e2e → slice 5 (PWA) → 6 (stats) →
+Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (PWA) → 6 (stats) →
 7 (optional photo) → 8 (polish, incl. wiring the `test:rules` CI job + BUILD_REPORT).
+
+- 2026-07-24 — GameSetup's "other players" fields are validated (≥1 required) only once hosting
+  resolves to the OFFLINE branch, never up front — online hosting proceeds with just the host,
+  any typed other-player names silently unused. — Two independent reasons, not just UX taste:
+  (a) docs/PLAN.md's host flow is "Reachable → normal synced room ... players join by code", i.e.
+  online hosting is meant to start solo; (b) `FirestoreGameRepository.addPlayer` seats *this
+  device's own* auth uid (`room/{code}/players/${uid}`) — looping it from the host's device for
+  each named "other player" would silently overwrite the same doc every time, not just be
+  redundant. Which branch we're on isn't known until the connectivity probe resolves, so the
+  fieldset stays visible and un-blocking until then (see GameSetup.test.ts).
+- 2026-07-24 — RoomView's entry-row seat order is a `ref` that only ever GROWS (append new
+  playerIds as first seen via a `watch(standings, ..., {immediate:true})`), replacing the slice-3
+  frozen "snapshot `standings` once at mount" list. — The frozen version broke online: `start()`
+  only awaits `createGame`, not the first `onSnapshot`, so `standings` can still be empty when
+  RoomView mounts; a frozen empty snapshot would permanently show zero entry rows (including the
+  host's own). Growing the list also correctly picks up players who join online mid-game. Verified
+  by RoomView.test.ts's existing "stable seat order" test (still passes, offline) plus new online
+  tests.
+- 2026-07-24 — RoomView's Next/Finish "has everyone scored this round" gate is derived from the
+  store's synced `roundScores` (`roundScores.filter(round === currentRound)`), not the old
+  view-local "which playerIds did I just commit through this component" `Set`. — The view-local
+  version silently broke the online host: online, `entryStandings` is filtered to `myPlayerId`
+  only (Firestore rules enforce own-score-only writes; see the 2026-07-24 trust-model entry), so
+  the view-local set could only ever contain one id — for any room with ≥2 players,
+  "all players scored" would never become true and the host's Next/Finish button would be
+  permanently disabled. `roundScores` is synced state, so it reflects every player's committed
+  score regardless of which device entered it — correct for both modes, and it let the view-local
+  `scoredPlayerIds` ref + its round-change `watch` be deleted outright.
+- 2026-07-24 — RoomView shows a persistent, icon+text (not color-only) banner keyed off
+  `!isOnline`: "You're offline — playing a local game on this device." — Per the error-ux skill's
+  "the offline→local path shows WHY": before this slice, local was the *only* mode, so there was
+  nothing to explain; now that online hosting is attempted first, `!isOnline` reliably means "this
+  device fell back to a local game" (the only remaining way to get a `null` room code), so it's a
+  correct hook for the explanation without touching the actual offline scoring mechanics (host
+  enters everyone, Next/Finish as before — unchanged).
+- 2026-07-24 — `useGameConnectivity.ts` loads `lib/firebase.ts` + `lib/firestore-repository.ts` via
+  dynamic `import()`, not a static top-level import. — `HomeView` is eager-loaded (landing route)
+  and renders `GameSetup`/`JoinGame` immediately; a static import would put the whole Firebase +
+  Firestore SDK in the app's initial bundle, so a fully offline host would download it before the
+  home screen even paints — directly against the "offline-capable host" golden rule and
+  mobile-first (a card table is exactly where connectivity is worst). Confirmed empirically: static
+  import inflated the main chunk from ~90 KB to ~282 KB gzip; the dynamic import keeps the main
+  chunk ~92 KB and puts Firebase in its own ~189 KB chunk fetched only when a player actually
+  submits the host/join form. `lib/connectivity.ts`/`lib/game-mode.ts`/`lib/local-repository.ts`
+  stay static — none of them touch Firebase.
 
 ## Carried-forward TODOs (flagged by implementers, not yet wired)
 
 - ~~Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap~~ — DONE in slice 3 (wired in
   main.ts before router, so identity is set before the first nav guard).
-- Slice 4: the game store's only entry is `start()` (host: calls `createGame`). The online JOINER
-  path needs a new store action (e.g. `join(repo, code)` that subscribes/addPlayer without
-  createGame). The interface itself is stable; the store gains an action (not zero change).
+- ~~Slice 4: the game store's only entry is `start()`... needs a new store action `join(repo,
+  code)`~~ — DONE: `useGameStore.join()` exists (seats via `addPlayer`, subscribes, never calls
+  `createGame`), with `callOrder` regression coverage in game.test.ts.
 - Slice 5: reload/resume of an in-progress LOCAL game. `LocalGameRepository` persists to
   localStorage, but the game store doesn't re-subscribe on mount — a hard reload mid-game loses
   the in-memory store (repo data survives, nothing reads it back). RoomView degrades gracefully
   (empty state → back home, no crash). Wire resume where offline robustness lives (slice 5).
+- Slice 5: the error-ux "reconnecting…" indicator for a mid-game connectivity BLIP during an
+  ONLINE game (distinct from never-connected → local). Firestore `persistentLocalCache` is already
+  on (slice 4a), so a blip keeps working from cache; slice 5 adds the subtle "reconnecting…" UI +
+  host-editing-others online (deferred from 4b-i) can be revisited then or in polish.
 - Slice 6 (stats): local non-host players get a fresh synthetic `crypto.randomUUID()` per game
   (slice 3), so their stats won't accumulate across local games. PLAN didn't pin local-player
   identity; reconcile when building stats (device-UUID model assumes real devices).
 - Slice 8 (polish): slice 3 UI is behavior-tested + static-checked (tokens/a11y/i18n) but not yet
   visually verified in a real browser at a phone viewport — do the cross-platform visual pass here.
-- Slice 4b: ONLINE UI must handle two things slice 4a surfaced — (a) each player enters only their
-  OWN score online (rules enforce it; host may correct anyone), unlike local mode where the host
-  enters everyone; (b) online room `status` stays `'waiting'` until the HOST first calls
-  `advanceRound()` (the room-doc update is host-only, so `setRoundScore` can't flip status the way
-  LocalGameRepository does) — don't gate the scoreboard UI on `status==='playing'` for round 1.
-  Also: 4b's e2e needs BOTH firestore + auth emulators + `connectAuthEmulator` (`VITE_USE_EMULATOR`).
+- ~~Slice 4b: ONLINE UI must handle...~~ DONE (4b-i, 2026-07-24): RoomView filters entry rows to
+  `myPlayerId` online, gates Next/Finish on `isHost`, and never gates on `status==='playing'` (the
+  Next/Finish gate itself was rebuilt off synced `roundScores`, not view-local state — see the
+  dated entry above). Host-editing-others' scores online is still explicitly deferred (not built).
+  Still open: **4b-ii's e2e** needs BOTH firestore + auth emulators + `connectAuthEmulator`
+  (`VITE_USE_EMULATOR`) — not started this session.
 - CI: `.github/workflows/ci.yml` has a commented `test:rules` job — wire it now that rules exist
   (needs Java + firebase-tools on the runner). Do in 4b or polish. Do NOT add `test:integration`
   to CI (see flake below).

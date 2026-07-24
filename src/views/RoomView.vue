@@ -2,13 +2,20 @@
 /**
  * The live scoreboard: contract banner, standings table, per-player round-score entry, and the
  * next-round/finish actions. Talks only to `useGameStore` — no repository, no Firestore, no
- * business logic here beyond thin UI orchestration (tracking which players have entered this
- * round's score is view-local state; the store doesn't expose per-round history — see repo.ts).
+ * business logic here beyond thin UI orchestration.
+ *
+ * Online vs offline (see docs/DECISIONS.md's 2026-07-24 online entries + the firestore-realtime
+ * skill): offline, the host enters every player's score and drives Next/Finish, unchanged from
+ * slice 3. Online, each device edits only its OWN row (`myPlayerId`) — Firestore rules enforce
+ * this too, this is the matching UI — and only the host (`isHost`) sees Next/Finish; a joiner
+ * waits. Never gate any of this on `status === 'playing'`: online, `status` stays `'waiting'`
+ * until the host's first `advanceRound()` (see DECISIONS.md), so gating on it would hide round 1.
  */
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
+import { WifiOff } from '@lucide/vue'
 import ContractBanner from '@/components/ContractBanner.vue'
 import PlayerScoreRow from '@/components/PlayerScoreRow.vue'
 import ScoreBoard from '@/components/ScoreBoard.vue'
@@ -21,41 +28,73 @@ import type { Standing } from '@/lib/types'
 
 const { t, n } = useI18n()
 const game = useGameStore()
-const { standings, currentContract, currentRound, status, winners } = storeToRefs(game)
+const {
+  standings,
+  currentContract,
+  currentRound,
+  status,
+  winners,
+  roundScores,
+  isHost,
+  myPlayerId,
+  isOnline,
+  roomCode,
+} = storeToRefs(game)
 
-/** Players who have committed a score for the round in progress — reset whenever it advances.
- * Not derived from the store: `GameState` only exposes per-player running totals, not which
- * round each score belongs to (see repository.ts) — this view-local set is a display concern. */
-const scoredPlayerIds = ref<Set<PlayerId>>(new Set())
 const announcement = ref('')
 const isAdvancing = ref(false)
 const isFinishing = ref(false)
 
 // `standings` is sorted by total, so it reorders after every commit — great for the scoreboard,
-// terrible for the entry list (a row would slide out from under the host's thumb mid-entry).
-// Snapshot the seat order once at mount (all totals are 0 then, so it equals join order) and
-// keep the entry rows in that fixed order regardless of how the totals move.
-const seatOrder = standings.value.map((standing) => standing.player.id)
-const entryStandings = computed(() =>
-  seatOrder
-    .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
-    .filter((standing): standing is Standing => standing !== undefined),
+// terrible for the entry list (a row would slide out from under a player's thumb mid-entry).
+// Grow a fixed seat order as players are first seen (never reorder, never drop) instead of a
+// one-time snapshot at mount: online, the first Firestore snapshot arrives asynchronously (this
+// component can mount before any player — even the host — has shown up yet), and new joiners can
+// arrive at any time during the game, so a frozen mount-time list would miss them permanently.
+const seatOrder = ref<PlayerId[]>([])
+watch(
+  standings,
+  (list) => {
+    for (const standing of list) {
+      if (!seatOrder.value.includes(standing.player.id)) {
+        seatOrder.value.push(standing.player.id)
+      }
+    }
+  },
+  { immediate: true },
 )
+const entryStandings = computed(() => {
+  const ordered = seatOrder.value
+    .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
+    .filter((standing): standing is Standing => standing !== undefined)
+  // Online, host-editing-others is deferred (see DECISIONS.md) — every device, host included,
+  // edits only its own seat; offline, the host still enters everyone's score as today.
+  return isOnline.value
+    ? ordered.filter((standing) => standing.player.id === myPlayerId.value)
+    : ordered
+})
 
 const hasActiveGame = computed(() => standings.value.length > 0)
 const isFinalRound = computed(() => currentRound.value === TOTAL_ROUNDS)
 const isFinished = computed(() => status.value === 'finished')
-const allPlayersScored = computed(() =>
-  standings.value.every((standing) => scoredPlayerIds.value.has(standing.player.id)),
+// Derived from synced `roundScores`, not view-local commits: online, only this device's own row
+// is ever committed here, so a view-local "who did I just commit" set would never see the other
+// seats' scores and the Next/Finish gate could never open. `roundScores` is the shared source of
+// truth for both modes (see repository.ts).
+const scoredPlayerIdsThisRound = computed(
+  () =>
+    new Set(
+      roundScores.value
+        .filter((score) => score.round === currentRound.value)
+        .map((score) => score.playerId),
+    ),
 )
-
-watch(currentRound, () => {
-  scoredPlayerIds.value = new Set()
-})
+const allPlayersScored = computed(() =>
+  standings.value.every((standing) => scoredPlayerIdsThisRound.value.has(standing.player.id)),
+)
 
 async function handleScoreCommit(playerId: PlayerId, points: number): Promise<void> {
   await game.setRoundScore({ playerId, round: currentRound.value, points })
-  scoredPlayerIds.value = new Set(scoredPlayerIds.value).add(playerId)
 
   const player = standings.value.find((standing) => standing.player.id === playerId)?.player
   if (!player) return
@@ -113,6 +152,25 @@ async function handleFinish(): Promise<void> {
         {{ t('room.heading') }}
       </h1>
 
+      <p
+        v-if="isOnline"
+        class="bg-muted text-foreground border-border rounded-lg border px-4 py-3 text-sm"
+      >
+        <span class="font-semibold">{{
+          t('room.online.codeLabel', { code: roomCode ?? '' })
+        }}</span>
+        <br />
+        <span class="text-muted-foreground">{{ t('room.online.codeHint') }}</span>
+      </p>
+      <p
+        v-else
+        role="status"
+        class="bg-muted text-foreground border-border flex items-center gap-2 rounded-lg border px-4 py-3 text-sm"
+      >
+        <WifiOff aria-hidden="true" class="size-4 shrink-0" />
+        {{ t('room.offline.banner') }}
+      </p>
+
       <ContractBanner :round="currentRound" :contract-key="currentContract.contractKey" />
 
       <ScoreBoard :standings="standings" />
@@ -129,7 +187,7 @@ async function handleFinish(): Promise<void> {
             :key="`${standing.player.id}-${currentRound}`"
             :player="standing.player"
             :round="currentRound"
-            :is-scored="scoredPlayerIds.has(standing.player.id)"
+            :is-scored="scoredPlayerIdsThisRound.has(standing.player.id)"
             @commit="handleScoreCommit"
           />
         </ul>
@@ -137,7 +195,7 @@ async function handleFinish(): Promise<void> {
 
       <div aria-live="polite" class="sr-only">{{ announcement }}</div>
 
-      <div class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
+      <div v-if="isHost" class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
         <Button
           v-if="!isFinalRound"
           class="h-11 flex-1"
@@ -155,6 +213,13 @@ async function handleFinish(): Promise<void> {
           {{ t('room.finish.button') }}
         </Button>
       </div>
+      <p
+        v-else-if="!isFinished"
+        role="status"
+        class="text-muted-foreground py-2 text-center text-sm"
+      >
+        {{ t('room.online.waitingForHost') }}
+      </p>
     </template>
   </main>
 </template>

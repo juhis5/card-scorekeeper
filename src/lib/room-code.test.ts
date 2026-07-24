@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { generateRoomCode, ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from './room-code'
+import {
+  generateRoomCode,
+  isValidRoomCode,
+  normalizeRoomCode,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LENGTH,
+} from './room-code'
 
 /** Returns a `randomInt` that always yields the next value from a fixed sequence. */
 function sequenceOf(...indices: number[]): (maxExclusive: number) => number {
@@ -63,5 +69,37 @@ describe('generateRoomCode', () => {
     const second = generateRoomCode({ randomInt: sequenceOf(3, 3, 3, 3, 3) })
 
     expect(first).toBe(second)
+  })
+})
+
+describe('normalizeRoomCode', () => {
+  it('trims surrounding whitespace and upper-cases the input', () => {
+    expect(normalizeRoomCode('  abcde ')).toBe('ABCDE')
+  })
+})
+
+describe('isValidRoomCode', () => {
+  it('accepts a code of the fixed length using only alphabet characters', () => {
+    expect(isValidRoomCode('23456')).toBe(true)
+  })
+
+  it('rejects a code shorter than the fixed length', () => {
+    expect(isValidRoomCode('2345')).toBe(false)
+  })
+
+  it('rejects a code longer than the fixed length', () => {
+    expect(isValidRoomCode('234567')).toBe(false)
+  })
+
+  it('rejects a code containing a character outside the unambiguous alphabet', () => {
+    expect(isValidRoomCode('AB0DE')).toBe(false)
+  })
+
+  it('rejects a lowercase code — callers must normalize before validating', () => {
+    expect(isValidRoomCode('abcde')).toBe(false)
+  })
+
+  it('rejects an empty string', () => {
+    expect(isValidRoomCode('')).toBe(false)
   })
 })

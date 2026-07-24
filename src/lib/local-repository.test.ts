@@ -57,7 +57,7 @@ describe('LocalGameRepository.createGame', () => {
 
     const created = await repository.createGame(HOST_CONFIG)
 
-    expect(created).toEqual({ gameId: 'id-1', roomCode: null })
+    expect(created).toEqual({ gameId: 'id-1', roomCode: null, hostPlayerId: 'id-2' })
   })
 
   it('uses the injected id generator rather than a real UUID', async () => {

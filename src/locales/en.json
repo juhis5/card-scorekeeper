@@ -12,16 +12,31 @@
   "home": {
     "heading": "Rommi Scorekeeper",
     "tagline": "Low score wins. Scores sync live.",
+    "orDivider": "or",
     "form": {
-      "heading": "New local game",
+      "heading": "New game",
       "hostNameLabel": "Your name",
       "hostNamePlaceholder": "e.g. Juho",
       "otherPlayersHeading": "Other players",
+      "otherPlayersHint": "Only used if this device ends up hosting locally — online, others join with the room code instead.",
       "otherPlayersEmpty": "No other players yet — add at least one to start.",
       "nameLabel": "Player {number} name",
       "removeLabel": "Remove player {number}",
       "addPlayerButton": "Add player",
-      "startButton": "Start game"
+      "startButton": "Start game",
+      "checkingConnection": "Checking connection…"
+    },
+    "join": {
+      "heading": "Join a game",
+      "roomCodeLabel": "Room code",
+      "roomCodePlaceholder": "e.g. 7K4RQ",
+      "nameLabel": "Your name",
+      "button": "Join game",
+      "errors": {
+        "invalidCode": "Enter the 5-character room code exactly as shown.",
+        "unreachable": "Couldn't reach the game — check your connection and try again.",
+        "joinFailed": "Couldn't join that room. Check the code and try again."
+      }
     },
     "errors": {
       "hostNameRequired": "Enter your name to continue.",
@@ -32,6 +47,14 @@
   "room": {
     "heading": "Rommi scoreboard",
     "roundBanner": "Round {round} of {total} — {contract}",
+    "online": {
+      "codeLabel": "Room code: {code}",
+      "codeHint": "Share this code so others can join.",
+      "waitingForHost": "Waiting for the host to move to the next round."
+    },
+    "offline": {
+      "banner": "You're offline — playing a local game on this device."
+    },
     "table": {
       "player": "Player",
       "total": "Total",

@@ -28,3 +28,19 @@ export function generateRoomCode(deps: RoomCodeDeps = {}): string {
   }
   return code
 }
+
+const ROOM_CODE_PATTERN = new RegExp(`^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$`)
+
+/** Trims and upper-cases user-typed input so a join attempt tolerates how people actually type a
+ * code on a phone (lowercase, stray whitespace) before it's validated or sent anywhere. */
+export function normalizeRoomCode(input: string): string {
+  return input.trim().toUpperCase()
+}
+
+/** Checks a room code against the fixed length + unambiguous alphabet — client-side, before
+ * ever calling the backend (see the error-ux skill: validate format before the network round
+ * trip). Expects an already-`normalizeRoomCode`d value; a lowercase code is rejected here, not
+ * silently accepted. */
+export function isValidRoomCode(code: string): boolean {
+  return ROOM_CODE_PATTERN.test(code)
+}

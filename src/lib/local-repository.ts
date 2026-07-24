@@ -155,7 +155,7 @@ export class LocalGameRepository implements GameRepository {
       state: { ...initialGameState(), players: [hostPlayer] },
     }
     this.persistAndNotify()
-    return { gameId, roomCode: null }
+    return { gameId, roomCode: null, hostPlayerId }
   }
 
   async addPlayer(input: AddPlayerInput): Promise<PlayerId> {

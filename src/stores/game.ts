@@ -31,6 +31,12 @@ export const useGameStore = defineStore('game', () => {
   const state = ref<GameState>(initialGameState())
   const gameId = ref<GameId | null>(null)
   const roomCode = ref<string | null>(null)
+  /** True on this device after `start()` (it created the game); false after `join()`. Gates
+   * host-only actions (advance round / finish) in the UI — see RoomView. */
+  const isHost = ref(false)
+  /** The playerId THIS device is seated as — the host's seat after `start()`, the joiner's own
+   * seat after `join()`. Lets the UI show only this device's own editable score row online. */
+  const myPlayerId = ref<PlayerId | null>(null)
 
   // Not `ref`s: the repository/unsubscribe handles are I/O plumbing, not state to render.
   // Injected by `start()` — this is the seam. Tests pass a fake or a LocalGameRepository;
@@ -41,6 +47,11 @@ export const useGameStore = defineStore('game', () => {
   const status = computed(() => state.value.status)
   const currentRound = computed(() => state.value.currentRound)
   const currentContract = computed(() => contractForRound(state.value.currentRound))
+  const roundScores = computed(() => state.value.roundScores)
+  /** A non-null room code only ever comes from an online (Firestore) repository — local mode's
+   * `CreatedGame.roomCode` is always null (see repository.ts) — so this doubles as "is this a
+   * live multi-device room" without the store importing a concrete repository to ask. */
+  const isOnline = computed(() => roomCode.value !== null)
 
   /**
    * Players with `totalScore` RECOMPUTED from `state.roundScores`, never the writable field a
@@ -73,6 +84,8 @@ export const useGameStore = defineStore('game', () => {
     const created = await repo.createGame(config)
     gameId.value = created.gameId
     roomCode.value = created.roomCode
+    isHost.value = true
+    myPlayerId.value = created.hostPlayerId
     unsubscribe = repo.subscribe((next) => {
       state.value = next
     })
@@ -95,7 +108,9 @@ export const useGameStore = defineStore('game', () => {
     repository = repo
     gameId.value = code
     roomCode.value = code
+    isHost.value = false
     const playerId = await repo.addPlayer(player)
+    myPlayerId.value = playerId
     unsubscribe = repo.subscribe((next) => {
       state.value = next
     })
@@ -118,12 +133,18 @@ export const useGameStore = defineStore('game', () => {
     return requireRepository().finishGame()
   }
 
-  /** Tears down the subscription and the repository's own resources. Safe to call repeatedly. */
+  /** Tears down the subscription and the repository's own resources. Safe to call repeatedly.
+   * Resets `state` too — not just the identity flags — so a finished game's players/roundScores/
+   * status never linger in the UI after leaving, waiting for the next repository's first
+   * snapshot to overwrite them (no "play again" flow reaches this yet, but it's correct hygiene). */
   function leave(): void {
     unsubscribe?.()
     unsubscribe = null
     repository?.leave()
     repository = null
+    isHost.value = false
+    myPlayerId.value = null
+    state.value = initialGameState()
   }
 
   onScopeDispose(leave)
@@ -131,9 +152,13 @@ export const useGameStore = defineStore('game', () => {
   return {
     gameId,
     roomCode,
+    isHost,
+    myPlayerId,
+    isOnline,
     status,
     currentRound,
     currentContract,
+    roundScores,
     standings,
     winners,
     start,

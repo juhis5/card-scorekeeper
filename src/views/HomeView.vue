@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import GameSetup from '@/components/GameSetup.vue'
+import JoinGame from '@/components/JoinGame.vue'
 
 const { t } = useI18n()
 </script>
@@ -20,5 +21,11 @@ const { t } = useI18n()
       <p class="text-muted-foreground">{{ t('home.tagline') }}</p>
     </div>
     <GameSetup />
+    <div class="text-muted-foreground flex items-center gap-3 text-sm">
+      <span aria-hidden="true" class="bg-border h-px flex-1" />
+      {{ t('home.orDivider') }}
+      <span aria-hidden="true" class="bg-border h-px flex-1" />
+    </div>
+    <JoinGame />
   </main>
 </template>

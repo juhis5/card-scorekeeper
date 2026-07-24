@@ -1,9 +1,18 @@
 <script setup lang="ts">
 /**
- * The home-screen form: sets the host's display name, collects the other players' names, and
- * starts a new LOCAL (offline) game — building a `LocalGameRepository` and handing it to
- * `useGameStore().start()`. This is the only place in slice 3 that constructs a repository;
- * everything downstream (RoomView and its children) only ever talks to the store.
+ * The home-screen "host" form: name your game and start it. On submit, probes backend
+ * reachability (see `useGameConnectivity`/`lib/game-mode.ts`) and picks the repository — online
+ * (Firestore, a real room code others join with) when reachable, local single-device otherwise.
+ * This is the only place that constructs a repository; everything downstream (RoomView and its
+ * children) only ever talks to the store.
+ *
+ * The "other players" fields only matter for the offline fallback — online, other players join
+ * later via the room code, not by the host typing their names upfront (see docs/PLAN.md's "Reachable
+ * → normal synced room ... players join by code"; also, `FirestoreGameRepository.addPlayer` seats
+ * *this device's own* auth uid, so the host looping it for named players would be wrong online,
+ * not just unnecessary). Which path we're on isn't known until the probe resolves, so "at least one
+ * other player" is enforced only once we learn we're local — never blocking an online host from
+ * starting solo and waiting for joiners.
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,9 +22,10 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { LocalGameRepository } from '@/lib/local-repository'
+import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
+import type { HostGameMode } from '@/lib/game-mode'
 
 interface OtherPlayerField {
   id: string
@@ -26,11 +36,14 @@ const { t } = useI18n()
 const router = useRouter()
 const identity = useIdentityStore()
 const game = useGameStore()
+const { hostRepository } = useGameConnectivity()
 
 const hostName = ref(identity.displayName)
 const otherPlayers = ref<OtherPlayerField[]>([{ id: crypto.randomUUID(), name: '' }])
 const attemptedSubmit = ref(false)
+const areOtherPlayersInvalid = ref(false)
 const isSubmitting = ref(false)
+const isCheckingConnection = ref(false)
 const submitError = ref('')
 
 const trimmedHostName = computed(() => hostName.value.trim())
@@ -38,9 +51,6 @@ const namedOtherPlayers = computed(() =>
   otherPlayers.value.map((field) => field.name.trim()).filter((name) => name.length > 0),
 )
 const isHostNameInvalid = computed(() => attemptedSubmit.value && trimmedHostName.value === '')
-const areOtherPlayersInvalid = computed(
-  () => attemptedSubmit.value && namedOtherPlayers.value.length === 0,
-)
 
 function addPlayerField(): void {
   otherPlayers.value.push({ id: crypto.randomUUID(), name: '' })
@@ -50,32 +60,52 @@ function removePlayerField(id: string): void {
   otherPlayers.value = otherPlayers.value.filter((field) => field.id !== id)
 }
 
-async function startLocalGame(): Promise<void> {
+/** The offline fallback is a single device with no remote join, so it needs at least one other
+ * named player up front; online hosting doesn't (see the file-level comment above). */
+function isMissingRequiredOtherPlayers(mode: HostGameMode): boolean {
+  return mode.kind === 'offline' && namedOtherPlayers.value.length === 0
+}
+
+async function startGame(mode: HostGameMode): Promise<void> {
   identity.setDisplayName(trimmedHostName.value)
-  await game.start(new LocalGameRepository(), {
+  await game.start(mode.repository, {
     hostDeviceUuid: identity.deviceUuid,
     hostDisplayName: trimmedHostName.value,
   })
-  // Local (offline) play has no other real devices — each added player gets its own synthetic
-  // id so their stats stay distinguishable from the host's, rather than aliasing hostDeviceUuid.
-  for (const name of namedOtherPlayers.value) {
-    await game.addPlayer({ name, deviceUuid: crypto.randomUUID() })
+  if (mode.kind === 'offline') {
+    // Local (offline) play has no other real devices — each added player gets its own synthetic
+    // id so their stats stay distinguishable from the host's, rather than aliasing hostDeviceUuid.
+    for (const name of namedOtherPlayers.value) {
+      await game.addPlayer({ name, deviceUuid: crypto.randomUUID() })
+    }
   }
-  await router.push({ name: 'room', params: { code: 'local' } })
+  const roomCodeParam = mode.kind === 'online' ? (game.roomCode ?? 'local') : 'local'
+  await router.push({ name: 'room', params: { code: roomCodeParam } })
 }
 
 async function handleSubmit(): Promise<void> {
   attemptedSubmit.value = true
-  if (isHostNameInvalid.value || namedOtherPlayers.value.length === 0 || isSubmitting.value) return
+  areOtherPlayersInvalid.value = false
+  if (isHostNameInvalid.value || isSubmitting.value) return
 
   isSubmitting.value = true
+  isCheckingConnection.value = true
   submitError.value = ''
   try {
-    await startLocalGame()
+    const mode = await hostRepository()
+    isCheckingConnection.value = false
+
+    if (isMissingRequiredOtherPlayers(mode)) {
+      areOtherPlayersInvalid.value = true
+      return
+    }
+
+    await startGame(mode)
   } catch {
     submitError.value = t('home.errors.startFailed')
   } finally {
     isSubmitting.value = false
+    isCheckingConnection.value = false
   }
 }
 </script>
@@ -107,6 +137,7 @@ async function handleSubmit(): Promise<void> {
 
         <fieldset class="flex flex-col gap-2">
           <legend class="text-sm font-medium">{{ t('home.form.otherPlayersHeading') }}</legend>
+          <p class="text-muted-foreground text-sm">{{ t('home.form.otherPlayersHint') }}</p>
 
           <p v-if="otherPlayers.length === 0" class="text-muted-foreground text-sm">
             {{ t('home.form.otherPlayersEmpty') }}
@@ -147,6 +178,9 @@ async function handleSubmit(): Promise<void> {
         </fieldset>
       </CardContent>
       <CardFooter class="flex flex-col gap-2">
+        <p v-if="isCheckingConnection" role="status" class="text-muted-foreground text-sm">
+          {{ t('home.form.checkingConnection') }}
+        </p>
         <p v-if="submitError" role="alert" class="text-destructive text-sm">{{ submitError }}</p>
         <Button
           type="submit"

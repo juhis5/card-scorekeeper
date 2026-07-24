@@ -24,6 +24,10 @@ export interface GameConfig {
 export interface CreatedGame {
   gameId: GameId
   roomCode: string | null
+  /** The id of the player THIS device (the host) was seated as — Local: the generated host
+   * player id; Firestore: the host's auth uid. Lets the caller (the game store) record which
+   * seated player is "me", the same way `join`'s return value does for a joiner. */
+  hostPlayerId: PlayerId
 }
 
 /** Adds someone other than the host — the host is seated automatically by `createGame`. */

@@ -12,16 +12,31 @@
   "home": {
     "heading": "Rommi-pisteet",
     "tagline": "Pienin pistemäärä voittaa. Pisteet päivittyvät suorassa lähetyksessä.",
+    "orDivider": "tai",
     "form": {
-      "heading": "Uusi paikallinen peli",
+      "heading": "Uusi peli",
       "hostNameLabel": "Oma nimesi",
       "hostNamePlaceholder": "esim. Juho",
       "otherPlayersHeading": "Muut pelaajat",
+      "otherPlayersHint": "Tarvitaan vain, jos tämä laite päätyy isännöimään paikallista peliä — verkossa muut liittyvät huonekoodilla.",
       "otherPlayersEmpty": "Ei vielä muita pelaajia — lisää vähintään yksi aloittaaksesi.",
       "nameLabel": "Pelaajan {number} nimi",
       "removeLabel": "Poista pelaaja {number}",
       "addPlayerButton": "Lisää pelaaja",
-      "startButton": "Aloita peli"
+      "startButton": "Aloita peli",
+      "checkingConnection": "Tarkistetaan yhteyttä…"
+    },
+    "join": {
+      "heading": "Liity peliin",
+      "roomCodeLabel": "Huonekoodi",
+      "roomCodePlaceholder": "esim. 7K4RQ",
+      "nameLabel": "Oma nimesi",
+      "button": "Liity peliin",
+      "errors": {
+        "invalidCode": "Anna 5-merkkinen huonekoodi täsmälleen näytetyn mukaisena.",
+        "unreachable": "Peliä ei tavoitettu — tarkista yhteytesi ja yritä uudelleen.",
+        "joinFailed": "Huoneeseen ei voitu liittyä. Tarkista koodi ja yritä uudelleen."
+      }
     },
     "errors": {
       "hostNameRequired": "Anna nimesi jatkaaksesi.",
@@ -32,6 +47,14 @@
   "room": {
     "heading": "Rommi-pistetaulukko",
     "roundBanner": "Kierros {round}/{total} — {contract}",
+    "online": {
+      "codeLabel": "Huonekoodi: {code}",
+      "codeHint": "Jaa tämä koodi, jotta muut voivat liittyä.",
+      "waitingForHost": "Odotetaan, että isäntä siirtyy seuraavalle kierrokselle."
+    },
+    "offline": {
+      "banner": "Olet offline-tilassa — pelaat paikallista peliä tällä laitteella."
+    },
     "table": {
       "player": "Pelaaja",
       "total": "Yhteensä",

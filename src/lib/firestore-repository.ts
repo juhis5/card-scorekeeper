@@ -155,7 +155,7 @@ export class FirestoreGameRepository implements GameRepository {
           joinOrder: 0,
         })
         this.roomCode = roomCode
-        return { gameId: roomCode, roomCode }
+        return { gameId: roomCode, roomCode, hostPlayerId: hostUid }
       } catch (error) {
         // A code collision surfaces as permission-denied: an existing room at that code makes
         // this a Firestore `update` (not `create`), and only its own host may update it (see
