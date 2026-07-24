@@ -44,6 +44,39 @@ One line per decision made without the human (asleep during the overnight build)
   polish, not core play. Keeps slice 3 focused and reviewable. Online join + connectivity probe
   stay in slice 4 (slice 3 always starts a LOCAL game).
 
+- 2026-07-24 — Online auth: Firebase **Anonymous Auth** is the actor identity for Firestore rules
+  (`request.auth.uid`). `device_uuid` (localStorage) stays the persistent STATS key; the anon `uid`
+  is the per-session AUTH key. — A `device_uuid` carried as a doc field is spoofable, so rules
+  couldn't enforce "own score vs host" without a trustworthy identity; the firestore-realtime skill
+  sanctions anon auth for exactly this. Player/roundScore docs carry `ownerUid`; room carries `hostUid`.
+- 2026-07-24 — Firestore topology: **subcollections** under `room/{code}` —
+  `room/{code}/players/{uid}`, `room/{code}/roundScores/{uid}_{round}` — NOT PLAN's flat
+  top-level sketch (PLAN's data model is explicitly "(sketch)"/directional). — Makes room-scoping
+  STRUCTURAL: rules match `/room/{code}/**`, ownership is `docId/ownerUid == auth.uid`, expiry is one
+  `get(/room/{code})`. Firestore `playerId == auth.uid` (Local uses a random id — fine, `players[].id`
+  is opaque to domain/UI).
+- 2026-07-24 — Read gate (real, not weak): the `room` doc is readable by any authed user (needed for
+  join-by-code discovery), but `players`/`roundScores` are readable ONLY by room members
+  (`exists(/room/{code}/players/$(auth.uid))`). — PLAN says "room-scoped reads"; the subcollection
+  topology lets us enforce it for real, so the rules test tests a real property instead of just
+  `auth != null`.
+- 2026-07-24 — Trust model for core play (CORRECTED after slice-4a adversarial review): rules
+  enforce OWN-SCORE-ONLY writes (+ host may correct anyone); no server-side total recompute (no
+  server; rules can't sum N docs — that review-checklist line is the slice-7 Gemini fn). The
+  earlier "a player can only wreck their own total, self-defeating" reasoning was WRONG: low total
+  WINS, so deflating your own score is self-SERVING. Closure: (a) rules bound `roundScores.points`
+  to a non-negative integer (with a generous upper sanity cap) and `round` to 1..5; (b) the
+  `roundScores` doc id is pinned to `{ownerUid}_{round}` so there's exactly one score per player
+  per round (no double-count); (c) standings/winners are DERIVED from the bounded `roundScores`
+  (via `runningTotal`), NOT from the freely-writable denormalized `totalScore` field — so a lied
+  `totalScore` can't affect ranking. Residual (accepted, = manual scoring anywhere): a player can
+  still claim they scored 0 (went out) for their own round; the table/host notices, same as lying
+  aloud. The impossible-in-real-Rommi negative score is what's now blocked.
+- 2026-07-24 — Room doc read is `allow get` only, NOT `allow read` (which = get + list). — Firestore
+  folds `list` into `read`; granting it let any authed stranger `getDocs(collection('room'))` and
+  enumerate every room, defeating join-by-code privacy. The app only ever single-doc `get`s a room
+  by known code, so dropping `list` costs nothing. (Found by the slice-4a fresh security review.)
+
 ## Carried-forward TODOs (flagged by implementers, not yet wired)
 
 - ~~Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap~~ — DONE in slice 3 (wired in
@@ -60,3 +93,18 @@ One line per decision made without the human (asleep during the overnight build)
   identity; reconcile when building stats (device-UUID model assumes real devices).
 - Slice 8 (polish): slice 3 UI is behavior-tested + static-checked (tokens/a11y/i18n) but not yet
   visually verified in a real browser at a phone viewport — do the cross-platform visual pass here.
+- Slice 4b: ONLINE UI must handle two things slice 4a surfaced — (a) each player enters only their
+  OWN score online (rules enforce it; host may correct anyone), unlike local mode where the host
+  enters everyone; (b) online room `status` stays `'waiting'` until the HOST first calls
+  `advanceRound()` (the room-doc update is host-only, so `setRoundScore` can't flip status the way
+  LocalGameRepository does) — don't gate the scoreboard UI on `status==='playing'` for round 1.
+  Also: 4b's e2e needs BOTH firestore + auth emulators + `connectAuthEmulator` (`VITE_USE_EMULATOR`).
+- CI: `.github/workflows/ci.yml` has a commented `test:rules` job — wire it now that rules exist
+  (needs Java + firebase-tools on the runner). Do in 4b or polish. Do NOT add `test:integration`
+  to CI (see flake below).
+- KNOWN FLAKE (accepted, fenced off): `pnpm test:integration` (emulator-backed FirestoreGameRepository
+  test) intermittently fails on a cold-booted emulator via Vitest — a Node24 + grpc-js + emulator
+  HTTP/2 cold-boot transport race (browser uses WebChannel, so NOT a product bug). Isolated into its
+  own `vitest.integration.config.ts`, OUT of `test:run`/CI/hooks. The join-order correctness it
+  demonstrates is ALSO covered by a deterministic store-level `callOrder` unit test. Per tdd's flake
+  rules this is the "quarantine with documented root cause" path, not a silent skip.

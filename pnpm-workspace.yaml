@@ -1,4 +1,7 @@
 allowBuilds:
+  '@firebase/util': true
+  protobufjs: true
+  re2: true
   vue-demi: true
 minimumReleaseAgeExclude:
   - lint-staged@17.2.0

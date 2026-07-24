@@ -33,20 +33,28 @@ class FakeGameRepository implements GameRepository {
   leaveCalls = 0
   lastCreateGameConfig: GameConfig | null = null
   lastSetRoundScoreInput: SetRoundScoreInput | null = null
+  /** Records the order `addPlayer`/`subscribe`/`createGame` are called in, so `join()` tests can
+   * assert the store seats the joiner before subscribing (see the room-scoped read gate note in
+   * firestore-realtime — subscribing first would hit a permission-denied `onSnapshot` never
+   * recovers from). */
+  callOrder: string[] = []
   state: GameState = { status: 'waiting', currentRound: 1, players: [], roundScores: [] }
 
   async createGame(config: GameConfig): Promise<CreatedGame> {
+    this.callOrder.push('createGame')
     this.lastCreateGameConfig = config
     return { gameId: 'fake-game', roomCode: null }
   }
 
   async addPlayer(input: AddPlayerInput): Promise<string> {
+    this.callOrder.push('addPlayer')
     const player = { id: `player-${input.name}`, name: input.name, totalScore: 0 }
     this.emit({ ...this.state, players: [...this.state.players, player] })
     return player.id
   }
 
   subscribe(onChange: (state: GameState) => void): Unsubscribe {
+    this.callOrder.push('subscribe')
     this.listeners.add(onChange)
     onChange(this.state)
     return () => this.listeners.delete(onChange)
@@ -95,6 +103,68 @@ describe('useGameStore.start', () => {
   })
 })
 
+describe('useGameStore.join', () => {
+  const JOIN_CODE = 'ABCDE'
+  const ALICE_INPUT: AddPlayerInput = { name: 'Alice', deviceUuid: 'device-a' }
+
+  it('seats the player via addPlayer without ever calling createGame', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    await game.join(repository, JOIN_CODE, ALICE_INPUT)
+
+    expect(repository.lastCreateGameConfig).toBeNull()
+    expect(repository.callOrder).not.toContain('createGame')
+  })
+
+  it('calls addPlayer before subscribe, so the joiner is a room member before any read', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    await game.join(repository, JOIN_CODE, ALICE_INPUT)
+
+    expect(repository.callOrder).toEqual(['addPlayer', 'subscribe'])
+  })
+
+  it('sets gameId and roomCode to the joined code', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    await game.join(repository, JOIN_CODE, ALICE_INPUT)
+
+    expect(game.gameId).toBe(JOIN_CODE)
+    expect(game.roomCode).toBe(JOIN_CODE)
+  })
+
+  it("returns the repository's assigned playerId", async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    const playerId = await game.join(repository, JOIN_CODE, ALICE_INPUT)
+
+    expect(playerId).toBe('player-Alice')
+  })
+
+  it('reflects state the repository emits after joining', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+
+    await game.join(repository, JOIN_CODE, ALICE_INPUT)
+    repository.emit({
+      status: 'playing',
+      currentRound: 1,
+      // Standings now derive totalScore from roundScores (see stores/game.ts), so the fixture's
+      // player.totalScore must agree with this — a lying totalScore is covered separately by
+      // the 'useGameStore standings' describe block's dedicated regression test.
+      roundScores: [{ round: 1, playerId: 'player-Alice', points: 7 }],
+      players: [{ id: 'player-Alice', name: 'Alice', totalScore: 7 }],
+    })
+
+    expect(game.standings.map((s) => s.player.name)).toEqual(['Alice'])
+    expect(game.standings[0]?.total).toBe(7)
+  })
+})
+
 describe('useGameStore standings', () => {
   it('maps a subscribed state update to standings sorted ascending by total', async () => {
     const game = useGameStore()
@@ -104,7 +174,13 @@ describe('useGameStore standings', () => {
     repository.emit({
       status: 'playing',
       currentRound: 1,
-      roundScores: [],
+      // Standings derive totalScore from roundScores (see stores/game.ts) — kept consistent
+      // with the players' totalScore field here so this test stays focused on sort order, not
+      // the derivation itself (that's the dedicated regression test below).
+      roundScores: [
+        { round: 1, playerId: 'a', points: 30 },
+        { round: 1, playerId: 'b', points: 10 },
+      ],
       players: [
         { id: 'a', name: 'Alice', totalScore: 30 },
         { id: 'b', name: 'Bob', totalScore: 10 },
@@ -121,6 +197,37 @@ describe('useGameStore standings', () => {
 
     expect(game.currentContract.round).toBe(1)
     expect(game.currentContract.melds).toEqual({ setsOfThree: 2, flushes: 0 })
+  })
+
+  // Security regression test: a malicious client (or a compromised/buggy repository) could emit
+  // a `totalScore` that disagrees with the actual `roundScores` — e.g. a player who wrote
+  // themselves a favorable total directly. Low-total-wins makes that self-SERVING, not
+  // self-defeating, so ranking must never trust the writable `totalScore` field; it must be
+  // recomputed from `roundScores` (see firestore.rules' bounded points/round + docs/DECISIONS.md).
+  it('ranks by the roundScores-derived total, ignoring a lying totalScore field', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+
+    repository.emit({
+      status: 'playing',
+      currentRound: 1,
+      // Alice's real total (from roundScores) is 40, but her player doc's totalScore field
+      // falsely claims 1 — if the store trusted totalScore directly, Alice would wrongly lead.
+      roundScores: [
+        { round: 1, playerId: 'a', points: 25 },
+        { round: 2, playerId: 'a', points: 15 },
+        { round: 1, playerId: 'b', points: 20 },
+      ],
+      players: [
+        { id: 'a', name: 'Alice', totalScore: 1 },
+        { id: 'b', name: 'Bob', totalScore: 20 },
+      ],
+    })
+
+    expect(game.standings.map((s) => s.player.id)).toEqual(['b', 'a'])
+    expect(game.standings.map((s) => s.total)).toEqual([20, 40])
+    expect(game.winners.map((s) => s.player.id)).toEqual(['b'])
   })
 })
 

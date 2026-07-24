@@ -6,7 +6,12 @@
  */
 import { computed, onScopeDispose, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { contractForRound, standings as standingsFor, winners as winnersFor } from '@/lib/rules'
+import {
+  contractForRound,
+  runningTotal,
+  standings as standingsFor,
+  winners as winnersFor,
+} from '@/lib/rules'
 import type {
   AddPlayerInput,
   GameConfig,
@@ -16,7 +21,7 @@ import type {
   SetRoundScoreInput,
   Unsubscribe,
 } from '@/lib/repository'
-import type { GameResult, GameState } from '@/lib/types'
+import type { GameResult, GameState, Player } from '@/lib/types'
 
 function initialGameState(): GameState {
   return { status: 'waiting', currentRound: 1, players: [], roundScores: [] }
@@ -36,8 +41,23 @@ export const useGameStore = defineStore('game', () => {
   const status = computed(() => state.value.status)
   const currentRound = computed(() => state.value.currentRound)
   const currentContract = computed(() => contractForRound(state.value.currentRound))
-  const standings = computed(() => standingsFor(state.value.players))
-  const winners = computed(() => winnersFor(state.value.players))
+
+  /**
+   * Players with `totalScore` RECOMPUTED from `state.roundScores`, never the writable field a
+   * repository/document reports. Low-total-wins makes a falsified `totalScore` self-SERVING
+   * (not "self-defeating" — see docs/DECISIONS.md), and Firestore rules bound `points`/`round`
+   * but can't sum a player's own docs into a trustworthy total — so ranking derives it here
+   * instead of trusting the field. Both repositories already emit `roundScores`, so this covers
+   * local and online alike.
+   */
+  const rankedPlayers = computed<Player[]>(() =>
+    state.value.players.map((player) => ({
+      ...player,
+      totalScore: runningTotal(player.id, state.value.roundScores),
+    })),
+  )
+  const standings = computed(() => standingsFor(rankedPlayers.value))
+  const winners = computed(() => winnersFor(rankedPlayers.value))
 
   function requireRepository(): GameRepository {
     if (!repository) {
@@ -56,6 +76,30 @@ export const useGameStore = defineStore('game', () => {
     unsubscribe = repo.subscribe((next) => {
       state.value = next
     })
+  }
+
+  /**
+   * Joins an existing online game by room code: seats `player` as a new player, then begins
+   * reflecting the room's live state — never calling `createGame` (the host already did that;
+   * see `start`). Order matters: `addPlayer` must resolve *before* `subscribe` is called. The
+   * room-scoped read gate in firestore.rules only lets already-seated members read the
+   * players/roundScores subcollections, so subscribing first would hit a permission-denied that
+   * `onSnapshot` never recovers from, even after the join completes (see firestore-realtime).
+   */
+  async function join(
+    repo: GameRepository,
+    code: string,
+    player: AddPlayerInput,
+  ): Promise<PlayerId> {
+    leave()
+    repository = repo
+    gameId.value = code
+    roomCode.value = code
+    const playerId = await repo.addPlayer(player)
+    unsubscribe = repo.subscribe((next) => {
+      state.value = next
+    })
+    return playerId
   }
 
   async function addPlayer(input: AddPlayerInput): Promise<PlayerId> {
@@ -93,6 +137,7 @@ export const useGameStore = defineStore('game', () => {
     standings,
     winners,
     start,
+    join,
     addPlayer,
     setRoundScore,
     advanceRound,

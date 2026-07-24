@@ -1,0 +1,127 @@
+rules_version = '2';
+
+// Firestore rules — THE security boundary for this app (see CLAUDE.md "Golden rules" and
+// docs/DECISIONS.md's 2026-07-24 online-auth / topology / read-gate / trust-model entries,
+// which this file implements verbatim). The UI hiding a button is not security; this is.
+//
+// Identity: Firebase Anonymous Auth's `request.auth.uid` is the actor Firestore checks.
+// `deviceUuid` carried on player/roundScore docs is the separate, persistent STATS key (see
+// the identity store) — it is never trusted for permission decisions, only `auth.uid` is.
+//
+// Topology: room/{code} (room lookup by code) with two subcollections —
+// room/{code}/players/{uid} and room/{code}/roundScores/{uid}_{round} — so every write/read
+// under a room is structurally scoped to that room's code, and a player's own docs are keyed
+// by their own uid.
+//
+// Trust model: OWN-SCORE-ONLY writes, plus the host may correct anyone's in their room. There
+// is no server here to recompute totals from N per-round docs. Note: under low-total-wins,
+// deflating your own score is SELF-SERVING, not "self-defeating" — so `points`/`round` are
+// bounded below, and the store derives standings from `roundScores`, never trusting the
+// writable `totalScore` field for ranking (see stores/game.ts).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** The existing room doc's data, fetched by code — for use from the player/roundScore
+     * subcollection rules, which need to look outside their own document. */
+    function roomData(code) {
+      return get(/databases/$(database)/documents/room/$(code)).data;
+    }
+
+    function roomNotExpired(code) {
+      return roomData(code).expiresAt > request.time;
+    }
+
+    function isHost(code) {
+      return roomData(code).hostUid == request.auth.uid;
+    }
+
+    /** Room-scoped read gate (not just "any authed user"): true only for someone already
+     * seated as a player in this room. */
+    function isRoomMember(code) {
+      return exists(/databases/$(database)/documents/room/$(code)/players/$(request.auth.uid));
+    }
+
+    match /room/{code} {
+      // Join-by-code discovery: any authed user may look up a room by its KNOWN code — but
+      // `read` covers both `get` (single doc) and `list` (collection query); only `get` is
+      // granted. Without this split, any authed stranger could getDocs(collection(db,'room'))
+      // and enumerate every room (codes, hostUid, ...), defeating join-by-code privacy. The app
+      // only ever fetches/subscribes a room by code — never lists the collection.
+      allow get: if isSignedIn();
+
+      // Only the creator can mint a room, seeded at round 1 with an honest future expiry.
+      allow create: if isSignedIn()
+        && request.resource.data.code == code
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.currentRound == 1
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.expiresAt > request.time;
+
+      // Only the host advances rounds / finishes the game, and only while the room is live.
+      // `resource` (not a get()) is enough here — we're already inside this exact document's
+      // own rule, no need to fetch it a second time. Field-restricted to exactly what the app
+      // ever writes here (advanceRound/finishGame): status + currentRound. hostUid/code/
+      // createdAt/expiresAt are immutable after create — an unbounded expiry extension would
+      // undermine "rooms auto-expire" (docs/PLAN.md's Gemini free-tier protection).
+      allow update: if isSignedIn()
+        && resource.data.hostUid == request.auth.uid
+        && resource.data.expiresAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentRound']);
+
+      allow delete: if false;
+
+      match /players/{playerUid} {
+        allow read: if isSignedIn() && isRoomMember(code);
+
+        // Joining is always seating yourself — the host never creates another player's doc,
+        // and nobody may claim an ownerUid that isn't their own uid.
+        allow create: if isSignedIn()
+          && playerUid == request.auth.uid
+          && request.resource.data.ownerUid == request.auth.uid
+          && roomNotExpired(code);
+
+        // A player corrects their own row; the host may correct anyone's in their room. Field-
+        // restricted to name/totalScore only — deviceUuid is the slice-6 stats trust anchor
+        // (a player rewriting it to someone else's key could steal/corrupt that device's
+        // persistent stats), and ownerUid must stay pinned to whoever created this doc.
+        allow update: if isSignedIn()
+          && (playerUid == request.auth.uid || isHost(code))
+          && roomNotExpired(code)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'totalScore'])
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.deviceUuid == resource.data.deviceUuid;
+
+        allow delete: if false;
+      }
+
+      match /roundScores/{scoreId} {
+        allow read: if isSignedIn() && isRoomMember(code);
+
+        // Own-score-only trust model: a player writes their own score; the host may correct
+        // anyone's. `playerId == ownerUid` keeps the two fields honest with each other so
+        // nobody can write a score doc for a player they aren't, under either field. `points`/
+        // `round` are bounded (low-total-wins makes deflating your own score SELF-serving, not
+        // self-defeating — there's no server to catch a falsified value otherwise), and the doc
+        // id is pinned to `{ownerUid}_{round}` so there is structurally exactly one score per
+        // player per round — an arbitrary id would let a client double-count a round via extra
+        // sibling docs `runningTotal` would sum together.
+        allow create, update: if isSignedIn()
+          && roomNotExpired(code)
+          && request.resource.data.playerId == request.resource.data.ownerUid
+          && (request.resource.data.ownerUid == request.auth.uid || isHost(code))
+          && request.resource.data.round is int
+          && request.resource.data.round >= 1
+          && request.resource.data.round <= 5
+          && request.resource.data.points is int
+          && request.resource.data.points >= 0
+          && request.resource.data.points <= 1000
+          && scoreId == request.resource.data.ownerUid + '_' + string(request.resource.data.round);
+
+        allow delete: if false;
+      }
+    }
+  }
+}

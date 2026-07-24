@@ -8,7 +8,11 @@ export default mergeConfig(
     test: {
       environment: 'happy-dom',
       globals: true,
-      exclude: [...configDefaults.exclude, 'e2e/**'],
+      // 'tests/**' (Firestore rules + emulator-backed integration tests) needs a real Node
+      // environment and a running emulator — see vitest.rules.config.ts (`pnpm test:rules`) and
+      // vitest.integration.config.ts (`pnpm test:integration`). Keeping it excluded here means
+      // `pnpm test:run` never depends on the emulator being up (see the tdd skill).
+      exclude: [...configDefaults.exclude, 'e2e/**', 'tests/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
     },
   }),

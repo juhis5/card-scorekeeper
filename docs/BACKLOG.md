@@ -65,7 +65,18 @@ game is playable single-device in the browser, mobile viewport, no backend.
 
 ## Slice 4 — Firestore online path + security rules + live-sync e2e
 
-**Status: TODO** · depends: 3 · SECURITY-CRITICAL
+**Status: 4a DONE / 4b TODO** · depends: 3 · SECURITY-CRITICAL
+Split into 4a (backend + rules, DONE) and 4b (online UI wiring + live-sync e2e, TODO).
+**4a DONE:** `firebase.ts` (anon auth, `persistentLocalCache`), `FirestoreGameRepository`,
+`room-code.ts`, store `join()` action, `firestore.rules` (subcollections; anon-uid identity;
+member-only reads; own-score-only writes; bounded points/round + pinned doc-id; field-locked
+updates), `firebase.json` (firestore+auth emulators), 24 rules tests on the emulator
+(mutation-tested), `test:rules` wired. Fresh security review found + fixed 2 BLOCKs
+(room-enumeration via `list`; negative-score win — ranking now derives from bounded roundScores).
+Known env flake fenced off in `test:integration` (not in CI). 93 app tests green.
+**4b TODO:** HomeView connectivity-probe → online vs local; show/enter room code; online UI
+(each enters own score; status stays 'waiting' until host advances); two-client live-sync
+Playwright e2e on the emulator; wire `test:rules` CI job.
 `src/lib/firebase.ts` init (public `VITE_FIREBASE_*`). `FirestoreGameRepository` (`onSnapshot` +
 writes, `writeBatch` for multi-player round; listeners unsubscribed). Room-code create/join flow;
 connectivity probe on "start game" → pick Firestore vs Local repo. `firestore.rules` — **the

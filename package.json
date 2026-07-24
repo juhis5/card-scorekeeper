@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:rules": "firebase emulators:exec 'vitest run rules'",
+    "test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'",
+    "test:integration": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.integration.config.ts'",
     "e2e": "playwright test",
     "prepare": "husky"
   },
@@ -24,6 +25,7 @@
     "@vueuse/core": "^14.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "firebase": "^12.16.0",
     "pinia": "^4.0.2",
     "pinia-plugin-persistedstate": "^4.7.1",
     "reka-ui": "^2.10.1",
@@ -37,6 +39,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.2.0",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/vue": "^8.1.0",
@@ -51,6 +54,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-playwright": "^2.10.5",
     "eslint-plugin-vue": "~10.9.2",
+    "firebase-tools": "^15.24.0",
     "happy-dom": "^20.11.1",
     "husky": "^9.1.7",
     "jiti": "^2.7.0",
