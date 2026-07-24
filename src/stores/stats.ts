@@ -36,7 +36,7 @@ import { ref } from 'vue'
 import { probeBackendReachable } from '@/lib/connectivity'
 import { headToHead, playerStats } from '@/lib/stats'
 import type { HeadToHeadRecord, PlayerStats } from '@/lib/stats'
-import type { GamePlayer } from '@/lib/types'
+import type { GamePlayer, GameResult } from '@/lib/types'
 
 /** Firestore's `in` operator caps how many values one query can compare against. The documented
  * ceiling has moved over time (10, then 30) — chunk well under either rather than assume the
@@ -168,10 +168,7 @@ export const useStatsStore = defineStore('stats', () => {
       const finishedAtByGameId = new Map<string, string>()
       for (const snapshot of resultSnapshots) {
         for (const snapshotDoc of snapshot.docs) {
-          finishedAtByGameId.set(
-            snapshotDoc.id,
-            (snapshotDoc.data() as { finishedAt: string }).finishedAt,
-          )
+          finishedAtByGameId.set(snapshotDoc.id, (snapshotDoc.data() as GameResult).finishedAt)
         }
       }
 

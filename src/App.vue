@@ -4,6 +4,8 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChartColumn, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import ThemeToggle from '@/components/ThemeToggle.vue'
+import LocaleToggle from '@/components/LocaleToggle.vue'
 import { useServiceWorker } from '@/composables/useServiceWorker'
 
 const route = useRoute()
@@ -45,13 +47,17 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
       >
         {{ t('app.title') }}
       </RouterLink>
-      <RouterLink
-        :to="{ name: 'stats' }"
-        class="text-primary focus-visible:ring-ring flex h-11 items-center gap-1 rounded-sm px-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
-      >
-        <ChartColumn aria-hidden="true" class="size-4" />
-        {{ t('nav.stats') }}
-      </RouterLink>
+      <div class="flex items-center gap-1">
+        <RouterLink
+          :to="{ name: 'stats' }"
+          class="text-primary focus-visible:ring-ring flex h-11 items-center gap-1 rounded-sm px-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+        >
+          <ChartColumn aria-hidden="true" class="size-4" />
+          {{ t('nav.stats') }}
+        </RouterLink>
+        <LocaleToggle />
+        <ThemeToggle />
+      </div>
     </header>
 
     <div

@@ -1,6 +1,12 @@
 {
   "app": {
     "title": "Rommi-pisteet",
+    "theme": {
+      "label": "Tumma tila"
+    },
+    "locale": {
+      "switchLabel": "{code} — vaihda kieltä napauttamalla"
+    },
     "update": {
       "available": "Uusi versio on saatavilla.",
       "reload": "Lataa uudelleen",

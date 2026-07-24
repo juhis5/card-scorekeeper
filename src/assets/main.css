@@ -129,3 +129,20 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Reduced motion: suppress the Sheet's enter/exit slide+fade (the only non-trivial motion in this
+ * app besides an already-gated spinner — see the a11y-mobile + design-system skills). Written as a
+ * plain, unlayered rule rather than Tailwind's `motion-reduce:` variant classes: Tailwind v4 puts
+ * ALL utilities — including `motion-reduce:` ones — inside the same `@layer utilities`, so within
+ * that layer it's ordinary source order that decides ties, and the base `data-open:animate-in`
+ * utility is emitted AFTER the media-gated override in this build, silently winning back the
+ * animation (confirmed against the built dist/assets/*.css — the class-based attempt did not
+ * work). An unlayered rule always beats every rule inside a layer regardless of source order or
+ * specificity (CSS cascade-layer semantics), so this is the one override that actually applies. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot='sheet-overlay'],
+  [data-slot='sheet-content'] {
+    animation: none;
+    transition: none;
+  }
+}

@@ -303,3 +303,15 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   with the anon-auth decision and not forgeable (same lesson as the stats-forgery fix): the client
   sends its Firebase ID token, the function verifies it → uid → checks the room exists/active/
   not-expired AND `players/{uid}` exists in it. A self-asserted token field would be spoofable.
+
+- 2026-07-24 — Slice 8 polish: theme toggle + locale switcher shipped (the slice-3 deferral).
+  `useTheme` is a non-singleton composable persisting `localStorage['theme']` byte-for-byte like
+  index.html's no-flash script (NOT via pinia-persistedstate, which JSON-wraps and would break the
+  match + reintroduce flash). Reduced-motion audit: only real motion was the shadcn Sheet
+  enter/exit — gated via an UNLAYERED `@media (prefers-reduced-motion: reduce)` in main.css
+  (Tailwind v4 `motion-reduce:` utilities lost to source-order within `@layer utilities`; unlayered
+  rules beat all layered ones — verified against compiled CSS). No score/win-celebration motion exists.
+- 2026-07-24 — Two cosmetic follow-ups (non-blocking, for BUILD_REPORT): index.html's
+  `<meta name="theme-color">` stays dark-tinted in light mode (a clean fix needs reading
+  `--background` at runtime, not a second hardcoded hex); shadcn `SheetContent`'s built-in "Close"
+  label is hardcoded English but unreachable today (`PhotoCountSheet` sets `:show-close-button="false"`).
