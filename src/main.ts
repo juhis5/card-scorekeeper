@@ -8,6 +8,7 @@ import App from './App.vue'
 import router from './router'
 import { i18n } from './i18n'
 import { useIdentityStore } from './stores/identity'
+import { flushPendingResultsOnLaunch } from './lib/reconnect-flush'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -23,3 +24,11 @@ app.use(router)
 app.use(i18n)
 
 app.mount('#app')
+
+// Best-effort reconnect flush (see docs/PLAN.md "Reconnect = push final result only"): push any
+// locally-queued finished-game results up to Firestore now that we're launching online. Never
+// awaited — must never delay app mount (see the offline-capable host golden rule) — and any
+// failure just leaves the queue for the next launch (see reconnect-flush.ts).
+if (navigator.onLine) {
+  void flushPendingResultsOnLaunch()
+}

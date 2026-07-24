@@ -17,7 +17,16 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { Timestamp, collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
+import {
+  Timestamp,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore'
 
 const RULES_PATH = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -61,6 +70,35 @@ function roundScoreFixture(ownerUid: string, overrides: Partial<Record<string, u
     ownerUid,
     round: 1,
     points: 10,
+    ...overrides,
+  }
+}
+
+const GAME_ID = 'local-game-1'
+
+function gameResultFixture(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    gameId: GAME_ID,
+    finishedAt: '2026-01-01T00:00:00.000Z',
+    totalRounds: 5,
+    winnerUuid: 'device-a',
+    ...overrides,
+  }
+}
+
+function gamePlayerFixture(
+  gameId: string,
+  deviceUuid: string,
+  overrides: Partial<Record<string, unknown>> = {},
+) {
+  return {
+    gameId,
+    deviceUuid,
+    displayName: 'Alice',
+    finalScore: 42,
+    placement: 1,
+    bestRound: 0,
+    worstRound: 20,
     ...overrides,
   }
 }
@@ -389,6 +427,283 @@ describe('players field-level write restrictions (bonus coverage)', () => {
         name: 'Alicia',
         totalScore: 42,
       }),
+    )
+  })
+})
+
+// Permanent stats records (docs/PLAN.md "Stats & history") are append-only: create is the only
+// write ever allowed. These games have no matching `room` doc (a purely local/offline game,
+// reaching Firestore only via the reconnect flush — see docs/PLAN.md "Reconnect = push final
+// result only"), so their create-authorization floor is bare authed + well-formed fields (see
+// docs/DECISIONS.md's create-authorization trade-off note).
+describe('game_result append-only stats records (no matching room)', () => {
+  it('lets an authenticated user create a game_result', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertSucceeds(setDoc(doc(alice, `game_result/${GAME_ID}`), gameResultFixture()))
+  })
+
+  it('denies an unauthenticated user creating a game_result', async () => {
+    const unauthed = testEnv.unauthenticatedContext().firestore()
+
+    await assertFails(setDoc(doc(unauthed, `game_result/${GAME_ID}`), gameResultFixture()))
+  })
+
+  it('denies updating an existing game_result', async () => {
+    await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      updateDoc(doc(alice, `game_result/${GAME_ID}`), { winnerUuid: 'someone-else' }),
+    )
+  })
+
+  it('denies deleting a game_result', async () => {
+    await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(deleteDoc(doc(alice, `game_result/${GAME_ID}`)))
+  })
+})
+
+// No `room` doc exists for GAME_ID in this describe block, so the identity anchor available is
+// SELF-WRITE ONLY (deviceUuid == auth.uid) — there's no room-participant list to check against
+// for a game that was never online (see the create-authorization trade-off note above the
+// hybrid describe block below).
+describe('game_player append-only stats records (no matching room)', () => {
+  beforeEach(async () => {
+    await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
+  })
+
+  it('lets an authenticated user create their OWN game_player row (self-write, no room)', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertSucceeds(
+      setDoc(
+        doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID),
+      ),
+    )
+  })
+
+  // THE FORGERY FIX: without a room to check a participant against, self-write is the only
+  // identity anchor left. Before this rule tightened, `!roomExists(gameId)` alone authorized the
+  // write regardless of whose deviceUuid was being claimed — any authed stranger could forge a
+  // permanent, append-only win/loss row for ANY victim's deviceUuid. See the mutation-check note
+  // in the PR/report: this exact test fails (i.e. `assertFails` itself fails, because the write
+  // actually succeeds) against the pre-fix rule.
+  it("denies an authenticated user creating a game_player row for someone ELSE's deviceUuid (no room)", async () => {
+    const mallory = testEnv.authenticatedContext('mallory-uid').firestore()
+
+    await assertFails(
+      setDoc(
+        doc(mallory, `game_player/${GAME_ID}_victim-device-uuid`),
+        gamePlayerFixture(GAME_ID, 'victim-device-uuid'),
+      ),
+    )
+  })
+
+  it('denies creating a game_player row whose game_result does not exist yet', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_player/missing-game_${ALICE_UID}`),
+        gamePlayerFixture('missing-game', ALICE_UID),
+      ),
+    )
+  })
+
+  it('denies an unauthenticated user creating a game_player row', async () => {
+    const unauthed = testEnv.unauthenticatedContext().firestore()
+
+    await assertFails(
+      setDoc(
+        doc(unauthed, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID),
+      ),
+    )
+  })
+
+  it('denies a doc id that does not match {gameId}_{deviceUuid}', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(doc(alice, `game_player/mismatched-id`), gamePlayerFixture(GAME_ID, ALICE_UID)),
+    )
+  })
+
+  it('denies updating an existing game_player row', async () => {
+    await seed(async (db) =>
+      setDoc(
+        doc(db(), `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID),
+      ),
+    )
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      updateDoc(doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`), { finalScore: 999 }),
+    )
+  })
+
+  it('denies deleting a game_player row', async () => {
+    await seed(async (db) =>
+      setDoc(
+        doc(db(), `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID),
+      ),
+    )
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(deleteDoc(doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`)))
+  })
+})
+
+// Numeric/range sanity bounds — exercised on the simpler self-write (no-room) path, but the
+// checks themselves are identity-agnostic (same conditions apply on the room-backed path too).
+describe('game_player value bounds (bonus coverage)', () => {
+  beforeEach(async () => {
+    await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
+  })
+
+  it('denies a finalScore over the sanity cap', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { finalScore: 5001 }),
+      ),
+    )
+  })
+
+  it('denies a placement below 1', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { placement: 0 }),
+      ),
+    )
+  })
+
+  it('denies a placement over the sanity cap', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { placement: 51 }),
+      ),
+    )
+  })
+
+  it('denies a bestRound over the sanity cap', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { bestRound: 1001 }),
+      ),
+    )
+  })
+
+  it('denies a worstRound over the sanity cap', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { worstRound: 1001 }),
+      ),
+    )
+  })
+})
+
+describe('game_result field sanity (bonus coverage)', () => {
+  it('denies a totalRounds that is not the fixed 5-round game', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(doc(alice, `game_result/${GAME_ID}`), gameResultFixture({ totalRounds: 6 })),
+    )
+  })
+})
+
+// The stronger constraint available when a gameId DOES correspond to a live/expired online
+// room: only that room's host may write its stats rows ("the host is the one finishing, so it
+// writes all rows"), AND (the forgery fix) only for a deviceUuid that was actually seated as a
+// real participant in that room — see docs/DECISIONS.md's create-authorization trade-off note.
+describe('game_result/game_player create authorization for a room-backed game', () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`), playerFixture(ALICE_UID))
+    })
+  })
+
+  it('lets the room host write the game_result for that room-backed game', async () => {
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertSucceeds(
+      setDoc(doc(host, `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
+    )
+  })
+
+  it('denies a non-host authenticated user writing the game_result for a room-backed game', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(doc(alice, `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
+    )
+  })
+
+  it("lets the host write a real participant's game_player row for a room-backed game", async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
+    )
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertSucceeds(
+      setDoc(
+        doc(host, `game_player/${ROOM_CODE}_${ALICE_UID}`),
+        gamePlayerFixture(ROOM_CODE, ALICE_UID),
+      ),
+    )
+  })
+
+  it('denies a non-host authenticated user (even a real participant) writing a game_player row for a room-backed game', async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
+    )
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_player/${ROOM_CODE}_${ALICE_UID}`),
+        gamePlayerFixture(ROOM_CODE, ALICE_UID),
+      ),
+    )
+  })
+
+  // THE FORGERY FIX: before this rule tightened, `isHost(gameId)` alone authorized the write —
+  // the host could write a game_player row for ANY deviceUuid, including someone who never
+  // joined this room at all (a fabricated "opponent" who never played). The mutation check (see
+  // the report) confirms this exact test fails against the pre-fix rule.
+  it('denies the host writing a game_player row for a uid that was never a participant in this room', async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
+    )
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(host, `game_player/${ROOM_CODE}_never-played-uid`),
+        gamePlayerFixture(ROOM_CODE, 'never-played-uid'),
+      ),
     )
   })
 })

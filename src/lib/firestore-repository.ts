@@ -27,10 +27,18 @@ import {
 } from 'firebase/firestore'
 import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
+import { writeGameResult } from './firestore-stats'
 import { generateRoomCode as defaultGenerateRoomCode } from './room-code'
-import { TOTAL_ROUNDS, runningTotal, winners as leadingPlayers } from './rules'
+import {
+  TOTAL_ROUNDS,
+  placements as placementsFor,
+  runningTotal,
+  winners as leadingPlayers,
+} from './rules'
+import { bestAndWorstRound } from './stats'
 import type {
   ContractRoundNumber,
+  GamePlayer,
   GameResult,
   GameState,
   GameStatus,
@@ -276,24 +284,66 @@ export class FirestoreGameRepository implements GameRepository {
     const roomCode = this.requireRoomCode()
     const playersSnapshot = await getDocs(collection(this.db, `room/${roomCode}/players`))
     const players = playersSnapshot.docs.map(toPlayer)
+    const roundScoresSnapshot = await getDocs(collection(this.db, `room/${roomCode}/roundScores`))
+    const roundScores = roundScoresSnapshot.docs.map(toRoundScore)
 
     await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
 
-    const [leader] = leadingPlayers(players)
     const deviceUuidByPlayerId = new Map(
       playersSnapshot.docs.map((snapshot) => [
         snapshot.id,
         (snapshot.data() as PlayerDocData).deviceUuid,
       ]),
     )
+    // Recomputed from roundScores, not the players' own writable totalScore field — same reason
+    // the game store's rankedPlayers does (see docs/DECISIONS.md's trust-model entry): a
+    // permanent stats row is worth getting exactly right regardless of any denormalized field.
+    const rankedPlayers = players.map((player) => ({
+      ...player,
+      totalScore: runningTotal(player.id, roundScores),
+    }))
+
+    const [leader] = leadingPlayers(rankedPlayers)
     const winnerUuid = leader ? (deviceUuidByPlayerId.get(leader.player.id) ?? '') : ''
 
-    return {
+    const result: GameResult = {
       gameId: roomCode,
       finishedAt: new Date(this.now()).toISOString(),
       totalRounds: TOTAL_ROUNDS,
       winnerUuid,
     }
+
+    const gamePlayers: GamePlayer[] = placementsFor(rankedPlayers).map(({ player, placement }) => {
+      const points = roundScores
+        .filter((score) => score.playerId === player.id)
+        .map((score) => score.points)
+      // Trusts the same "everyone scored every round" assumption the UI's Finish-button gate
+      // relies on (see LocalGameRepository.finishGame's matching comment) — guarded rather than
+      // left to bestAndWorstRound's empty-input throw, for the edge case of a player with no
+      // recorded rounds at all.
+      const { bestRound, worstRound } =
+        points.length > 0 ? bestAndWorstRound(points) : { bestRound: 0, worstRound: 0 }
+      return {
+        gameId: roomCode,
+        // The room participant's own auth uid (player.id — `room/{code}/players/{uid}` is keyed
+        // by it), NOT the localStorage device_uuid on their player doc. firestore.rules can only
+        // verify "this deviceUuid was a real participant in this room" via
+        // exists(room/{gameId}/players/{deviceUuid}) — a check that only works if the value
+        // matches how player docs are actually keyed. Using the spoofable localStorage
+        // device_uuid here would let the host forge a stats row for a deviceUuid nobody ever
+        // seated (see docs/DECISIONS.md's forgery-fix entry).
+        deviceUuid: player.id,
+        displayName: player.name,
+        finalScore: player.totalScore,
+        placement,
+        bestRound,
+        worstRound,
+      }
+    })
+
+    await writeGameResult(this.db, result, gamePlayers)
+
+    return result
   }
 
   leave(): void {

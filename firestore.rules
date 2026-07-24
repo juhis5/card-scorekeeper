@@ -44,6 +44,15 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/room/$(code)/players/$(request.auth.uid));
     }
 
+    /** True when a `room/{code}` doc exists for this gameId — i.e. this game was (or still is) a
+     * live online room, as opposed to a purely local (offline, single-device) game whose result
+     * only ever reaches Firestore via the reconnect flush (see docs/PLAN.md "Reconnect = push
+     * final result only"). Used below to decide how much the game_result/game_player create rules
+     * CAN verify about the writer for a given gameId. */
+    function roomExists(gameId) {
+      return exists(/databases/$(database)/documents/room/$(gameId));
+    }
+
     match /room/{code} {
       // Join-by-code discovery: any authed user may look up a room by its KNOWN code — but
       // `read` covers both `get` (single doc) and `list` (collection query); only `get` is
@@ -122,6 +131,86 @@ service cloud.firestore {
 
         allow delete: if false;
       }
+    }
+
+    // Permanent stats records (docs/PLAN.md "Stats & history" — a second layer, separate from
+    // the transient room above). APPEND-ONLY: `create` is the only write ever allowed; `update`
+    // and `delete` are always denied, so a written result can never be edited or removed
+    // afterward, even by its own writer.
+    //
+    // READS are open to any authed user (not room-scoped like players/roundScores above) — this
+    // is intentional, not an oversight: head-to-head derivation (`lib/stats.ts`) must read
+    // OPPONENTS' rows too, not just the caller's own, so a room-membership-style read gate would
+    // break the feature outright. This is safe because these are shared game outcomes among
+    // friends, not sensitive data (see docs/PLAN.md) — and, after the write-side fix below,
+    // forgery is closed at the CREATE rule, not by hiding reads.
+    //
+    // Create-authorization trade-off (see docs/DECISIONS.md): when a gameId corresponds to a
+    // room that exists (an online game — the common case), only that room's host may write its
+    // stats rows, matching "the host is the one finishing, so it writes all rows" — AND (the
+    // forgery fix below) only for a deviceUuid that was actually seated as a real participant in
+    // that room, via `exists(room/{gameId}/players/{deviceUuid})`. `deviceUuid` on these rows is
+    // therefore the room participant's own AUTH UID (see `firestore-repository.ts`'s
+    // `finishGame`), not the separate localStorage `device_uuid` the room's `players` docs carry
+    // — the auth uid is the one identity Firestore can actually verify against room membership.
+    //
+    // When no room exists (a purely local/offline game, only reaching Firestore via the
+    // reconnect flush — see docs/PLAN.md "Reconnect = push final result only"), there is no room
+    // doc to check a participant against, so the ONLY remaining identity anchor is SELF-WRITE:
+    // `deviceUuid == request.auth.uid`. Before this fix, the local branch had no identity check
+    // at all (`!roomExists(gameId)` alone authorized the write) — any authed user could forge a
+    // permanent win/loss row for any victim's deviceUuid; closed here.
+    //
+    // `game_player` additionally requires a matching `game_result` to already exist, so a row can
+    // never be created as an orphan pointing at a game that was never (yet) finished.
+    match /game_result/{gameId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.gameId == gameId
+        && request.resource.data.finishedAt is string
+        && request.resource.data.totalRounds is int
+        && request.resource.data.totalRounds == 5
+        && request.resource.data.winnerUuid is string
+        && (!roomExists(gameId) || isHost(gameId));
+
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /game_player/{playerDocId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.gameId is string
+        && request.resource.data.deviceUuid is string
+        && playerDocId == request.resource.data.gameId + '_' + request.resource.data.deviceUuid
+        && exists(/databases/$(database)/documents/game_result/$(request.resource.data.gameId))
+        && request.resource.data.displayName is string
+        && request.resource.data.finalScore is int
+        && request.resource.data.finalScore >= 0
+        && request.resource.data.finalScore <= 5000
+        && request.resource.data.placement is int
+        && request.resource.data.placement >= 1
+        && request.resource.data.placement <= 50
+        && request.resource.data.bestRound is int
+        && request.resource.data.bestRound >= 0
+        && request.resource.data.bestRound <= 1000
+        && request.resource.data.worstRound is int
+        && request.resource.data.worstRound >= 0
+        && request.resource.data.worstRound <= 1000
+        && (
+          (roomExists(request.resource.data.gameId)
+            && isHost(request.resource.data.gameId)
+            && exists(
+              /databases/$(database)/documents/room/$(request.resource.data.gameId)/players/$(request.resource.data.deviceUuid)
+            ))
+          || (!roomExists(request.resource.data.gameId)
+            && request.resource.data.deviceUuid == request.auth.uid)
+        );
+
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

@@ -166,6 +166,69 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   (regression-tested). Reconnecting indicator uses `navigator.onLine` (same signal as the probe),
   distinct from the never-connected local banner.
 
+- 2026-07-24 — Stats identity keying (slice 6): stats are keyed by device UUID. They AGGREGATE
+  across games for real devices — the host (their own persisted `device_uuid`) and online joiners
+  (each their own device). In a LOCAL game the host's other players are ad-hoc names on one device
+  with per-game synthetic UUIDs (slice 3), so they appear in THAT game's result + head-to-head but
+  do NOT aggregate across games. — This is the documented "history follows the device, not the
+  person" limitation (PLAN "Stats & history"), not a bug; the highest-value stat (the host's own
+  record) works everywhere, online opponents aggregate correctly, and we avoid inventing a
+  cross-game identity for ad-hoc local players that PLAN never specified. Surface the caveat in the
+  Stats UI.
+
+- 2026-07-24 — Slice 6 (stats backend) built: `lib/stats.ts` (pure `playerStats`/`headToHead`/
+  `bestAndWorstRound`, no `GameResult[]` needed — every stat PLAN asks for lives on `GamePlayer`
+  rows, grouped by their own `gameId`), persistence in both repositories' `finishGame`
+  (`LocalGameRepository` queues `{result, players}` to a localStorage `pending-results` list via
+  new `lib/pending-results.ts`; `FirestoreGameRepository` writes straight to top-level
+  `game_result/{gameId}` + `game_player/{gameId}_{deviceUuid}` via new `lib/firestore-stats.ts`),
+  a reconnect flush (`pending-results.ts`'s `flushPendingResults`, wired minimally at launch via
+  `lib/reconnect-flush.ts` + `main.ts`), and `firestore.rules` append-only records for both
+  collections. `lib/key-value-storage.ts` extracted from `local-repository.ts` (2nd real
+  duplication) so `pending-results.ts` can share the `KeyValueStorage` interface without a
+  circular import.
+- 2026-07-24 — `game_result`/`game_player` create-authorization is a HYBRID, not a flat "any
+  authed user": when a gameId corresponds to an existing `room/{code}` doc (an online game — the
+  common case, since `FirestoreGameRepository` uses the room code as the gameId), only that
+  room's host may create its stats rows (`roomExists(gameId) → isHost(gameId)`), matching "the
+  host is the one finishing, so it writes all rows". When no room exists for that gameId (a
+  purely local/offline game only reaching Firestore via the reconnect flush — there is no room
+  doc to check a participant against for a game that was never online), the floor is bare
+  authed-create + well-formed fields + referential integrity (`game_player` requires a matching
+  `game_result` to already exist, via `exists()` — not batched with it, since a `get()` inside a
+  rule can't see a sibling write from the same batch, so the two are genuine sequential writes,
+  same pattern as `createGame`'s room-then-player order). Both are read-open to any authed user
+  (shared game outcomes among friends, not sensitive per PLAN) and always deny `update`/`delete`.
+- 2026-07-24 — `writeGameResult` (`lib/firestore-stats.ts`) is per-document IDEMPOTENT
+  (`getDoc` existence check before every `setDoc`, skipping docs already written) — found in
+  review, not in the original design. The reconnect flush retries a whole queued result on the
+  NEXT launch after ANY failure, including a partial one: `Promise.all` over `game_player` writes
+  rejects on the first failure, but sibling writes that already resolved are already committed.
+  Without the idempotency check, retrying would re-`setDoc` an already-written append-only doc,
+  which the rules' `update` denial would reject forever — turning one transient failure into a
+  permanent block on that game (and, since the flush stops at the first failure, on every later
+  queued game too). The extra reads are cheap for this low-frequency, tiny-record feature.
+
+- 2026-07-24 — Stats rows key on the anon UID, NOT the separate localStorage `device_uuid`, and
+  writes are tied to auth in rules (closes a targeted-forgery BLOCK from the 6-backend review).
+  `game_player.deviceUuid` = the player's uid (= their `room/{code}/players/{uid}` id). Create rule:
+  ONLINE (room exists) → only the host may write, and only for a real participant
+  (`exists(players/{uid})`); LOCAL (flushed offline game) → `deviceUuid == request.auth.uid`
+  (self-write only), and only the HOST's own row is flushed (local ad-hoc co-players don't
+  aggregate). — Without tying the written deviceUuid to `request.auth.uid`, any authed stranger
+  could forge a permanent append-only win/loss on any victim's stats. The room already keys players
+  by uid, so this is a bounded slice-6 change (no identity rewrite, no finish-flow rewrite).
+  Mutation-tested: the forgery negatives fail against the pre-fix rule.
+- 2026-07-24 — Stats reads (`game_result`/`game_player`) stay OPEN to any authed user (not
+  per-device-scoped). — Head-to-head must read opponents' rows, so per-device read scoping would
+  break it; now that forgery is closed by the create rules, open reads are just "friends see the
+  group's shared game history" (intended). Numeric bounds pinned by rules tests (finalScore ≤5000,
+  placement 1..50, best/worst round ≤1000, totalRounds == 5).
+- 2026-07-24 — ACCEPTED RESIDUAL (within PLAN's "stats are only as trustworthy as the identity
+  model"): a malicious HOST can still misreport the result of a game played IN THEIR OWN room —
+  rules can't recompute a total from N per-round docs (no server). This is the same trust line
+  already accepted for live play; correcting it would need a server. Not a blocker.
+
 ## Carried-forward TODOs (flagged by implementers, not yet wired)
 
 - ~~Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap~~ — DONE in slice 3 (wired in
@@ -193,9 +256,25 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   ONLINE game (distinct from never-connected → local). Firestore `persistentLocalCache` is already
   on (slice 4a), so a blip keeps working from cache; slice 5 adds the subtle "reconnecting…" UI +
   host-editing-others online (deferred from 4b-i) can be revisited then or in polish.
-- Slice 6 (stats): local non-host players get a fresh synthetic `crypto.randomUUID()` per game
-  (slice 3), so their stats won't accumulate across local games. PLAN didn't pin local-player
-  identity; reconcile when building stats (device-UUID model assumes real devices).
+- ~~Slice 6 (stats): local non-host players get a fresh synthetic `crypto.randomUUID()` per
+  game...~~ RECONCILED (2026-07-24, see the "Stats identity keying" entry above): `lib/stats.ts`
+  doesn't special-case it — a synthetic per-game UUID just never repeats across games, so it
+  naturally never aggregates, which is the documented behavior, not a bug to fix here.
+- Slice 6 (stats) — left for the Stats UI/store slice, NOT built here per this slice's scope
+  (backend only): the actual views/routes/store reading `game_result`/`game_player` back out and
+  rendering `playerStats`/`headToHead`, and surfacing the identity caveats (device-follows-not-
+  person, local non-aggregation) in that UI per PLAN.
+- Slice 6 (stats) — residual gap, accepted for this slice: an ONLINE game's `finishGame` writes
+  `game_result`/`game_player` directly (no queue) after the room already flipped to `'finished'`;
+  if that specific write fails (as opposed to the room update, which is a separate, already-
+  awaited call), there's no retry — unlike the offline path, which always has the
+  `pending-results` queue as a safety net. Not treated as a blocker (the game itself still ends
+  correctly for players either way), but worth a queue-on-failure fallback if it's ever observed
+  in practice.
+- Slice 6 (stats): the new `finishGame`-writes-`game_result`/`game_player` end-to-end assertion
+  lives in `tests/integration/firestore-repository.test.ts` — the quarantined, NOT-in-CI,
+  documented-flake suite (see the KNOWN FLAKE entry below), not `pnpm test:rules`/`test:run`. It
+  passed every run this session; treat it as bonus real-emulator evidence, not a CI gate.
 - Slice 8 (polish): slice 3 UI is behavior-tested + static-checked (tokens/a11y/i18n) but not yet
   visually verified in a real browser at a phone viewport — do the cross-platform visual pass here.
 - ~~Slice 4b: ONLINE UI must handle...~~ DONE (4b-i, 2026-07-24): RoomView filters entry rows to

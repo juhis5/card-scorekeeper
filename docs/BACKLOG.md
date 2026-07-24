@@ -122,7 +122,13 @@ start→finish; the two offline modes are visually distinguished.
 
 ## Slice 6 — Persistent stats + head-to-head — STRICT TDD (derivation)
 
-**Status: TODO** · depends: 4 (5 helps but not required)
+**Status: 6-backend DONE / 6-ui TODO** · depends: 4 (5 helps but not required)
+6-backend DONE: `lib/stats.ts` pure derivation (win-rate, best/worst final+round, averages,
+head-to-head — TDD); both repos persist at finish (Firestore `game_result`/`game_player`
+uid-keyed; local queues + reconnect-flush pushes host's own row); append-only rules with
+auth-tied create (forgery BLOCK found+fixed by fresh review, mutation-tested); 218 tests, 46
+rules tests. 6-ui TODO: stats store + Stats view + route + identity caveats display + i18n.
+--- original scope ---
 On game finish, write `game_result` + one `game_player` per player (keyed by device UUID). Stats
 derivation (pure, TDD over fixtures): wins/win-rate, best/worst final score, best/worst single
 round, games played + averages, head-to-head (compare `placement` across shared `game_id`). Stats

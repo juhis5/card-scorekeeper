@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { hasPersistedGame, LocalGameRepository, STORAGE_KEY } from './local-repository'
 import type { KeyValueStorage } from './local-repository'
+import { readPendingResults } from './pending-results'
 import type { ContractRoundNumber, GameState } from './types'
 
 const ALL_ROUNDS: readonly ContractRoundNumber[] = [1, 2, 3, 4, 5]
@@ -214,9 +215,10 @@ describe('LocalGameRepository.advanceRound', () => {
 
 describe('LocalGameRepository.finishGame', () => {
   /** Plays a full game where the host is deliberately kept out of the running for lowest total,
-   * so tests can assert a specific, unambiguous winner among Alice/Bob. */
-  async function playFullGame() {
-    const repository = makeRepository()
+   * so tests can assert a specific, unambiguous winner among Alice/Bob. Accepts the storage so
+   * pending-queue tests can inspect it after the fact. */
+  async function playFullGame(storage: KeyValueStorage = makeMemoryStorage()) {
+    const repository = makeRepository({ storage })
     const created = await repository.createGame(HOST_CONFIG)
     const host = recordEmissions(repository)[0]?.players[0]
     if (!host) throw new Error('expected the host to be seated after createGame')
@@ -230,7 +232,7 @@ describe('LocalGameRepository.finishGame', () => {
       if (round < 5) await repository.advanceRound()
     }
 
-    return { repository, host, alice, bob, gameId: created.gameId }
+    return { repository, host, alice, bob, gameId: created.gameId, storage }
   }
 
   it('marks the game finished and reports the lowest-total player as the winner', async () => {
@@ -281,11 +283,71 @@ describe('LocalGameRepository.finishGame', () => {
   })
 
   it('throws when called before the final round is reached', async () => {
-    const repository = makeRepository()
+    const storage = makeMemoryStorage()
+    const repository = makeRepository({ storage })
     await repository.createGame(HOST_CONFIG)
     await repository.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
     await expect(repository.finishGame()).rejects.toThrow()
+    expect(readPendingResults(storage)).toEqual([])
+  })
+
+  // Only the host's own row is queued — never the local ad-hoc co-players'. Two independent
+  // reasons (see buildHostGamePlayer's doc comment): (1) locked decision — synthetic per-game
+  // co-player ids never aggregate across games anyway; (2) security — firestore.rules' local-path
+  // game_player create rule is self-write-only (deviceUuid == auth.uid), so a co-player's row
+  // could never legitimately be written under anyone's auth session.
+  it("queues a pending stats result with only the host's own GamePlayer row on finish", async () => {
+    const { repository, gameId, storage } = await playFullGame()
+
+    await repository.finishGame()
+
+    const pending = readPendingResults(storage)
+    expect(pending).toHaveLength(1)
+    expect(pending[0]?.result).toMatchObject({ gameId, totalRounds: 5, winnerUuid: 'device-a' })
+    expect(pending[0]?.players).toHaveLength(1)
+    expect(pending[0]?.players[0]?.deviceUuid).toBe('device-host')
+  })
+
+  it("records the host's own placement (not the winner's) in the queued result", async () => {
+    const { repository, storage } = await playFullGame()
+
+    await repository.finishGame()
+
+    // host scored 50/round (worst of the 3: alice 10/round wins, bob 20/round is 2nd).
+    const hostPlayer = readPendingResults(storage)[0]?.players[0]
+    expect(hostPlayer?.deviceUuid).toBe('device-host')
+    expect(hostPlayer?.placement).toBe(3)
+  })
+
+  it("computes the host's own best and worst single round from their own varying round scores", async () => {
+    const storage = makeMemoryStorage()
+    const repository = makeRepository({ storage })
+    await repository.createGame(HOST_CONFIG)
+    const host = recordEmissions(repository)[0]?.players[0]
+    if (!host) throw new Error('expected the host to be seated after createGame')
+    const alice = await repository.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+
+    const hostPoints = [10, 40, 0, 25, 15]
+    for (const [index, round] of ALL_ROUNDS.entries()) {
+      await repository.setRoundScore({ playerId: host.id, round, points: hostPoints[index] ?? 0 })
+      await repository.setRoundScore({ playerId: alice, round, points: 5 })
+      if (round < 5) await repository.advanceRound()
+    }
+
+    await repository.finishGame()
+
+    const hostPlayer = readPendingResults(storage)[0]?.players[0]
+    expect(hostPlayer?.deviceUuid).toBe('device-host')
+    expect(hostPlayer?.bestRound).toBe(0)
+    expect(hostPlayer?.worstRound).toBe(40)
+  })
+
+  it('does not fail the game when the pending-queue storage write throws', async () => {
+    const throwingStorage = makeThrowingStorage()
+    const { repository } = await playFullGame(throwingStorage)
+
+    await expect(repository.finishGame()).resolves.toMatchObject({ winnerUuid: 'device-a' })
   })
 })
 

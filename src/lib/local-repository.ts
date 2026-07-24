@@ -4,11 +4,25 @@
  * `roomCode` is always null. `subscribe` re-emits the full state to a new listener
  * immediately, and to every listener again on each mutation.
  *
- * Persisting the permanent per-player stats rows (`game_result` / `game_player`) on
- * finish is slice 6 — `finishGame` here only computes and returns the `GameResult`.
+ * `finishGame` also queues the permanent stats record (a `GameResult` plus the HOST's own single
+ * `GamePlayer` row only — see `buildHostGamePlayer`'s doc comment for why not the local
+ * co-players' too, see docs/PLAN.md "Stats & history") into the pending-results localStorage
+ * queue — there is no network here, so they can't be written to Firestore directly;
+ * `pending-results.ts`'s `flushPendingResults` uploads them once the app is next online (see
+ * docs/DECISIONS.md's "Reconnect = push final result only").
  */
-import { TOTAL_ROUNDS, contractForRound, runningTotal, winners as leadingPlayers } from './rules'
-import type { GameResult, GameState, Player, RoundScore } from './types'
+import {
+  TOTAL_ROUNDS,
+  contractForRound,
+  placements as placementsFor,
+  runningTotal,
+  winners as leadingPlayers,
+} from './rules'
+import { bestAndWorstRound } from './stats'
+import { appendPendingResult } from './pending-results'
+import { browserLocalStorage } from './key-value-storage'
+import type { KeyValueStorage } from './key-value-storage'
+import type { GamePlayer, GameResult, GameState, Player, RoundScore } from './types'
 import type {
   AddPlayerInput,
   CreatedGame,
@@ -54,22 +68,10 @@ function emptyStoredGame(): StoredGame {
   }
 }
 
-/**
- * The minimal `localStorage` shape this repository needs. Kept as our own interface (decoupled
- * from lib.dom's `Storage`) so tests can inject a plain in-memory fake instead of driving a real
- * browser API — see `tdd`'s "mock I/O at the boundary".
- */
-export interface KeyValueStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
-}
-
-/** The real browser localStorage, typed as our own `KeyValueStorage` rather than lib.dom's
- * `Storage` and reached via `globalThis` (not the `window` identifier) so it resolves in any
- * global context this class might run in. */
-function browserLocalStorage(): KeyValueStorage {
-  return (globalThis as unknown as { localStorage: KeyValueStorage }).localStorage
-}
+// Re-exported so existing call sites (`stores/game.ts`, this file's own tests) keep importing it
+// from here — the interface itself now lives in `key-value-storage.ts`, shared with
+// `pending-results.ts` (see that file's doc comment on why it was extracted).
+export type { KeyValueStorage }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -255,16 +257,70 @@ export class LocalGameRepository implements GameRepository {
 
     const [leader] = leadingPlayers(this.game.state.players)
     const winnerUuid = leader ? (this.game.deviceUuidByPlayerId[leader.player.id] ?? '') : ''
-    return {
+    const result: GameResult = {
       gameId: this.game.gameId,
       finishedAt: this.now(),
       totalRounds: TOTAL_ROUNDS,
       winnerUuid,
     }
+
+    // No network here (offline by construction): queue the permanent record for the reconnect
+    // flush (see pending-results.ts) instead of writing it anywhere now. Best-effort, same as
+    // persistAndNotify above — a queueing failure must not fail the game the player just finished.
+    appendPendingResult(this.storage, { result, players: [this.buildHostGamePlayer()] })
+
+    return result
   }
 
   leave(): void {
     this.listeners.clear()
+  }
+
+  /**
+   * Builds the ONE permanent `GamePlayer` row `finishGame` queues: the host's own — never the
+   * local ad-hoc co-players'. Two independent reasons this is correct, not a shortcut:
+   *
+   * 1. Locked decision (docs/DECISIONS.md "Stats identity keying"): local co-players get a fresh
+   *    synthetic per-game UUID, so their stats never aggregate across games anyway — a permanent
+   *    Firestore row for them would never be useful.
+   * 2. Security (docs/DECISIONS.md's forgery-fix entry): `firestore.rules`' local-path
+   *    (no-room) `game_player` create rule requires `deviceUuid == request.auth.uid` — a
+   *    self-write only. The reconnect flush (`reconnect-flush.ts`) stamps this row's `deviceUuid`
+   *    with whoever is actually signed in at flush time; queuing a co-player's row here would
+   *    just be queued data that could never pass that rule under anyone's auth session.
+   *
+   * `finalScore` is recomputed from `roundScores` (not the possibly-stale `totalScore` field) the
+   * same way the game store's `rankedPlayers` does, for the same reason: a written stats row is
+   * worth getting exactly right.
+   */
+  private buildHostGamePlayer(): GamePlayer {
+    const { roundScores, players } = this.game.state
+    const hostStanding = placementsFor(players).find(
+      (standing) => standing.player.id === this.game.hostPlayerId,
+    )
+    if (!hostStanding) {
+      throw new Error('finishGame: host player not found among seated players')
+    }
+    const { player: host, placement } = hostStanding
+
+    const points = roundScores
+      .filter((score) => score.playerId === host.id)
+      .map((score) => score.points)
+    // Trusts the same finishGame precondition as above — the host should have a score for every
+    // round reached — but never crashes on the edge case (no recorded rounds) rather than let
+    // bestAndWorstRound's empty-input throw surface here.
+    const { bestRound, worstRound } =
+      points.length > 0 ? bestAndWorstRound(points) : { bestRound: 0, worstRound: 0 }
+
+    return {
+      gameId: this.game.gameId,
+      deviceUuid: this.game.hostDeviceUuid,
+      displayName: host.name,
+      finalScore: runningTotal(host.id, roundScores),
+      placement,
+      bestRound,
+      worstRound,
+    }
   }
 
   private persistAndNotify(): void {
