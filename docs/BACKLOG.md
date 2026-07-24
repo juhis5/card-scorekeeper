@@ -74,9 +74,12 @@ updates), `firebase.json` (firestore+auth emulators), 24 rules tests on the emul
 (mutation-tested), `test:rules` wired. Fresh security review found + fixed 2 BLOCKs
 (room-enumeration via `list`; negative-score win — ranking now derives from bounded roundScores).
 Known env flake fenced off in `test:integration` (not in CI). 93 app tests green.
-**4b TODO:** HomeView connectivity-probe → online vs local; show/enter room code; online UI
-(each enters own score; status stays 'waiting' until host advances); two-client live-sync
-Playwright e2e on the emulator; wire `test:rules` CI job.
+**4b IN PROGRESS (STALLED — see DECISIONS build-stall note):** split into 4b-i (online UI) +
+4b-ii (e2e). **4b-i PARTIAL, uncommitted:** connectivity probe + repo factory + `CreatedGame.
+hostPlayerId` done & green; store `isHost`/`myPlayerId`, HomeView probe/join, RoomView online
+adaptations, i18n still to do (+ one build error to fix in game.test.ts). Stalled on the Sonnet
+session limit (resets ~04:00 Helsinki 2026-07-24). **4b-ii TODO:** two-client live-sync Playwright
+e2e on the emulator. Then wire `test:rules` CI job.
 `src/lib/firebase.ts` init (public `VITE_FIREBASE_*`). `FirestoreGameRepository` (`onSnapshot` +
 writes, `writeBatch` for multi-player round; listeners unsubscribed). Room-code create/join flow;
 connectivity probe on "start game" → pick Firestore vs Local repo. `firestore.rules` — **the

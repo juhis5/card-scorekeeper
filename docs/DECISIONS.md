@@ -77,6 +77,27 @@ One line per decision made without the human (asleep during the overnight build)
   enumerate every room, defeating join-by-code privacy. The app only ever single-doc `get`s a room
   by known code, so dropping `list` costs nothing. (Found by the slice-4a fresh security review.)
 
+## BUILD STALL — 2026-07-24 ~00:38 Helsinki: Sonnet delegates hit the account session limit
+
+Resets ~04:00 Helsinki. The orchestrator does not write feature code, so remaining slices wait for
+the reset. HEAD = `b30ed14` (slice 4a) is clean and builds. Slice **4b-i is PARTIAL, uncommitted**
+in the working tree — resume brief (do NOT restart from scratch; finish what's there):
+
+- DONE + green (107 tests): `src/lib/connectivity.ts` (+test, the reachability probe),
+  `src/lib/game-mode.ts` (+test, the Local-vs-Firestore repo factory), and the `CreatedGame`
+  extension with `hostPlayerId` in `src/lib/repository.ts` + both repos (`local-repository.ts`,
+  `firestore-repository.ts`) + `local-repository.test.ts`.
+- BROKEN: `pnpm build` fails — `src/stores/game.test.ts:46` has a fake `CreatedGame` missing the
+  now-required `hostPlayerId`. First fix to make the tree build again.
+- NOT DONE (finish per the online-ui delegation spec, items 4–7): store `isHost`/`myPlayerId`
+  (set from `hostPlayerId` on start / from join's return); HomeView start-probe → online/offline +
+  a join-by-code entry; RoomView online adaptations (show room code, self-only score entry,
+  host-only Next/Finish, don't gate on status==='playing'); i18n for all new strings.
+- THEN: slice 4b-ii (two-client live-sync Playwright e2e on the emulator + auth emulator).
+
+Resume order after reset: finish 4b-i → review → 4b-ii e2e → slice 5 (PWA) → 6 (stats) →
+7 (optional photo) → 8 (polish, incl. wiring the `test:rules` CI job + BUILD_REPORT).
+
 ## Carried-forward TODOs (flagged by implementers, not yet wired)
 
 - ~~Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap~~ — DONE in slice 3 (wired in
