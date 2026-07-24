@@ -98,7 +98,7 @@ e2e green; no leaked listeners.
 
 ## Slice 5 — PWA offline shell + offline UX
 
-**Status: 5a DONE / 5b TODO** · depends: 4
+**Status: DONE** · depends: 4
 Split: 5a (PWA shell) + 5b (offline robustness: persistence degrade, local resume, reconnecting).
 **5a DONE:** `vite-plugin-pwa` (prompt-mode SW, manifest, real icons 192/512/maskable/apple-touch),
 precached app shell (offline cold-start verified in-browser by killing the server — shell loads
@@ -108,6 +108,11 @@ degrade — a missing/invalid config or persistence failure must fall back to of
 throw at import and break "Start game" (found in 5a: blank `VITE_FIREBASE_*` → `getAuth` throws
 synchronously); (2) `persistentMultipleTabManager` → memory/single-tab fallback for constrained
 storage (iOS private mode); (3) local-game resume-on-reload; (4) mid-game "reconnecting…" indicator.
+**5b DONE:** all four — firebase lazy getters + try/catch degrade to local host (proof-tested);
+`canUsePersistentCache` → memory fallback + single-tab; store `resume()` route-gated to `local`
+(regression-tested against online routes); `useConnectionStatus` reconnecting banner. 173 tests,
+shuffle-stable (fixed a real cross-block localStorage flake at root); live-sync e2e re-verified green
+after the firebase refactor. Fresh review: no blocks.
 `vite-plugin-pwa` + Workbox: manifest, icons, precache app shell so **offline cold-start loads
 and a local game is playable**. Firestore `persistentLocalCache` for mid-game blips (distinct
 from never-connected). error-ux: never-connected → local-game banner; blip mid-game →

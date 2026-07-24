@@ -1,11 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import RoomView from './RoomView.vue'
 import { useGameStore } from '@/stores/game'
 import { LocalGameRepository } from '@/lib/local-repository'
 import type { KeyValueStorage } from '@/lib/local-repository'
+import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { runningTotal } from '@/lib/rules'
 import { i18n } from '@/i18n'
 import type {
@@ -117,10 +119,28 @@ class FakeOnlineRepository implements GameRepository {
 
 const RouterLinkStub = { template: '<a><slot /></a>' }
 
-function renderRoom() {
-  return render(RoomView, {
-    global: { plugins: [i18n], stubs: { RouterLink: RouterLinkStub } },
+/** A minimal real router — RoomView reads `route.params.code` (to gate resume() to the local
+ * sentinel route; see stores/game.ts + lib/local-game-route.ts), so `useRoute()` needs an
+ * actually-installed router, not just the `RouterLink` stub used for navigation elsewhere. */
+function makeTestRouter(): Router {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/room/:code', name: 'room', component: { template: '<div />' } }],
   })
+}
+
+/** Navigates a fresh test router to `/room/:code` and mounts RoomView there — `routeCode`
+ * defaults to the local-game sentinel since most of this file's tests are local games. */
+async function renderRoomAt(routeCode: string) {
+  const router = makeTestRouter()
+  await router.push(`/room/${routeCode}`)
+  return render(RoomView, {
+    global: { plugins: [router, i18n], stubs: { RouterLink: RouterLinkStub } },
+  })
+}
+
+function renderRoom() {
+  return renderRoomAt(LOCAL_GAME_ROUTE_CODE)
 }
 
 async function enterScore(name: string, round: number, points: number): Promise<void> {
@@ -141,6 +161,12 @@ async function advanceOrFinish(round: number): Promise<void> {
 
 beforeEach(() => {
   setActivePinia(createPinia())
+  // RoomView's resume() reads real browser localStorage by default (see the "resume after
+  // reload" describe block below, which seeds it directly with the real `LocalGameRepository`
+  // default storage). Cleared before EVERY test, file-wide — not just within that describe block
+  // — so a persisted game from one test can never leak into an unrelated test's mount, whatever
+  // order `--sequence.shuffle` happens to run them in (found by exactly that shuffle run).
+  localStorage.clear()
 })
 
 describe('RoomView score entry', () => {
@@ -149,7 +175,7 @@ describe('RoomView score entry', () => {
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
-    renderRoom()
+    await renderRoom()
     await enterScore('Alice', 1, 12)
 
     const rows = screen.getAllByRole('row').slice(1) // drop the header row
@@ -164,7 +190,7 @@ describe('RoomView invalid score entry', () => {
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
-    renderRoom()
+    await renderRoom()
     await enterScore('Alice', 1, -5)
 
     expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
@@ -179,7 +205,7 @@ describe('RoomView invalid score entry', () => {
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
-    renderRoom()
+    await renderRoom()
     await enterScore('Alice', 1, 12.5)
 
     expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
@@ -194,7 +220,7 @@ describe('RoomView invalid score entry', () => {
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
-    renderRoom()
+    await renderRoom()
     await enterScore('Alice', 1, -5)
     expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
 
@@ -208,12 +234,78 @@ describe('RoomView invalid score entry', () => {
 })
 
 describe('RoomView with no active game', () => {
-  it('shows a friendly empty state with a link back home', () => {
-    renderRoom()
+  it('shows a friendly empty state with a link back home', async () => {
+    await renderRoom()
 
     expect(screen.getByRole('heading', { name: 'No local game in progress' })).toBeTruthy()
     expect(screen.getByText('Start a new game from the home screen.')).toBeTruthy()
     expect(screen.getByText('Back to home')).toBeTruthy()
+  })
+})
+
+describe('RoomView resume after reload (slice 5 offline robustness)', () => {
+  // RoomView's resume() call (on mount, with no active store game) uses the real browser
+  // localStorage by default — the same boundary a hard page reload actually loses and restores
+  // from — so these tests seed it directly (the file-wide `beforeEach` above clears it first).
+
+  it('resumes a persisted local game on mount instead of showing the empty state', async () => {
+    let count = 0
+    const seed = new LocalGameRepository({
+      now: () => '2026-01-01T00:00:00.000Z',
+      newId: () => `id-${++count}`,
+    })
+    await seed.createGame({ hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    seed.leave()
+
+    await renderRoom()
+    // resume() runs inside onMounted, so the state it reads back is applied reactively — same
+    // "await a tick before asserting" need as the seat-order growth test above.
+    await flushPromises()
+
+    expect(screen.queryByRole('heading', { name: 'No local game in progress' })).toBeNull()
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows.some((row) => row.textContent?.includes('Alice'))).toBe(true)
+  })
+
+  it('lets a resumed game continue accepting score entry', async () => {
+    const seed = new LocalGameRepository({ now: () => '2026-01-01T00:00:00.000Z' })
+    await seed.createGame({ hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    seed.leave()
+
+    await renderRoom()
+    await flushPromises()
+    await enterScore('Alice', 1, 9)
+
+    const rows = screen.getAllByRole('row').slice(1)
+    const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
+    expect(aliceRow?.textContent).toContain('9')
+  })
+
+  it('still shows the empty state when nothing is persisted', async () => {
+    await renderRoom()
+
+    expect(screen.getByRole('heading', { name: 'No local game in progress' })).toBeTruthy()
+  })
+
+  it('never resumes a stale local game onto an ONLINE room route — the two must never mix', async () => {
+    // A leftover local game from an earlier offline session sits in localStorage. Reloading a
+    // real online room (a different, non-'local' route code) must NOT resurrect it — that would
+    // silently show the wrong game instead of the online room the URL actually asked for.
+    const seed = new LocalGameRepository({ now: () => '2026-01-01T00:00:00.000Z' })
+    await seed.createGame({ hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    seed.leave()
+
+    await renderRoomAt('7K4RQ')
+    await flushPromises()
+
+    // No online reconnect is wired up for this test — the store legitimately has nothing yet —
+    // but the point being proven is what it does NOT do: it must never fall back to Alice's
+    // stale local game just because one happens to be sitting in storage.
+    expect(screen.getByRole('heading', { name: 'No local game in progress' })).toBeTruthy()
+    expect(screen.queryByText('Alice')).toBeNull()
   })
 })
 
@@ -223,7 +315,7 @@ describe('RoomView score entry order', () => {
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
-    renderRoom()
+    await renderRoom()
     const seatOrder = screen
       .getAllByLabelText(/'s round 1 score$/)
       .map((input) => input.getAttribute('id'))
@@ -243,7 +335,7 @@ describe('RoomView score entry order', () => {
     const game = useGameStore()
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
 
-    renderRoom()
+    await renderRoom()
     expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
 
     // Simulates a player showing up after mount — e.g. an async first-snapshot delay online, or
@@ -262,7 +354,7 @@ describe('RoomView finishing the game', () => {
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
-    renderRoom()
+    await renderRoom()
 
     for (let round = 1; round <= 5; round++) {
       await enterScore('Host', round, 50)
@@ -279,7 +371,7 @@ describe('RoomView finishing the game', () => {
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
     await game.addPlayer({ name: 'Bob', deviceUuid: 'device-b' })
 
-    renderRoom()
+    await renderRoom()
 
     for (let round = 1; round <= 5; round++) {
       await enterScore('Host', round, 50)
@@ -297,7 +389,7 @@ describe('RoomView offline banner', () => {
     const game = useGameStore()
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
 
-    renderRoom()
+    await renderRoom()
 
     expect(screen.getByText("You're offline — playing a local game on this device.")).toBeTruthy()
     expect(screen.queryByText(/Room code:/)).toBeNull()
@@ -328,9 +420,13 @@ describe('RoomView online mode', () => {
     return { repository, hostPinia, hostGame, joinerPinia, joinerGame, aliceId }
   }
 
-  function renderAs(pinia: ReturnType<typeof createPinia>) {
+  // Every online-room render needs a router at the REAL room code, not the local sentinel — see
+  // renderRoomAt's doc comment above; onMounted's resume() gate depends on telling them apart.
+  async function renderAs(pinia: ReturnType<typeof createPinia>) {
+    const router = makeTestRouter()
+    await router.push(`/room/${ROOM_CODE}`)
     return render(RoomView, {
-      global: { plugins: [pinia, i18n], stubs: { RouterLink: RouterLinkStub } },
+      global: { plugins: [pinia, router, i18n], stubs: { RouterLink: RouterLinkStub } },
     })
   }
 
@@ -338,7 +434,7 @@ describe('RoomView online mode', () => {
     const { hostPinia } = await setUpOnlineRoom()
     setActivePinia(hostPinia)
 
-    renderAs(hostPinia)
+    await renderAs(hostPinia)
 
     expect(screen.getByText(`Room code: ${ROOM_CODE}`)).toBeTruthy()
     expect(screen.queryByText("You're offline — playing a local game on this device.")).toBeNull()
@@ -348,7 +444,7 @@ describe('RoomView online mode', () => {
     const { joinerPinia } = await setUpOnlineRoom()
     setActivePinia(joinerPinia)
 
-    renderAs(joinerPinia)
+    await renderAs(joinerPinia)
 
     expect(screen.getByLabelText("Alice's round 1 score")).toBeTruthy()
     expect(screen.queryByLabelText("Host's round 1 score")).toBeNull()
@@ -358,12 +454,12 @@ describe('RoomView online mode', () => {
     const { hostPinia, joinerPinia } = await setUpOnlineRoom()
 
     setActivePinia(hostPinia)
-    const hostRender = renderAs(hostPinia)
+    const hostRender = await renderAs(hostPinia)
     expect(screen.getByRole('button', { name: 'Next round' })).toBeTruthy()
     hostRender.unmount()
 
     setActivePinia(joinerPinia)
-    renderAs(joinerPinia)
+    await renderAs(joinerPinia)
     expect(screen.queryByRole('button', { name: 'Next round' })).toBeNull()
     expect(screen.getByText('Waiting for the host to move to the next round.')).toBeTruthy()
   })
@@ -376,10 +472,77 @@ describe('RoomView online mode', () => {
     await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 5 })
 
     setActivePinia(hostPinia)
-    renderAs(hostPinia)
+    await renderAs(hostPinia)
     await enterScore('Host', 1, 50)
 
     const nextButton = screen.getByRole('button', { name: 'Next round' }) as HTMLButtonElement
     expect(nextButton.disabled).toBe(false)
+  })
+})
+
+describe('RoomView reconnecting indicator (slice 5 offline robustness)', () => {
+  const ROOM_CODE = '7K4RQ'
+
+  /** Restores the real navigator.onLine value so a test's stub never leaks into another file's
+   * shared happy-dom window. */
+  afterEach(() => {
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true })
+  })
+
+  it('shows a subtle "reconnecting" status distinct from the never-connected banner, on an offline event mid-online-game', async () => {
+    const repository = new FakeOnlineRepository(ROOM_CODE)
+    const game = useGameStore()
+    await game.start(repository, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+
+    await renderRoomAt(ROOM_CODE)
+    expect(
+      screen.queryByText('Reconnecting… your scores are safe and will sync automatically.'),
+    ).toBeNull()
+
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
+    window.dispatchEvent(new Event('offline'))
+    await flushPromises()
+
+    expect(
+      screen.getByText('Reconnecting… your scores are safe and will sync automatically.'),
+    ).toBeTruthy()
+    // Distinct from the never-connected → local-game banner: this is a live online room.
+    expect(screen.queryByText("You're offline — playing a local game on this device.")).toBeNull()
+    expect(screen.getByText(`Room code: ${ROOM_CODE}`)).toBeTruthy()
+  })
+
+  it('clears the reconnecting status once an online event fires', async () => {
+    const repository = new FakeOnlineRepository(ROOM_CODE)
+    const game = useGameStore()
+    await game.start(repository, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
+    await renderRoomAt(ROOM_CODE)
+    await flushPromises()
+    expect(
+      screen.getByText('Reconnecting… your scores are safe and will sync automatically.'),
+    ).toBeTruthy()
+
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true })
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+
+    expect(
+      screen.queryByText('Reconnecting… your scores are safe and will sync automatically.'),
+    ).toBeNull()
+  })
+
+  it('never shows the reconnecting status for an offline LOCAL game — that path is the persistent offline banner', async () => {
+    const game = useGameStore()
+    await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
+    await renderRoom()
+    await flushPromises()
+
+    expect(screen.getByText("You're offline — playing a local game on this device.")).toBeTruthy()
+    expect(
+      screen.queryByText('Reconnecting… your scores are safe and will sync automatically.'),
+    ).toBeNull()
   })
 })

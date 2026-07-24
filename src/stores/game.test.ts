@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useGameStore } from './game'
-import { LocalGameRepository } from '@/lib/local-repository'
+import { LocalGameRepository, STORAGE_KEY } from '@/lib/local-repository'
 import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
   AddPlayerInput,
@@ -419,6 +419,75 @@ describe('useGameStore full game flow with LocalGameRepository', () => {
     expect(game.standings.map((s) => s.player.name)).toEqual(['Alice', 'Carol', 'Bob', 'Host'])
     expect(game.winners.map((s) => s.player.name)).toEqual(['Alice'])
     expect(game.status).toBe('finished')
+  })
+})
+
+describe('useGameStore.resume', () => {
+  it('does nothing and returns false when no local game is persisted', () => {
+    const game = useGameStore()
+
+    const resumed = game.resume({ storage: makeMemoryStorage() })
+
+    expect(resumed).toBe(false)
+    expect(game.standings).toEqual([])
+    expect(game.isHost).toBe(false)
+  })
+
+  it('reconstructs a persisted local game and reflects its state as host', async () => {
+    const storage = makeMemoryStorage()
+    let count = 0
+    const seed = new LocalGameRepository({ storage, newId: () => `id-${++count}` })
+    const created = await seed.createGame(HOST_CONFIG)
+    await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    seed.leave()
+
+    const game = useGameStore()
+    const resumed = game.resume({ storage })
+
+    expect(resumed).toBe(true)
+    expect(game.isHost).toBe(true)
+    expect(game.isOnline).toBe(false)
+    expect(game.myPlayerId).toBe(created.hostPlayerId)
+    expect(game.standings.map((s) => s.player.name)).toEqual(['Host', 'Alice'])
+  })
+
+  it('keeps reflecting further mutations after resuming (stays subscribed)', async () => {
+    const storage = makeMemoryStorage()
+    const seed = new LocalGameRepository({ storage })
+    await seed.createGame(HOST_CONFIG)
+    const alice = await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    seed.leave()
+
+    const game = useGameStore()
+    game.resume({ storage })
+    await game.setRoundScore({ playerId: alice, round: 1, points: 7 })
+
+    expect(game.standings.find((s) => s.player.id === alice)?.total).toBe(7)
+  })
+
+  it('does not clobber an already-active repository', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+
+    const storage = makeMemoryStorage()
+    const seed = new LocalGameRepository({ storage })
+    await seed.createGame({ hostDeviceUuid: 'someone-else', hostDisplayName: 'Someone Else' })
+
+    const resumed = game.resume({ storage })
+
+    expect(resumed).toBe(false)
+    expect(game.myPlayerId).toBe('fake-host')
+  })
+
+  it('returns false for a storage holding only a corrupted/foreign value', () => {
+    const storage = makeMemoryStorage()
+    storage.setItem(STORAGE_KEY, 'not json')
+
+    const game = useGameStore()
+    const resumed = game.resume({ storage })
+
+    expect(resumed).toBe(false)
   })
 })
 

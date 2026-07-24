@@ -3,6 +3,12 @@
  * `LocalGameRepository` directly — so this file is identical whether the caller injected a
  * local offline game or (slice 4) a Firestore-backed online room. See the `GameRepository`
  * seam in src/lib/repository.ts and the firestore-realtime + vue-pinia skills.
+ *
+ * `resume()` (slice 5, offline robustness) is the one deliberate exception to "never
+ * `LocalGameRepository` directly": resuming a persisted game after a reload is local-only by
+ * definition (an online room is Firestore-backed and reconnects there, not resumed here — see
+ * docs/DECISIONS.md's slice-5 entries), so there is no online counterpart this needs to stay
+ * identical to, unlike `start`/`join`.
  */
 import { computed, onScopeDispose, ref } from 'vue'
 import { defineStore } from 'pinia'
@@ -12,6 +18,8 @@ import {
   standings as standingsFor,
   winners as winnersFor,
 } from '@/lib/rules'
+import { hasPersistedGame, LocalGameRepository } from '@/lib/local-repository'
+import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
   AddPlayerInput,
   GameConfig,
@@ -117,6 +125,36 @@ export const useGameStore = defineStore('game', () => {
     return playerId
   }
 
+  /**
+   * Resumes an already-persisted LOCAL game after a hard reload — mirrors `start()`'s wiring
+   * (records identity, subscribes) but skips `createGame()`: the repository's storage already has
+   * a game, `getResumeInfo()` reads back the identity `createGame()` would otherwise have
+   * returned. No-ops (returns `false`) when a repository is already active — never clobber a
+   * running game — or when nothing is persisted. `deps.storage` lets tests inject a fake instead
+   * of real `localStorage` (see the tdd skill); RoomView calls this with no args in production.
+   */
+  function resume(deps: { storage?: KeyValueStorage } = {}): boolean {
+    if (repository) return false
+    if (!hasPersistedGame(deps.storage)) return false
+
+    const repo = new LocalGameRepository({ storage: deps.storage })
+    const resumed = repo.getResumeInfo()
+    // Belt-and-suspenders: storage could in principle change between the hasPersistedGame()
+    // check above and this read. Never expected in practice (single-threaded, no await between
+    // them), but falling through to "nothing to resume" is always safe.
+    if (!resumed) return false
+
+    repository = repo
+    gameId.value = resumed.gameId
+    roomCode.value = null
+    isHost.value = true
+    myPlayerId.value = resumed.hostPlayerId
+    unsubscribe = repo.subscribe((next) => {
+      state.value = next
+    })
+    return true
+  }
+
   async function addPlayer(input: AddPlayerInput): Promise<PlayerId> {
     return requireRepository().addPlayer(input)
   }
@@ -163,6 +201,7 @@ export const useGameStore = defineStore('game', () => {
     winners,
     start,
     join,
+    resume,
     addPlayer,
     setRoundScore,
     advanceRound,

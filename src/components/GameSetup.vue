@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
+import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import type { HostGameMode } from '@/lib/game-mode'
 
 interface OtherPlayerField {
@@ -79,7 +80,8 @@ async function startGame(mode: HostGameMode): Promise<void> {
       await game.addPlayer({ name, deviceUuid: crypto.randomUUID() })
     }
   }
-  const roomCodeParam = mode.kind === 'online' ? (game.roomCode ?? 'local') : 'local'
+  const roomCodeParam =
+    mode.kind === 'online' ? (game.roomCode ?? LOCAL_GAME_ROUTE_CODE) : LOCAL_GAME_ROUTE_CODE
   await router.push({ name: 'room', params: { code: roomCodeParam } })
 }
 

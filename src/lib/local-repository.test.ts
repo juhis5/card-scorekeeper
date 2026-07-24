@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LocalGameRepository, STORAGE_KEY } from './local-repository'
+import { hasPersistedGame, LocalGameRepository, STORAGE_KEY } from './local-repository'
 import type { KeyValueStorage } from './local-repository'
 import type { ContractRoundNumber, GameState } from './types'
 
@@ -341,6 +341,36 @@ describe('LocalGameRepository persistence', () => {
 
     expect(created.gameId).toBe('id-1')
     expect(emissions.at(-1)?.players.map((p) => p.name)).toEqual(['Host', 'Alice'])
+  })
+})
+
+describe('LocalGameRepository.getResumeInfo / hasPersistedGame', () => {
+  it('reports no persisted game before createGame has ever been called', () => {
+    const storage = makeMemoryStorage()
+
+    expect(hasPersistedGame(storage)).toBe(false)
+    expect(makeRepository({ storage }).getResumeInfo()).toBeNull()
+  })
+
+  it('reports a persisted game, with the seated host player id, once created', async () => {
+    const storage = makeMemoryStorage()
+    const first = makeRepository({ storage })
+    const created = await first.createGame(HOST_CONFIG)
+
+    expect(hasPersistedGame(storage)).toBe(true)
+
+    const resumed = new LocalGameRepository({ storage })
+    expect(resumed.getResumeInfo()).toEqual({
+      gameId: created.gameId,
+      hostPlayerId: created.hostPlayerId,
+    })
+  })
+
+  it('starts fresh (reports no persisted game) when the stored value has an unexpected shape', () => {
+    const storage = makeMemoryStorage()
+    storage.setItem(STORAGE_KEY, JSON.stringify({ unexpected: 'shape' }))
+
+    expect(hasPersistedGame(storage)).toBe(false)
   })
 })
 

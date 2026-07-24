@@ -145,6 +145,27 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   submits the host/join form. `lib/connectivity.ts`/`lib/game-mode.ts`/`lib/local-repository.ts`
   stay static — none of them touch Firebase.
 
+- 2026-07-24 — Offline-host robustness (slice 5b): `firebase.ts` `db`/`auth` are LAZY getters
+  (`getDb()`/`getFirebaseAuth()`), no Firebase calls at import; `useGameConnectivity` wraps the whole
+  online setup (dynamic import + getters + probe + sign-in) in try/catch so ANY failure (blank/bad
+  `VITE_FIREBASE_*`, import failure, sign-in reject, probe timeout) lands the HOST in a working LOCAL
+  game and JOIN in a friendly "unreachable" message — never a crash. — Honors the offline-host golden
+  rule: a broken/absent backend must not break local play. Accepted residual: a probe-success then
+  `createGame` write failure shows a friendly retry (not a local fallback) — narrower window, still
+  no raw error.
+- 2026-07-24 — Firestore persistence degrades: `persistentLocalCache` + `persistentSingleTabManager`
+  when storage is usable (`canUsePersistentCache` feature-detects IndexedDB + a localStorage probe),
+  else `memoryLocalCache`. — Single-tab (not multi-tab) drops the cross-tab zombie-leadership work
+  (multi-tab sync isn't needed one-device-per-player); memory fallback keeps iOS Safari PRIVATE mode
+  working. (Firestore still logs internal "zombie client id" noise in some test browsers — cosmetic,
+  non-fatal, tests pass.)
+- 2026-07-24 — Local-game resume-on-reload: store `resume()` reconstructs a `LocalGameRepository`
+  from localStorage and re-subscribes, GATED to the `local` room route only. — Documented exception
+  to "store never touches a concrete repository" (resume is local-only by construction, no online
+  counterpart). The route gate prevents resurrecting a stale local game onto a real online room URL
+  (regression-tested). Reconnecting indicator uses `navigator.onLine` (same signal as the probe),
+  distinct from the never-connected local banner.
+
 ## Carried-forward TODOs (flagged by implementers, not yet wired)
 
 - ~~Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap~~ — DONE in slice 3 (wired in

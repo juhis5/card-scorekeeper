@@ -55,7 +55,8 @@
     "online": {
       "codeLabel": "Room code: {code}",
       "codeHint": "Share this code so others can join.",
-      "waitingForHost": "Waiting for the host to move to the next round."
+      "waitingForHost": "Waiting for the host to move to the next round.",
+      "reconnecting": "Reconnecting… your scores are safe and will sync automatically."
     },
     "offline": {
       "banner": "You're offline — playing a local game on this device."

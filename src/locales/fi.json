@@ -55,7 +55,8 @@
     "online": {
       "codeLabel": "Huonekoodi: {code}",
       "codeHint": "Jaa tämä koodi, jotta muut voivat liittyä.",
-      "waitingForHost": "Odotetaan, että isäntä siirtyy seuraavalle kierrokselle."
+      "waitingForHost": "Odotetaan, että isäntä siirtyy seuraavalle kierrokselle.",
+      "reconnecting": "Yhteyttä muodostetaan uudelleen… pisteesi ovat tallessa ja synkronoituvat automaattisesti."
     },
     "offline": {
       "banner": "Olet offline-tilassa — pelaat paikallista peliä tällä laitteella."

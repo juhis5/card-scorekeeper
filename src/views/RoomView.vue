@@ -11,22 +11,25 @@
  * waits. Never gate any of this on `status === 'playing'`: online, `status` stays `'waiting'`
  * until the host's first `advanceRound()` (see DECISIONS.md), so gating on it would hide round 1.
  */
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { WifiOff } from '@lucide/vue'
 import ContractBanner from '@/components/ContractBanner.vue'
 import PlayerScoreRow from '@/components/PlayerScoreRow.vue'
 import ScoreBoard from '@/components/ScoreBoard.vue'
 import WinnerBanner from '@/components/WinnerBanner.vue'
 import { Button } from '@/components/ui/button'
+import { useConnectionStatus } from '@/composables/useConnectionStatus'
+import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { TOTAL_ROUNDS } from '@/lib/rules'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/repository'
 import type { Standing } from '@/lib/types'
 
 const { t, n } = useI18n()
+const route = useRoute()
 const game = useGameStore()
 const {
   standings,
@@ -40,6 +43,9 @@ const {
   isOnline,
   roomCode,
 } = storeToRefs(game)
+// Mid-game connectivity blip, distinct from the never-connected `!isOnline` banner below (see
+// the error-ux skill's "the two offline modes") — only ever shown while `isOnline` (a live room).
+const { isReconnecting } = useConnectionStatus()
 
 const announcement = ref('')
 const isAdvancing = ref(false)
@@ -125,6 +131,20 @@ async function handleFinish(): Promise<void> {
     isFinishing.value = false
   }
 }
+
+// Slice 5 offline robustness: a hard reload mid-LOCAL-game used to lose the in-memory store
+// entirely (repo data survived in localStorage, nothing read it back) — RoomView showed the empty
+// state even though a game was still there to continue. Gated on BOTH "no active game yet" AND
+// the route actually being the local sentinel: without the route check, reloading a real ONLINE
+// room (`/room/<code>`) — also a fresh, game-less store at that point — would resume any stale
+// LOCAL game left in localStorage from an earlier session and silently show the wrong game
+// instead of the online room the URL asked for. Resuming an online room is a different problem
+// (Firestore reconnect, not this), not something `resume()` does at all.
+onMounted(() => {
+  if (!hasActiveGame.value && route.params.code === LOCAL_GAME_ROUTE_CODE) {
+    game.resume()
+  }
+})
 </script>
 
 <template>
@@ -163,7 +183,15 @@ async function handleFinish(): Promise<void> {
         <span class="text-muted-foreground">{{ t('room.online.codeHint') }}</span>
       </p>
       <p
-        v-else
+        v-if="isOnline && isReconnecting"
+        role="status"
+        class="bg-muted text-foreground border-border flex items-center gap-2 rounded-lg border px-4 py-3 text-sm"
+      >
+        <WifiOff aria-hidden="true" class="size-4 shrink-0" />
+        {{ t('room.online.reconnecting') }}
+      </p>
+      <p
+        v-else-if="!isOnline"
         role="status"
         class="bg-muted text-foreground border-border flex items-center gap-2 rounded-lg border px-4 py-3 text-sm"
       >

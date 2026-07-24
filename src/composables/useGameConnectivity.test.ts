@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const ensureSignedInMock = vi.fn()
 
 vi.mock('@/lib/firebase', () => ({
-  auth: { currentUser: null },
-  db: {},
+  getFirebaseAuth: () => ({ currentUser: null }),
+  getDb: () => ({}),
   ensureSignedIn: ensureSignedInMock,
 }))
 

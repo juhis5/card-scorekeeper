@@ -30,6 +30,10 @@ interface StoredGame {
   /** Not enforced in local mode (single device, single host) — kept so a future permission
    * model (or a shared-device edge case) has it available without a repository change. */
   hostDeviceUuid: string
+  /** The host's seated playerId — kept alongside (not inside) GameState, like
+   * `deviceUuidByPlayerId` below, so a resumed repository can report it back to the game store
+   * (see `getResumeInfo`) without `createGame()` having run in this process. */
+  hostPlayerId: PlayerId
   /** playerId -> deviceUuid. Kept alongside (not inside) GameState so the pure Player type
    * doesn't carry device identity — only this repository needs it, to report a winnerUuid. */
   deviceUuidByPlayerId: Record<PlayerId, string>
@@ -41,7 +45,13 @@ function initialGameState(): GameState {
 }
 
 function emptyStoredGame(): StoredGame {
-  return { gameId: '', hostDeviceUuid: '', deviceUuidByPlayerId: {}, state: initialGameState() }
+  return {
+    gameId: '',
+    hostDeviceUuid: '',
+    hostPlayerId: '',
+    deviceUuidByPlayerId: {},
+    state: initialGameState(),
+  }
 }
 
 /**
@@ -107,6 +117,7 @@ function isStoredGame(value: unknown): value is StoredGame {
     isRecord(value) &&
     typeof value.gameId === 'string' &&
     typeof value.hostDeviceUuid === 'string' &&
+    typeof value.hostPlayerId === 'string' &&
     isRecord(value.deviceUuidByPlayerId) &&
     isGameState(value.state)
   )
@@ -122,6 +133,17 @@ function readStoredGame(storage: KeyValueStorage): StoredGame | null {
     // Corrupted or foreign localStorage value under our key — start fresh instead of crashing.
     return null
   }
+}
+
+/**
+ * True when `storage` holds a local game that has actually been started (`createGame()` called at
+ * least once) — used to decide whether to resume on mount rather than show the empty state (see
+ * `stores/game.ts`'s `resume()` and RoomView). Reading a "no persisted game" / corrupted value the
+ * same way `readStoredGame` does means this never throws either.
+ */
+export function hasPersistedGame(storage: KeyValueStorage = browserLocalStorage()): boolean {
+  const stored = readStoredGame(storage)
+  return stored !== null && stored.gameId !== ''
 }
 
 export interface LocalGameRepositoryDeps {
@@ -151,11 +173,24 @@ export class LocalGameRepository implements GameRepository {
     this.game = {
       gameId,
       hostDeviceUuid: config.hostDeviceUuid,
+      hostPlayerId,
       deviceUuidByPlayerId: { [hostPlayerId]: config.hostDeviceUuid },
       state: { ...initialGameState(), players: [hostPlayer] },
     }
     this.persistAndNotify()
     return { gameId, roomCode: null, hostPlayerId }
+  }
+
+  /**
+   * The identifying bits `stores/game.ts`'s `resume()` needs to reconstruct the store's identity
+   * flags (`myPlayerId`, `isHost`) that normally come back from `createGame()`'s `CreatedGame` —
+   * resuming (a fresh repository instance reading an existing `StoredGame` from storage, not a
+   * fresh `createGame()` call) has no such return value to draw from otherwise. `null` when
+   * nothing has been persisted yet (mirrors `hasPersistedGame`).
+   */
+  getResumeInfo(): { gameId: GameId; hostPlayerId: PlayerId } | null {
+    if (!this.game.gameId) return null
+    return { gameId: this.game.gameId, hostPlayerId: this.game.hostPlayerId }
   }
 
   async addPlayer(input: AddPlayerInput): Promise<PlayerId> {
