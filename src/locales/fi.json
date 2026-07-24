@@ -1,6 +1,11 @@
 {
   "app": {
-    "title": "Rommi-pisteet"
+    "title": "Rommi-pisteet",
+    "update": {
+      "available": "Uusi versio on saatavilla.",
+      "reload": "Lataa uudelleen",
+      "dismiss": "Sulje"
+    }
   },
   "contract": {
     "round1": "Kaksi kolmen sarjaa",

@@ -1,6 +1,11 @@
 {
   "app": {
-    "title": "Rommi Scorekeeper"
+    "title": "Rommi Scorekeeper",
+    "update": {
+      "available": "A new version is available.",
+      "reload": "Reload",
+      "dismiss": "Dismiss"
+    }
   },
   "contract": {
     "round1": "Two sets of three",

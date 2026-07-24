@@ -98,7 +98,16 @@ e2e green; no leaked listeners.
 
 ## Slice 5 — PWA offline shell + offline UX
 
-**Status: TODO** · depends: 4
+**Status: 5a DONE / 5b TODO** · depends: 4
+Split: 5a (PWA shell) + 5b (offline robustness: persistence degrade, local resume, reconnecting).
+**5a DONE:** `vite-plugin-pwa` (prompt-mode SW, manifest, real icons 192/512/maskable/apple-touch),
+precached app shell (offline cold-start verified in-browser by killing the server — shell loads
+from SW cache); Firestore/googleapis NOT SW-cached (only a nav fallback route); dismissible
+"new version" update banner (a11y'd, i18n). 146 tests. **5b TODO:** (1) `firebase.ts` graceful-
+degrade — a missing/invalid config or persistence failure must fall back to offline-local, NOT
+throw at import and break "Start game" (found in 5a: blank `VITE_FIREBASE_*` → `getAuth` throws
+synchronously); (2) `persistentMultipleTabManager` → memory/single-tab fallback for constrained
+storage (iOS private mode); (3) local-game resume-on-reload; (4) mid-game "reconnecting…" indicator.
 `vite-plugin-pwa` + Workbox: manifest, icons, precache app shell so **offline cold-start loads
 and a local game is playable**. Firestore `persistentLocalCache` for mid-game blips (distinct
 from never-connected). error-ux: never-connected → local-game banner; blip mid-game →
