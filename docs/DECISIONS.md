@@ -156,6 +156,18 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   localStorage, but the game store doesn't re-subscribe on mount — a hard reload mid-game loses
   the in-memory store (repo data survives, nothing reads it back). RoomView degrades gracefully
   (empty state → back home, no crash). Wire resume where offline robustness lives (slice 5).
+- Slice 5 (robustness, surfaced by the 4b-ii e2e): Firestore persistence should GRACEFULLY DEGRADE.
+  The live-sync e2e passes on chromium+firefox but logs `@firebase/firestore: Failed to set zombie
+  client id` + `removeItem NS_ERROR_FAILURE`, and Playwright-WebKit fails the spec ~8/10 — all
+  pointing at `persistentLocalCache({ tabManager: persistentMultipleTabManager() })` in
+  `src/lib/firebase.ts` choking where IndexedDB/localStorage is constrained (test browsers; iOS
+  Safari PRIVATE mode blocks them entirely — and iOS Safari is a target platform). Slice 5: try
+  persistent cache but fall back to memory cache (or `persistentSingleTabManager`) when persistence
+  is unavailable, so a constrained/private context still runs. Likely also clears the WebKit e2e flake.
+- KNOWN LIMITATION (needs real-device verification, cannot do autonomously): live sync is unverified
+  on REAL Safari / iOS Safari. Playwright's bundled WebKit ≠ real Safari (known networking/streaming
+  divergence), so the WebKit e2e failure may be a harness artifact — but do a manual live-sync smoke
+  test on a real iPhone/Safari before relying on online multiplayer there. Recorded for BUILD_REPORT.
 - Slice 5: the error-ux "reconnecting…" indicator for a mid-game connectivity BLIP during an
   ONLINE game (distinct from never-connected → local). Firestore `persistentLocalCache` is already
   on (slice 4a), so a blip keeps working from cache; slice 5 adds the subtle "reconnecting…" UI +

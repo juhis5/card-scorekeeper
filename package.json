@@ -18,6 +18,7 @@
     "test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'",
     "test:integration": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.integration.config.ts'",
     "e2e": "playwright test",
+    "test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'",
     "prepare": "husky"
   },
   "dependencies": {
