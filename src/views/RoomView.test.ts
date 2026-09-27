@@ -239,17 +239,27 @@ beforeEach(() => {
 })
 
 describe('RoomView score entry', () => {
-  it("entering a round score updates that player's total in the scoreboard", async () => {
+  it('shows a round on the board as entered, then reveals its scores when the host moves on', async () => {
     const game = useGameStore()
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
     await renderRoom()
+    await enterScore('Host', 1, 20)
     await enterScore('Alice', 1, 10)
 
-    const rows = screen.getAllByRole('row').slice(1) // drop the header row
-    const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
-    expect(aliceRow?.textContent).toContain('10')
+    const aliceRow = () =>
+      screen
+        .getAllByRole('row')
+        .slice(1)
+        .find((row) => row.textContent?.includes('Alice'))
+    expect(aliceRow()?.textContent).toContain('Entered')
+    expect(aliceRow()?.textContent).not.toContain('10')
+
+    await advanceOrFinish(1)
+
+    expect(aliceRow()?.textContent).toContain('10')
+    expect(aliceRow()?.textContent).not.toContain('Entered')
   })
 
   it('marks no leader until the first round is complete', async () => {
@@ -279,6 +289,79 @@ describe('RoomView score entry', () => {
 
     expect(screen.getByRole('button', { name: "Edit Alice's score (15 points)" })).toBeTruthy()
     expect(screen.getByText('15 pts')).toBeTruthy()
+  })
+})
+
+describe('RoomView moving to the next round', () => {
+  async function startWithAlice(): Promise<void> {
+    const game = useGameStore()
+    await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+  }
+
+  function liveRegion(container: Element): string {
+    return container.querySelector('[aria-live="polite"]')?.textContent ?? ''
+  }
+
+  it('moves on with one tap when the last score is still being typed', async () => {
+    await startWithAlice()
+    await renderRoom()
+    await enterScore('Host', 1, 20)
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
+    await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '10')
+
+    // The tap on Next blurs the input, which saves the score, just before the click lands.
+    void fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await fireEvent.click(screen.getByRole('button', { name: 'Next round' }))
+    await flushPromises()
+
+    expect(screen.getByRole('heading', { name: 'Round 2 scores' })).toBeTruthy()
+  })
+
+  it('says whose scores are missing when Next is tapped too early, and stays put', async () => {
+    await startWithAlice()
+    await renderRoom()
+    await enterScore('Host', 1, 20)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Next round' }))
+    await flushPromises()
+
+    expect(screen.getByText('Still waiting for scores from Alice.')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
+  })
+
+  it('announces the revealed results, your place and the next contract in one message', async () => {
+    await startWithAlice()
+    const { container } = await renderRoom()
+    await enterScore('Host', 1, 20)
+    await enterScore('Alice', 1, 10)
+
+    await advanceOrFinish(1)
+    await flushPromises()
+
+    const message = liveRegion(container)
+    expect(message).toContain('Round 1 results: Alice leads with 10 points.')
+    expect(message).toContain("You're in place 2.")
+    expect(message).toContain('Round 2 of 5')
+  })
+
+  it('announces nothing about results when a game in progress is reopened', async () => {
+    const seed = new LocalGameRepository({ now: () => '2026-01-01T00:00:00.000Z' })
+    const created = await seed.createGame({
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Host',
+    })
+    const aliceId = await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await seed.setRoundScore({ playerId: created.hostPlayerId, round: 1, points: 20 })
+    await seed.setRoundScore({ playerId: aliceId, round: 1, points: 10 })
+    await seed.advanceRound()
+    seed.leave()
+
+    const { container } = await renderRoom()
+    await flushPromises()
+
+    expect(screen.getByRole('heading', { name: 'Round 2 scores' })).toBeTruthy()
+    expect(liveRegion(container)).not.toContain('results')
   })
 })
 
@@ -325,9 +408,7 @@ describe('RoomView invalid score entry', () => {
     await enterScore('Alice', 1, 10)
 
     expect(screen.queryByText('Enter a multiple of 5 from 0 to 1,000.')).toBeNull()
-    const rows = screen.getAllByRole('row').slice(1)
-    const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
-    expect(aliceRow?.textContent).toContain('10')
+    expect(screen.getByRole('button', { name: "Edit Alice's score (10 points)" })).toBeTruthy()
   })
 })
 
@@ -376,9 +457,7 @@ describe('RoomView resume after reload (slice 5 offline robustness)', () => {
     await flushPromises()
     await enterScore('Alice', 1, 10)
 
-    const rows = screen.getAllByRole('row').slice(1)
-    const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
-    expect(aliceRow?.textContent).toContain('10')
+    expect(screen.getByRole('button', { name: "Edit Alice's score (10 points)" })).toBeTruthy()
   })
 
   it('still shows the empty state when nothing is persisted', async () => {
@@ -687,6 +766,22 @@ describe('RoomView online mode', () => {
     expect(screen.getByText('Alice was removed from the game.')).toBeTruthy()
   })
 
+  it('says both "removed" and "everyone has entered" when the last player still to score is removed', async () => {
+    const { hostPinia, hostGame } = await setUpOnlineRoom()
+    await hostGame.setRoundScore({ playerId: 'host-uid', round: 1, points: 20 })
+    setActivePinia(hostPinia)
+    const { container } = await renderAs(hostPinia)
+
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove Alice' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Yes, remove Alice' }))
+    await flushPromises()
+
+    const message = container.querySelector('[aria-live="polite"]')?.textContent ?? ''
+    expect(message).toContain('Alice was removed from the game.')
+    expect(message).toContain('Everyone has entered round 1 scores.')
+  })
+
   it("never offers removing the host's own seat", async () => {
     const { hostPinia } = await setUpOnlineRoom()
     setActivePinia(hostPinia)
@@ -720,6 +815,21 @@ describe('RoomView online mode', () => {
 
     expect(screen.getByRole('button', { name: "Edit Alice's score (scored)" })).toBeTruthy()
     expect(screen.queryByText('20 pts')).toBeNull()
+  })
+
+  it('tells the host when the last score comes in from another device', async () => {
+    const { hostPinia, hostGame, joinerGame, aliceId } = await setUpOnlineRoom()
+    setActivePinia(hostPinia)
+    const { container } = await renderAs(hostPinia)
+    await hostGame.setRoundScore({ playerId: 'host-uid', round: 1, points: 20 })
+    await flushPromises()
+
+    await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 10 })
+    await flushPromises()
+
+    expect(container.querySelector('[aria-live="polite"]')?.textContent).toContain(
+      'Everyone has entered round 1 scores.',
+    )
   })
 
   it('never offers removing players to a joiner', async () => {
@@ -898,13 +1008,13 @@ describe('RoomView late joiners', () => {
     await joinerGame.setRoundScore({ playerId: aliceId, round: 2, points: 5 })
     setActivePinia(hostPinia)
     await renderAs(hostPinia)
-    const nextButton = () => screen.getByRole('button', { name: 'Next round' }) as HTMLButtonElement
+    const nextButton = () => screen.getByRole('button', { name: 'Next round' })
 
-    expect(nextButton().disabled).toBe(true)
+    expect(nextButton().getAttribute('aria-disabled')).toBe('true')
 
     await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 15 })
     await flushPromises()
-    expect(nextButton().disabled).toBe(false)
+    expect(nextButton().getAttribute('aria-disabled')).toBe('false')
   })
 
   it('lets the host fill in a missed round for the late joiner', async () => {

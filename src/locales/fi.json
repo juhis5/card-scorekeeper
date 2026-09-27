@@ -73,7 +73,12 @@
     "table": {
       "player": "Pelaaja",
       "total": "Yhteensä",
-      "leaderLabel": "Johdossa"
+      "leaderLabel": "Johdossa",
+      "totalShort": "Yht.",
+      "roundHeader": "Kierros {round}",
+      "entered": "Syötetty",
+      "noScore": "Ei pisteitä",
+      "caption": "Tilanne kierroksen {round} jälkeen"
     },
     "score": {
       "sectionHeading": "Kierroksen {round} pisteet",
@@ -142,7 +147,8 @@
       "cancel": "Peruuta"
     },
     "next": {
-      "button": "Seuraava kierros"
+      "button": "Seuraava kierros",
+      "waiting": "Odotetaan vielä pisteitä: {names}."
     },
     "finish": {
       "button": "Päätä peli"
@@ -152,8 +158,10 @@
       "tie": "{names} jakavat voiton!"
     },
     "live": {
-      "scoreEntered": "{name} sai {points} pistettä.",
-      "scoreEnteredLeading": "{name} sai {points} pistettä — johtaa nyt.",
+      "scoreSaved": "{name}: {points} pistettä tallennettu.",
+      "allScored": "Kaikki ovat syöttäneet kierroksen {round} pisteet.",
+      "roundResults": "Kierroksen {round} tulokset: {names} johtaa {total} pisteellä. | Kierroksen {round} tulokset: {names} johtavat {total} pisteellä.",
+      "yourPlacement": "Olet sijalla {placement}.",
       "playerRemoved": "Pelaaja {name} poistettiin pelistä."
     },
     "empty": {

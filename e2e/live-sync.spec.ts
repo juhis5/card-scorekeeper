@@ -59,12 +59,19 @@ test.describe('two-client live score sync', () => {
       // 1. The joiner appears on the HOST's scoreboard live — no reload on the host page.
       await expect(scoreboardRow(hostPage, joinerName)).toBeVisible()
 
-      // 2. The joiner enters their own round-1 score; it appears on the HOST's scoreboard live.
+      // 2. The joiner enters their own round-1 score. The HOST's board shows live that it's in,
+      //    but not the number: a round's scores are revealed when the host moves on.
       await enterOwnRoundScore(joinerPage, 1, 15)
-      await expect(scoreboardRow(hostPage, joinerName)).toContainText('15')
+      await expect(scoreboardRow(hostPage, joinerName)).toContainText('Entered')
+      await expect(scoreboardRow(hostPage, joinerName)).not.toContainText('15')
 
-      // 3. The host enters their own round-1 score; it appears on the JOINER's scoreboard live.
+      // 3. The host enters their own round-1 score; the JOINER's board shows it's in, live.
       await enterRoundScore(hostPage, hostName, 1, 20)
+      await expect(scoreboardRow(joinerPage, hostName)).toContainText('Entered')
+
+      // 4. The host moves on: both boards reveal round 1, live on the joiner's device too.
+      await hostPage.getByRole('button', { name: 'Next round' }).click()
+      await expect(scoreboardRow(hostPage, joinerName)).toContainText('15')
       await expect(scoreboardRow(joinerPage, hostName)).toContainText('20')
     } finally {
       await hostContext.close()

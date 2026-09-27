@@ -10,7 +10,7 @@ describe('ContractBanner', () => {
       global: { plugins: [i18n] },
     })
 
-    const banner = screen.getByRole('status').textContent ?? ''
+    const banner = screen.getByText(/Round 3 of 5/).textContent ?? ''
     expect(banner).toContain('Round 3 of 5')
     expect(banner).toContain('Three sets of three')
   })
@@ -21,8 +21,17 @@ describe('ContractBanner', () => {
       global: { plugins: [i18n] },
     })
 
-    const banner = screen.getByRole('status').textContent ?? ''
+    const banner = screen.getByText(/Round 5 of 5/).textContent ?? ''
     expect(banner).toContain('Round 5 of 5')
     expect(banner).toContain('Two flushes and one set of three')
+  })
+
+  it('is not a live region: the room view announces the new round with the results', () => {
+    render(ContractBanner, {
+      props: { round: 2, contractKey: 'contract.round2' },
+      global: { plugins: [i18n] },
+    })
+
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })

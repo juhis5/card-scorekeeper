@@ -372,6 +372,30 @@ describe('useGameStore.completedRounds', () => {
   })
 })
 
+describe('useGameStore.board', () => {
+  it('reveals a round on the board only once the host moves on', async () => {
+    const game = useGameStore()
+    const repository = new LocalGameRepository({ storage: makeMemoryStorage() })
+    await game.start(repository, HOST_CONFIG)
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    const [hostId, aliceId] = game.standings.map((standing) => standing.player.id)
+    if (!hostId || !aliceId) throw new Error('expected two players')
+
+    await game.setRoundScore({ playerId: hostId, round: 1, points: 20 })
+    await game.setRoundScore({ playerId: aliceId, round: 1, points: 10 })
+
+    expect(game.board.map((row) => row.total)).toEqual([0, 0])
+    expect(game.board.every((row) => row.cells[0]?.kind === 'entered')).toBe(true)
+
+    await game.advanceRound()
+
+    expect(game.board.map((row) => [row.player.name, row.total])).toEqual([
+      ['Alice', 10],
+      ['Host', 20],
+    ])
+  })
+})
+
 describe('useGameStore.leave', () => {
   it('unsubscribes so no further repository emissions reach the store', async () => {
     const game = useGameStore()

@@ -28,7 +28,7 @@ Retrofitting a11y is painful; bake it in. This app is used one-handed at a card 
 
 ## Live regions — important for live scores
 
-- Announce meaningful live changes via `aria-live="polite"` so a player not staring at the screen still knows: "Maiju scored 12 — now leading" / round advanced. Announce sparingly (not every keystroke or every write).
+- Announce meaningful live changes via `aria-live="polite"` so a player not staring at the screen still knows: "Maiju: 15 points saved" on save, and when a round is revealed "Round 2 results: Maiju leads with 30 points. You're in place 2." plus the next contract, in one message. Never announce a ranking before its round is revealed. Announce sparingly (not every keystroke or every write).
 - Toasts + status ("reading your cards…") also go through a polite live region. Reserve `assertive` for urgent errors.
 
 ## Color & contrast

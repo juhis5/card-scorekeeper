@@ -31,11 +31,13 @@ import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/repository'
 import type { ContractRoundNumber, Player, Standing } from '@/lib/types'
 
-const { t, n } = useI18n()
+const { t, n, locale } = useI18n()
 const route = useRoute()
 const game = useGameStore()
 const {
+  gameId,
   standings,
+  board,
   currentContract,
   currentRound,
   completedRounds,
@@ -131,6 +133,88 @@ function isOwnCard(playerId: PlayerId): boolean {
   return !isHost.value && playerId === myPlayerId.value
 }
 
+/** Set while this device saves a score or removes a player: either can complete the round, and
+ * its own announcement then says "everyone has entered" instead of a second message racing it. */
+let isLocalChangeInFlight = false
+let pendingSave: Promise<void> = Promise.resolve()
+/** Shown when Next or Finish is tapped before every score is in. */
+const isWaitingHintShown = ref(false)
+const waitingForNames = computed(() =>
+  new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
+    standings.value
+      .filter(
+        ({ player }) => missingRounds(player.id, roundScores.value, currentRound.value).length > 0,
+      )
+      .map(({ player }) => player.name),
+  ),
+)
+
+/** Clears the live region first, so the same words said twice are announced twice. */
+async function announce(message: string): Promise<void> {
+  announcement.value = ''
+  await nextTick()
+  announcement.value = message
+}
+
+function allScoredMessage(): string {
+  return t('room.live.allScored', { round: n(currentRound.value) })
+}
+
+/** "Round 2 results: Juho leads with 30 points. You're in place 2. Round 3 of 5 — …": one message
+ * on every device when a round is revealed. The contract banner doesn't announce on its own, so
+ * the two don't talk over each other. */
+function revealMessage(round: number): string {
+  const leaders = board.value.filter((row) => row.placement === 1)
+  const names = new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
+    leaders.map((row) => row.player.name),
+  )
+  const results =
+    leaders.length === 0
+      ? ''
+      : t(
+          'room.live.roundResults',
+          { round: n(round), names, total: n(leaders[0]?.total ?? 0) },
+          leaders.length,
+        )
+  const myPlacement = board.value.find((row) => row.player.id === myPlayerId.value)?.placement
+  const place = myPlacement ? t('room.live.yourPlacement', { placement: n(myPlacement) }) : ''
+  const nextRound = t('room.roundBanner', {
+    round: n(currentRound.value),
+    total: n(TOTAL_ROUNDS),
+    contract: t(currentContract.value.contractKey),
+  })
+  return [results, place, nextRound].filter((part) => part !== '').join(' ')
+}
+
+// Announce a reveal once, on every device, but not when a room is first opened or resumed: the
+// board is already showing those rounds then. Finishing is announced by WinnerBanner instead.
+let revealBaseline: { gameId: string | null; completed: number } | null = null
+watch(
+  [gameId, completedRounds, hasActiveGame],
+  ([id, completed, isActive]) => {
+    if (!isActive) {
+      revealBaseline = null
+      return
+    }
+    const isNewReveal =
+      revealBaseline !== null &&
+      revealBaseline.gameId === id &&
+      completed > revealBaseline.completed
+    revealBaseline = { gameId: id, completed }
+    if (isNewReveal && status.value !== 'finished') void announce(revealMessage(completed))
+  },
+  { immediate: true },
+)
+
+// The host hears when the last score comes in from another device; its own last save says so in
+// the same message.
+watch(allPlayersScored, (isReady, wasReady) => {
+  if (isReady) isWaitingHintShown.value = false
+  if (isReady && !wasReady && isHost.value && hasActiveGame.value && !isLocalChangeInFlight) {
+    void announce(allScoredMessage())
+  }
+})
+
 function canRemove(playerId: PlayerId): boolean {
   return isHost.value && playerId !== myPlayerId.value
 }
@@ -145,7 +229,18 @@ async function handleScoreCommit(
   round: ContractRoundNumber,
   points: number,
 ): Promise<void> {
+  const saving = saveScore(playerId, round, points)
+  pendingSave = saving
+  await saving
+}
+
+async function saveScore(
+  playerId: PlayerId,
+  round: ContractRoundNumber,
+  points: number,
+): Promise<void> {
   const player = standings.value.find((standing) => standing.player.id === playerId)?.player
+  isLocalChangeInFlight = true
   try {
     await game.setRoundScore({ playerId, round, points })
   } catch (error) {
@@ -154,32 +249,46 @@ async function handleScoreCommit(
       t('room.saveError.score', { name: player?.name ?? '' }),
     )
     return
+  } finally {
+    isLocalChangeInFlight = false
   }
   saveError.value = ''
   scoresEnteredHere.value.add(scoreKey(playerId, round))
   if (!player) return
 
-  const isLeading = standings.value[0]?.player.id === playerId
-  announcement.value = isLeading
-    ? t('room.live.scoreEnteredLeading', { name: player.name, points: n(points) })
-    : t('room.live.scoreEntered', { name: player.name, points: n(points) })
+  // No ranking here: numbers stay hidden from the board until the round is revealed.
+  const saved = t('room.live.scoreSaved', { name: player.name, points: n(points) })
+  void announce(isHost.value && allPlayersScored.value ? `${saved} ${allScoredMessage()}` : saved)
 }
 
 async function handleRemovePlayer(player: Player): Promise<void> {
+  isLocalChangeInFlight = true
   try {
     await game.removePlayer(player.id)
   } catch (error) {
     saveError.value = describeSaveFailure(error, t('room.saveError.remove', { name: player.name }))
     return
+  } finally {
+    isLocalChangeInFlight = false
   }
   saveError.value = ''
-  announcement.value = t('room.live.playerRemoved', { name: player.name })
+  const removed = t('room.live.playerRemoved', { name: player.name })
+  void announce(allPlayersScored.value ? `${removed} ${allScoredMessage()}` : removed)
   // The removed player's card (and the focused control in it) is gone; keep the host's place.
   await nextTick()
   scoreEntryHeading.value?.focus()
 }
 
+/** A score typed but not saved yet is saved by the input's blur, which lands just before the tap
+ * on Next or Finish. Waiting for that save makes one tap enough. */
+async function isReadyToAdvance(): Promise<boolean> {
+  await pendingSave
+  isWaitingHintShown.value = !allPlayersScored.value
+  return allPlayersScored.value
+}
+
 async function handleNextRound(): Promise<void> {
+  if (isAdvancing.value || !(await isReadyToAdvance())) return
   isAdvancing.value = true
   try {
     await game.advanceRound()
@@ -192,6 +301,7 @@ async function handleNextRound(): Promise<void> {
 }
 
 async function handleFinish(): Promise<void> {
+  if (isFinishing.value || !(await isReadyToAdvance())) return
   isFinishing.value = true
   try {
     // No separate "game finished" announcement here: WinnerBanner is its own `role="status"`
@@ -332,7 +442,7 @@ onMounted(async () => {
 
       <ContractBanner :round="currentRound" :contract-key="currentContract.contractKey" />
 
-      <ScoreBoard :standings="standings" :show-leader="completedRounds > 0" />
+      <ScoreBoard :rows="board" :completed-rounds="completedRounds" />
 
       <WinnerBanner v-if="isFinished" :winners="winners" />
 
@@ -395,19 +505,31 @@ onMounted(async () => {
 
       <div aria-live="polite" class="sr-only">{{ announcement }}</div>
 
+      <p
+        v-if="isHost && isWaitingHintShown && !allPlayersScored"
+        role="status"
+        class="text-muted-foreground text-sm"
+      >
+        {{ t('room.next.waiting', { names: waitingForNames }) }}
+      </p>
+
+      <!-- aria-disabled rather than disabled: the tap must still reach the handler, which waits
+           for a score saved by that same tap before deciding. -->
       <div v-if="isHost" class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
         <Button
           v-if="!isFinalRound"
-          class="h-11 flex-1"
-          :disabled="!allPlayersScored || isAdvancing"
+          class="h-11 flex-1 aria-disabled:opacity-50"
+          :aria-disabled="!allPlayersScored"
+          :disabled="isAdvancing"
           @click="handleNextRound"
         >
           {{ t('room.next.button') }}
         </Button>
         <Button
           v-else-if="!isFinished"
-          class="h-11 flex-1"
-          :disabled="!allPlayersScored || isFinishing"
+          class="h-11 flex-1 aria-disabled:opacity-50"
+          :aria-disabled="!allPlayersScored"
+          :disabled="isFinishing"
           @click="handleFinish"
         >
           {{ t('room.finish.button') }}

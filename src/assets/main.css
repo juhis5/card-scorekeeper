@@ -146,3 +146,31 @@
     transition: none;
   }
 }
+
+/* Scoreboard motion (ScoreBoard.vue). When a round is revealed, rows slide to their new places
+ * (TransitionGroup's FLIP move class) and a changed total fades in. Long enough to follow the
+ * reorder; off entirely for reduced motion. Unlayered for the same reason as the rule above. */
+.board-row-move {
+  transition: transform 450ms var(--ease-standard);
+}
+.board-total-enter-active,
+.board-total-leave-active {
+  transition:
+    opacity var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+.board-total-enter-from {
+  opacity: 0;
+  transform: translateY(-0.25rem);
+}
+.board-total-leave-to {
+  opacity: 0;
+  transform: translateY(0.25rem);
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-row-move,
+  .board-total-enter-active,
+  .board-total-leave-active {
+    transition: none;
+  }
+}

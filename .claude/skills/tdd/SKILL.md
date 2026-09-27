@@ -15,7 +15,7 @@ Install latest stable: `pnpm add -D vitest @vue/test-utils happy-dom @testing-li
 |------|----------|
 | `lib/` pure logic (Rommi `rules.ts`, scoring, validators), Pinia stores, composables, serverless handler logic, Firestore security rules | **Strict TDD** — write the failing test first, then the code. |
 | Components | **Behavior tests**, written alongside — assert what the user sees/does (scoreboard sorts ascending, entering a round score updates the total, contract banner shows the right round). Not test-first-mandatory. |
-| Critical user flows | **A few Playwright E2E** — host creates room → second client joins with the code → a score entered on one client appears on the other. |
+| Critical user flows | **A few Playwright E2E** — host creates room → second client joins with the code → a score entered on one client shows as entered on the other, and both reveal it when the host moves on. |
 | CSS, layout, exact styling, animations, framework glue | **Don't unit-test.** Verify by eye on a phone viewport. |
 
 Don't chase a coverage number. Coverage is a signal (untested logic branch = write a test), not a target.
@@ -67,4 +67,4 @@ Reproduce before declaring it fixed: run it many times, shuffled — `for s in $
 
 ## This project (card-scorekeeper)
 
-Highest-leverage test-first targets: `lib/rules.ts` (card values + 5 contracts + winner), the stats/head-to-head derivation, the room+token gate and total-recompute in the photo-count function, and the Firestore security rules. One Playwright flow: two browser contexts, host + joiner, assert a score syncs live between them.
+Highest-leverage test-first targets: `lib/rules.ts` (card values + 5 contracts + winner), the stats/head-to-head derivation, the room+token gate and total-recompute in the photo-count function, and the Firestore security rules. One Playwright flow: two browser contexts, host + joiner, assert an entry syncs live and the round's numbers are revealed on both after Next.

@@ -21,15 +21,16 @@ function roundHeading(page: Page, round: number) {
   return page.getByRole('heading', { name: `Round ${round} scores` })
 }
 
-/** Both players score, the host sees both totals and moves on, and the joiner follows. */
+/** Both players score, the host moves on once both are in, the board reveals the round's totals
+ * and the joiner follows. */
 async function playRound(hostPage: Page, joinerPage: Page, round: number): Promise<void> {
   await enterRoundScore(hostPage, 'Host', round, 20)
   await enterOwnRoundScore(joinerPage, round, 10)
-  await expect(scoreboardRow(hostPage, 'Alice')).toContainText(String(round * 10))
   const isLastRound = round === TOTAL_ROUNDS
   const button = hostPage.getByRole('button', { name: isLastRound ? 'Finish game' : 'Next round' })
   await expect(button).toBeEnabled()
   await button.click()
+  await expect(scoreboardRow(hostPage, 'Alice')).toContainText(String(round * 10))
   if (!isLastRound) await expect(roundHeading(joinerPage, round + 1)).toBeVisible()
 }
 

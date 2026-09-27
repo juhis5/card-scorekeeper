@@ -13,10 +13,9 @@ const { t, n } = useI18n()
 </script>
 
 <template>
-  <!-- `role="status"` is an implicit polite live region: when the round advances, this text
-       changes and is announced on its own — no separate manual announcement needed. -->
+  <!-- Not a live region: RoomView announces the new round and its contract together with the
+       revealed results, in one message. -->
   <p
-    role="status"
     class="bg-muted text-foreground border-border rounded-lg border px-4 py-3 text-base font-medium"
   >
     {{

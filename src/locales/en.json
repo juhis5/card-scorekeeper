@@ -73,7 +73,12 @@
     "table": {
       "player": "Player",
       "total": "Total",
-      "leaderLabel": "Leader"
+      "leaderLabel": "Leader",
+      "totalShort": "Total",
+      "roundHeader": "Round {round}",
+      "entered": "Entered",
+      "noScore": "No score",
+      "caption": "Totals after round {round}"
     },
     "score": {
       "sectionHeading": "Round {round} scores",
@@ -142,7 +147,8 @@
       "cancel": "Cancel"
     },
     "next": {
-      "button": "Next round"
+      "button": "Next round",
+      "waiting": "Still waiting for scores from {names}."
     },
     "finish": {
       "button": "Finish game"
@@ -152,8 +158,10 @@
       "tie": "{names} tie for the win!"
     },
     "live": {
-      "scoreEntered": "{name} scored {points} points.",
-      "scoreEnteredLeading": "{name} scored {points} points — now leading.",
+      "scoreSaved": "{name}: {points} points saved.",
+      "allScored": "Everyone has entered round {round} scores.",
+      "roundResults": "Round {round} results: {names} leads with {total} points. | Round {round} results: {names} lead with {total} points.",
+      "yourPlacement": "You're in place {placement}.",
       "playerRemoved": "{name} was removed from the game."
     },
     "empty": {

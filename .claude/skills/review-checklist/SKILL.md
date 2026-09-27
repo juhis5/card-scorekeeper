@@ -30,7 +30,7 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 - Logic (`lib/rules.ts`, stats, stores, composables, serverless) has test-first-grade coverage; new branches + edge cases covered.
 - Components: **behavior** tested, not just "it renders".
 - **Firestore security rules** changes have emulator tests (own-vs-other score edits, host override, expired room, room-scoped reads).
-- Critical flow has/updates an e2e (two clients: a score syncs live between them).
+- Critical flow has/updates an e2e (two clients: an entered score shows as entered on the other live, and its number appears on both when the host moves on).
 - Tests are deterministic (no real network/clock/Firebase — mock the boundary / use the emulator), meaningful, one behavior each.
 - **No flaky tests.** No `retry`, `.skip`/`.only`, arbitrary sleeps, or loosened assertions to mask an intermittent failure — a flaky or order-dependent test is a **Block** (see `tdd`). Verify suspect tests with a shuffled seed loop (Vitest 4 has no repeat flag): `for s in $(seq 1 20); do pnpm exec vitest run <file> --sequence.shuffle --sequence.seed=$s || break; done`. For an emulator suite, loop the `pnpm test:*` script and judge each run by its exit code, not the "Tests passed" line.
 
@@ -69,4 +69,4 @@ The bar: code should read like the surrounding code and be pleasant to maintain.
 - **Nit:** style not already handled by Prettier/ESLint.
 
 ## This project (card-scorekeeper)
-Pay special attention to: Firestore **rules** (test them, don't trust the UI), the **offline** path (cold-start loads + local game fully playable; reconnect pushes only the final result), live-score **a11y announcements**, `rules.ts` correctness, and secret/public env separation. Critical e2e: host + joiner, a score syncs live between two clients.
+Pay special attention to: Firestore **rules** (test them, don't trust the UI), the **offline** path (cold-start loads + local game fully playable; reconnect pushes only the final result), live-score **a11y announcements**, `rules.ts` correctness, and secret/public env separation. Critical e2e: host + joiner, an entry syncs live and the round is revealed on both.
