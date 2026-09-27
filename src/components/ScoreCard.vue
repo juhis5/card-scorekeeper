@@ -2,7 +2,9 @@
 /**
  * Single job: one player's round-score entry card. Collapsed by default (name + saved points, or
  * just "scored" when the number isn't this device's to see); tapping the header expands it inline
- * to reveal the numeric input + photo-count affordance. A non-host player's own card reads "Enter
+ * to reveal the numeric input with its Save button, and the photo-count affordance. Save is the
+ * way to save on a phone: the iPhone number keypad has no Enter key. Enter and leaving the field
+ * still save too. A non-host player's own card reads "Enter
  * your points" instead of their name.
  * Presentation + local draft value only; persisting the score is the parent's job (it owns the
  * store call), this just emits the validated number on commit.
@@ -18,6 +20,7 @@ import { useI18n } from 'vue-i18n'
 import { Check } from '@lucide/vue'
 import PhotoCountSheet from '@/components/PhotoCountSheet.vue'
 import RoundScoreInput from '@/components/RoundScoreInput.vue'
+import { Button } from '@/components/ui/button'
 import { isValidRoundScore, MAX_ROUND_SCORE } from '@/lib/rules'
 import type { ContractRoundNumber, Player } from '@/lib/types'
 
@@ -59,7 +62,7 @@ const points = ref<number | null>(null)
 const savedPoints = ref<number | null>(null)
 const errorMessage = ref('')
 const isExpanded = ref(false)
-/** Pressing a control inside the card (Cancel, Snap cards) blurs the input before that control's
+/** Pressing a control inside the card (Save, Cancel, Snap cards) blurs the input before that control's
  * click lands. The blur must not save, but iOS Safari doesn't focus a tapped button, so the blur's
  * relatedTarget can't tell us where focus is going. Remember the press instead. */
 let isPressInsidePanel = false
@@ -111,7 +114,10 @@ async function expand(): Promise<void> {
   points.value = savedPoints.value
   isExpanded.value = true
   await nextTick()
-  document.getElementById(inputId.value)?.focus()
+  // The room's Next bar sticks to the bottom of the screen, so bring the whole open card, Save
+  // included, into view above it (its scroll margin) rather than just the field.
+  document.getElementById(inputId.value)?.focus({ preventScroll: true })
+  cardElement.value?.scrollIntoView({ block: 'nearest' })
 }
 
 /** Collapsing unmounts the focused control, so hand focus back to the header — otherwise it
@@ -156,8 +162,13 @@ function discardDraft(): void {
   void collapse({ restoreFocus: true })
 }
 
-/** Enter keeps focus in the input, so hand it to the header once the input is gone. */
-function handleEnter(): void {
+/** Save and Enter ask to save, so an empty field says why nothing happened. Focus stays on the
+ * removed input or button, so hand it to the header once the panel is gone. */
+function handleSave(): void {
+  if (points.value === null) {
+    errorMessage.value = t('room.score.emptyError')
+    return
+  }
   commitPoints({ restoreFocus: true })
 }
 
@@ -190,7 +201,7 @@ function handleKeyDown(event: KeyboardEvent): void {
 <template>
   <li
     ref="card"
-    class="bg-card border-border rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
+    class="bg-card border-border scroll-mb-20 rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
     :class="isExpanded ? 'ring-ring ring-2' : 'hover:bg-muted'"
     @keydown="handleKeyDown"
   >
@@ -228,9 +239,13 @@ function handleKeyDown(event: KeyboardEvent): void {
         :label="label"
         :is-invalid="hasError"
         :described-by="hasError ? errorId : undefined"
-        @commit="handleEnter"
+        @commit="handleSave"
         @blur="handleInputBlur"
-      />
+      >
+        <Button type="button" class="h-11 shrink-0 px-5" @click="handleSave">
+          {{ t('room.score.save') }}
+        </Button>
+      </RoundScoreInput>
 
       <PhotoCountSheet
         v-if="canSnapCards"
