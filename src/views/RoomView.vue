@@ -17,6 +17,7 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { WifiOff } from '@lucide/vue'
 import ContractBanner from '@/components/ContractBanner.vue'
+import PlayAgain from '@/components/PlayAgain.vue'
 import RemovePlayerControl from '@/components/RemovePlayerControl.vue'
 import ScoreCard from '@/components/ScoreCard.vue'
 import ScoreBoard from '@/components/ScoreBoard.vue'
@@ -80,16 +81,28 @@ watch(
   },
   { immediate: true },
 )
+const seatedStandings = computed(() =>
+  seatOrder.value
+    .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
+    .filter((standing): standing is Standing => standing !== undefined),
+)
 // The host (offline or online) enters and fixes anyone's score; an online joiner edits only their
 // own seat. firestore.rules enforces the same split.
-const entryStandings = computed(() => {
-  const ordered = seatOrder.value
-    .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
-    .filter((standing): standing is Standing => standing !== undefined)
-  return isHost.value
-    ? ordered
-    : ordered.filter((standing) => standing.player.id === myPlayerId.value)
-})
+const entryStandings = computed(() =>
+  isHost.value
+    ? seatedStandings.value
+    : seatedStandings.value.filter((standing) => standing.player.id === myPlayerId.value),
+)
+/** Play again carries this game's names on: this device's own, and everyone else's in seat order. */
+const myName = computed(
+  () =>
+    seatedStandings.value.find(({ player }) => player.id === myPlayerId.value)?.player.name ?? '',
+)
+const otherNames = computed(() =>
+  seatedStandings.value
+    .filter(({ player }) => player.id !== myPlayerId.value)
+    .map(({ player }) => player.name),
+)
 
 /** Earlier rounds an editable player has no score for: a late joiner fills these in, so nobody is
  * ranked on fewer rounds than the others. */
@@ -328,6 +341,13 @@ const isOpeningRoom = computed(
     (isOnline.value && !hasActiveGame.value && connectionError.value === null),
 )
 
+const heading = computed(() => {
+  if (isOpeningRoom.value) return t('room.opening', { code: routeCode.value })
+  if (resumeState.value === 'not-seated') return t('room.notSeated.heading')
+  if (!hasActiveGame.value) return t('room.empty.heading')
+  return t('room.heading')
+})
+
 async function resumeOnlineRoom(code: string): Promise<void> {
   resumeState.value = 'opening'
   const repository = await resumeRepository(code)
@@ -352,24 +372,20 @@ onMounted(async () => {
 
 <template>
   <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
-    <template v-if="isOpeningRoom">
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.opening', { code: routeCode }) }}
-      </h1>
-    </template>
+    <!-- One heading for every state: navigation focuses it before the room's first snapshot
+         arrives, and a new element per state would drop that focus when the room opens. -->
+    <h1
+      id="main-heading"
+      tabindex="-1"
+      class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
+    >
+      {{ heading }}
+    </h1>
+
+    <!-- While the room opens, the heading alone says so. -->
+    <template v-if="isOpeningRoom" />
 
     <template v-else-if="resumeState === 'not-seated'">
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.notSeated.heading') }}
-      </h1>
       <p class="text-muted-foreground">{{ t('room.notSeated.body') }}</p>
       <RouterLink
         :to="{ name: 'home', query: { code: routeCode } }"
@@ -380,13 +396,6 @@ onMounted(async () => {
     </template>
 
     <template v-else-if="!hasActiveGame">
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.empty.heading') }}
-      </h1>
       <p class="text-muted-foreground">{{ t('room.empty.body') }}</p>
       <RouterLink :to="{ name: 'home' }" class="text-primary underline underline-offset-4">
         {{ t('room.empty.backHome') }}
@@ -394,14 +403,6 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.heading') }}
-      </h1>
-
       <p
         v-if="isOnline"
         class="bg-muted text-foreground border-border rounded-lg border px-4 py-3 text-sm"
@@ -513,9 +514,12 @@ onMounted(async () => {
         {{ t('room.next.waiting', { names: waitingForNames }) }}
       </p>
 
+      <div v-if="isFinished" class="bg-background sticky bottom-0 mt-auto pt-2 pb-2">
+        <PlayAgain :my-name="myName" :other-names="otherNames" />
+      </div>
       <!-- aria-disabled rather than disabled: the tap must still reach the handler, which waits
            for a score saved by that same tap before deciding. -->
-      <div v-if="isHost" class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
+      <div v-else-if="isHost" class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
         <Button
           v-if="!isFinalRound"
           class="h-11 flex-1 aria-disabled:opacity-50"
@@ -526,7 +530,7 @@ onMounted(async () => {
           {{ t('room.next.button') }}
         </Button>
         <Button
-          v-else-if="!isFinished"
+          v-else
           class="h-11 flex-1 aria-disabled:opacity-50"
           :aria-disabled="!allPlayersScored"
           :disabled="isFinishing"
@@ -535,11 +539,7 @@ onMounted(async () => {
           {{ t('room.finish.button') }}
         </Button>
       </div>
-      <p
-        v-else-if="!isFinished"
-        role="status"
-        class="text-muted-foreground py-2 text-center text-sm"
-      >
+      <p v-else role="status" class="text-muted-foreground py-2 text-center text-sm">
         {{ t('room.online.waitingForHost') }}
       </p>
     </template>

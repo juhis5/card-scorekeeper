@@ -93,6 +93,21 @@ export function useGameConnectivity() {
     }
   }
 
+  /** Play again path: a fresh room to host, like the host path, but never a local game when the
+   * backend can't be reached: the other phones are waiting to be pointed at the next room, so
+   * the host gets an error and a retry instead. Same probe-then-create shape as joining. */
+  async function nextRoomRepository(): Promise<JoinGameMode> {
+    try {
+      const { auth, db, checkBackend, FirestoreGameRepository } = await loadFirebase()
+      return await createJoinRepository({
+        probeBackendReachable: () => probeBackendReachable({ checkBackend }),
+        createOnlineRepository: () => new FirestoreGameRepository({ db, auth }),
+      })
+    } catch {
+      return { kind: 'unreachable' }
+    }
+  }
+
   /** Resume path: the room from the URL after a reload. No probe first: finding the seat reads
    * through Firestore's local cache when the connection is down, which is what a mid-game reload
    * needs. `null` when Firebase itself can't load. */
@@ -105,5 +120,11 @@ export function useGameConnectivity() {
     }
   }
 
-  return { hostRepository, joinRepository, localRepository, resumeRepository }
+  return {
+    hostRepository,
+    joinRepository,
+    localRepository,
+    nextRoomRepository,
+    resumeRepository,
+  }
 }

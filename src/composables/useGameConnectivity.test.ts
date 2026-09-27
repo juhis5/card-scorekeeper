@@ -86,6 +86,31 @@ describe('useGameConnectivity().joinRepository', () => {
   })
 })
 
+describe('useGameConnectivity().nextRoomRepository', () => {
+  it('builds an online repository with no room code, to host the next room', async () => {
+    vi.stubGlobal('navigator', { onLine: true })
+    checkBackendReachableMock.mockResolvedValue('uid-1')
+
+    const mode = await useGameConnectivity().nextRoomRepository()
+
+    expect(mode.kind).toBe('online')
+    expect(FirestoreGameRepository).toHaveBeenCalledWith(
+      expect.not.objectContaining({ roomCode: expect.anything() }),
+    )
+    vi.unstubAllGlobals()
+  })
+
+  it('reports unreachable instead of a local game when the backend check rejects', async () => {
+    vi.stubGlobal('navigator', { onLine: true })
+    checkBackendReachableMock.mockRejectedValue(new Error('offline'))
+
+    const mode = await useGameConnectivity().nextRoomRepository()
+
+    expect(mode).toEqual({ kind: 'unreachable' })
+    vi.unstubAllGlobals()
+  })
+})
+
 describe('useGameConnectivity().resumeRepository', () => {
   it('builds an online repository for the room in the URL, without re-probing', async () => {
     const repository = await useGameConnectivity().resumeRepository('7K4RQ')

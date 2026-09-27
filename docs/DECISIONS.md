@@ -513,3 +513,24 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   - Local games check the same keys in the setup form and in `LocalGameRepository.addPlayer`.
   - A failed join now resets the store, so Home never offers to continue a room this device
     never got into.
+- 2026-09-27 — Play again (tester note 7):
+  - Online, the host's Play again creates a new room first, then writes one field on the
+    finished room, `nextRoomCode`. Every device still in it sees "The host started a new game"
+    with "Join the next game", which seats them under their name from the finished game. A new
+    room, not a reset of the old one: stats are stored per room, and a finished room never
+    reopens (the /api photo gate trusts that).
+  - The rules let a finished room take exactly that one write: by its host, before it expires,
+    set once, pointing at another room the same host owns, and nothing else changes with it.
+  - The host moves on even if the link doesn't land (an expired room refuses it); the new room's
+    code is on screen to share instead. A link write that times out stays queued in the SDK.
+  - Never a local game when the server can't be reached here: the other phones wait for that
+    room, so the host gets an error and a retry (`nextRoomRepository`, online only).
+  - A local Play again opens the setup form with the finished game's names, host first, passed in
+    the history entry's state, so the host can add or remove players first.
+  - `join()` now takes the seat before leaving the current game, so a refused join from a
+    finished game leaves it on screen (with "Join with another name" when the name is taken)
+    instead of an empty room. From an empty store it still leaves nothing behind.
+  - Each room path gets a fresh RoomView (a keyed RouterView): Vue Router reuses the view when
+    only the code changes, and a device keeps its anonymous uid across rooms, so which scores
+    the host entered in the finished game would otherwise show a player's numbers early in the
+    next one.

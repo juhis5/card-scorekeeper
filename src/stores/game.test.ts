@@ -9,6 +9,7 @@ import type {
   CreatedGame,
   GameConfig,
   GameRepository,
+  ReplayableGameRepository,
   ResumableGameRepository,
   Seat,
   SetRoundScoreInput,
@@ -666,6 +667,112 @@ describe('useGameStore.resumeOnline', () => {
     const resumed = await game.resumeOnline(new FakeResumableRepository(), 'ABCDE')
 
     expect(resumed).toBe(false)
+  })
+})
+
+/** An online room that records the next-room links the store writes. */
+class FakeReplayableRepository extends FakeGameRepository implements ReplayableGameRepository {
+  linkedRoomCodes: string[] = []
+  linkError: Error | null = null
+
+  async linkNextRoom(nextRoomCode: string): Promise<void> {
+    this.callOrder.push('linkNextRoom')
+    if (this.linkError) throw this.linkError
+    this.linkedRoomCodes.push(nextRoomCode)
+  }
+}
+
+describe('useGameStore.playAgain', () => {
+  const FINISHED_CODE = 'ABCDE'
+  const NEXT_CODE = 'FGHJK'
+
+  async function finishedOnlineGame() {
+    const game = useGameStore()
+    const finished = new FakeReplayableRepository()
+    finished.roomCodeToReturn = FINISHED_CODE
+    await game.start(finished, HOST_CONFIG)
+    await game.finishGame()
+    const next = new FakeGameRepository()
+    next.roomCodeToReturn = NEXT_CODE
+    return { game, finished, next }
+  }
+
+  it('creates the next room, points the finished room at it, then follows the next room', async () => {
+    const { game, finished, next } = await finishedOnlineGame()
+
+    await game.playAgain(next, HOST_CONFIG)
+
+    expect(next.callOrder).toEqual(['createGame', 'subscribe'])
+    expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
+    expect(finished.leaveCalls).toBe(1)
+    expect(game.roomCode).toBe(NEXT_CODE)
+    expect(game.isHost).toBe(true)
+    expect(game.myPlayerId).toBe('fake-host')
+    expect(game.status).toBe('waiting')
+    expect(lastRoom()).toBe(NEXT_CODE)
+  })
+
+  it('still moves to the next room when the finished room refuses the link', async () => {
+    const { game, finished, next } = await finishedOnlineGame()
+    finished.linkError = Object.assign(new Error('expired'), { code: 'permission-denied' })
+
+    await game.playAgain(next, HOST_CONFIG)
+
+    expect(game.roomCode).toBe(NEXT_CODE)
+  })
+
+  it('keeps the finished game when the next room cannot be created, and passes the error on', async () => {
+    const { game, finished, next } = await finishedOnlineGame()
+    const unreachable = new Error('unreachable')
+    next.createGame = () => Promise.reject(unreachable)
+
+    const error = await game.playAgain(next, HOST_CONFIG).catch((caught: unknown) => caught)
+
+    expect(error).toBe(unreachable)
+    expect(finished.linkedRoomCodes).toEqual([])
+    expect(finished.leaveCalls).toBe(0)
+    expect(game.roomCode).toBe(FINISHED_CODE)
+    expect(game.status).toBe('finished')
+  })
+
+  it("exposes the finished room's link to the next room", async () => {
+    const { game, finished } = await finishedOnlineGame()
+
+    finished.emit({ ...finished.state, nextRoomCode: NEXT_CODE })
+
+    expect(game.nextRoomCode).toBe(NEXT_CODE)
+  })
+})
+
+describe('useGameStore.join from a finished game', () => {
+  async function finishedGame() {
+    const game = useGameStore()
+    const finished = new FakeGameRepository()
+    finished.roomCodeToReturn = 'ABCDE'
+    await game.start(finished, HOST_CONFIG)
+    await game.finishGame()
+    return { game, finished }
+  }
+
+  it('keeps showing the finished game when the seat in the next room is refused', async () => {
+    const { game, finished } = await finishedGame()
+    const next = new FakeGameRepository()
+    next.addPlayer = () => Promise.reject(new Error('name taken'))
+
+    await game.join(next, 'FGHJK', { name: 'Juho', deviceUuid: 'device-a' }).catch(() => undefined)
+
+    expect(finished.leaveCalls).toBe(0)
+    expect(game.roomCode).toBe('ABCDE')
+    expect(game.status).toBe('finished')
+  })
+
+  it('leaves the finished room once seated in the next one', async () => {
+    const { game, finished } = await finishedGame()
+
+    await game.join(new FakeGameRepository(), 'FGHJK', { name: 'Juho', deviceUuid: 'device-a' })
+
+    expect(finished.leaveCalls).toBe(1)
+    expect(game.roomCode).toBe('FGHJK')
   })
 })
 

@@ -29,7 +29,11 @@ import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
 import { writeGameResult } from './firestore-stats'
 import { cleanPlayerName, NameTakenError, playerNameKey } from './player-names'
-import { generateRoomCode as defaultGenerateRoomCode, ROOM_TTL_MS } from './room-code'
+import {
+  generateRoomCode as defaultGenerateRoomCode,
+  isValidRoomCode,
+  ROOM_TTL_MS,
+} from './room-code'
 import { CONTRACTS, TOTAL_ROUNDS, placements as placementsFor, runningTotal } from './rules'
 import { bestAndWorstRound } from './stats'
 import { withTimeout } from './timeout'
@@ -48,6 +52,7 @@ import type {
   CreatedGame,
   GameConfig,
   PlayerId,
+  ReplayableGameRepository,
   ResumableGameRepository,
   Seat,
   SetRoundScoreInput,
@@ -65,6 +70,7 @@ interface RoomDocData {
   hostUid: string
   createdAt: Timestamp
   expiresAt: Timestamp
+  nextRoomCode?: string
 }
 
 interface PlayerDocData {
@@ -110,7 +116,7 @@ export interface FirestoreGameRepositoryDeps {
  * waits on before entering a room (create, join) get a bound; the caller then falls back. */
 const DEFAULT_WRITE_TIMEOUT_MS = 10_000
 
-export class FirestoreGameRepository implements ResumableGameRepository {
+export class FirestoreGameRepository implements ResumableGameRepository, ReplayableGameRepository {
   private readonly db: Firestore
   private readonly auth: Auth
   private readonly now: () => number
@@ -250,7 +256,7 @@ export class FirestoreGameRepository implements ResumableGameRepository {
     const roomCode = this.requireRoomCode()
     const reportError = (error: unknown) => onError?.(error)
 
-    let room: { status: GameStatus; currentRound: ContractRoundNumber } | null = null
+    let room: Pick<GameState, 'status' | 'currentRound' | 'nextRoomCode'> | null = null
     let players: Player[] = []
     let roundScores: RoundScore[] = []
 
@@ -258,7 +264,7 @@ export class FirestoreGameRepository implements ResumableGameRepository {
     // required fields on GameState, so there is nothing coherent to emit before then.
     const emit = () => {
       if (!room) return
-      onChange({ status: room.status, currentRound: room.currentRound, players, roundScores })
+      onChange({ ...room, players, roundScores })
     }
 
     const roomUnsub = onSnapshot(
@@ -267,6 +273,10 @@ export class FirestoreGameRepository implements ResumableGameRepository {
         const data = snapshot.data() as RoomDocData | undefined
         if (!data) return
         room = { status: data.status, currentRound: data.currentRound }
+        // The rules check the link, but it becomes a route and a join, so it's checked here too.
+        if (typeof data.nextRoomCode === 'string' && isValidRoomCode(data.nextRoomCode)) {
+          room.nextRoomCode = data.nextRoomCode
+        }
         emit()
       },
       reportError,
@@ -418,6 +428,14 @@ export class FirestoreGameRepository implements ResumableGameRepository {
     await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
 
     return result
+  }
+
+  /** Bounded like create and join: the host waits on it before moving to the next room. A write
+   * that times out stays queued in the SDK and still lands once the connection is back. */
+  async linkNextRoom(nextRoomCode: string): Promise<void> {
+    await ensureSignedIn(this.auth)
+    const roomRef = doc(this.db, `room/${this.requireRoomCode()}`)
+    await withTimeout(updateDoc(roomRef, { nextRoomCode }), this.writeTimeoutMs)
   }
 
   leave(): void {

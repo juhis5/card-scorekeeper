@@ -46,6 +46,9 @@ export interface GameState {
   currentRound: ContractRoundNumber
   players: Player[]
   roundScores: RoundScore[]
+  /** Online only: set once the game has finished and its host started the next one (Play again),
+   * so every device still in this room can join it. */
+  nextRoomCode?: string
 }
 
 /** A player's rank in the current (or final) standings. */

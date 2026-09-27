@@ -25,6 +25,7 @@ import { boardRows } from '@/lib/scoreboard'
 import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
   AddPlayerInput,
+  CreatedGame,
   GameConfig,
   GameId,
   GameRepository,
@@ -33,7 +34,7 @@ import type {
   SetRoundScoreInput,
   Unsubscribe,
 } from '@/lib/repository'
-import { isResumable } from '@/lib/repository'
+import { isReplayable, isResumable } from '@/lib/repository'
 import { isPermissionDenied } from '@/lib/write-errors'
 import type { GameResult, GameState, Player } from '@/lib/types'
 
@@ -109,6 +110,8 @@ export const useGameStore = defineStore('game', () => {
     boardRows(state.value.players, state.value.roundScores, completedRounds.value),
   )
   const winners = computed(() => winnersFor(rankedPlayers.value))
+  /** Set once the host of this finished online game started the next one (Play again). */
+  const nextRoomCode = computed(() => state.value.nextRoomCode ?? null)
 
   function requireRepository(): GameRepository {
     if (!repository) {
@@ -117,17 +120,39 @@ export const useGameStore = defineStore('game', () => {
     return repository
   }
 
-  /** Starts a new game against the given repository and begins reflecting its live state. */
-  async function start(repo: GameRepository, config: GameConfig): Promise<void> {
-    leave()
+  /** Makes this device the host of the game `repo` just created, and follows it. */
+  function hostCreatedGame(repo: GameRepository, created: CreatedGame): void {
     repository = repo
-    const created = await repo.createGame(config)
     gameId.value = created.gameId
     roomCode.value = created.roomCode
     isHost.value = true
     myPlayerId.value = created.hostPlayerId
     if (created.roomCode) rememberRoom(created.roomCode)
     followRoom(repo)
+  }
+
+  /** Starts a new game against the given repository and begins reflecting its live state. */
+  async function start(repo: GameRepository, config: GameConfig): Promise<void> {
+    leave()
+    repository = repo
+    hostCreatedGame(repo, await repo.createGame(config))
+  }
+
+  /**
+   * Play again, online: creates the next room on `nextRepo` while the finished game stays on
+   * screen, points the finished room at it so the other devices are asked to join, then follows
+   * the next room as its host. A failed create changes nothing, so the host can retry.
+   */
+  async function playAgain(nextRepo: GameRepository, config: GameConfig): Promise<void> {
+    const finished = requireRepository()
+    const created = await nextRepo.createGame(config)
+    if (created.roomCode && isReplayable(finished)) {
+      // The next game goes ahead even when the link doesn't land: an expired room refuses it,
+      // and the next room's code is on screen to share instead.
+      await finished.linkNextRoom(created.roomCode).catch(() => undefined)
+    }
+    leave()
+    hostCreatedGame(nextRepo, created)
   }
 
   /**
@@ -137,27 +162,22 @@ export const useGameStore = defineStore('game', () => {
    * room-scoped read gate in firestore.rules only lets already-seated members read the
    * players/roundScores subcollections, so subscribing first would hit a permission-denied that
    * `onSnapshot` never recovers from, even after the join completes (see firestore-realtime).
+   *
+   * The current game, if any, is left only once the seat is taken: a refused seat changes nothing
+   * here, so a player joining the next game from a finished one still sees it, and Home never
+   * offers to continue a room this device never got into.
    */
   async function join(
     repo: GameRepository,
     code: string,
     player: AddPlayerInput,
   ): Promise<PlayerId> {
+    const playerId = await repo.addPlayer(player)
     leave()
     repository = repo
     gameId.value = code
     roomCode.value = code
     isHost.value = false
-    let playerId: PlayerId
-    try {
-      playerId = await repo.addPlayer(player)
-    } catch (error) {
-      // Not seated, so not in this room: Home mustn't offer to continue it.
-      leave()
-      gameId.value = null
-      roomCode.value = null
-      throw error
-    }
     myPlayerId.value = playerId
     rememberRoom(code)
     // The host rejoining their own room by code is still its host.
@@ -235,7 +255,7 @@ export const useGameStore = defineStore('game', () => {
   /** Tears down the subscription and the repository's own resources. Safe to call repeatedly.
    * Resets `state` too — not just the identity flags — so a finished game's players/roundScores/
    * status never linger in the UI after leaving, waiting for the next repository's first
-   * snapshot to overwrite them (no "play again" flow reaches this yet, but it's correct hygiene). */
+   * snapshot to overwrite them (Play again moves straight from a finished game to the next). */
   function leave(): void {
     unsubscribe?.()
     unsubscribe = null
@@ -264,7 +284,9 @@ export const useGameStore = defineStore('game', () => {
     standings,
     board,
     winners,
+    nextRoomCode,
     start,
+    playAgain,
     join,
     resume,
     addPlayer,

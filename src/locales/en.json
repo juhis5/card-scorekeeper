@@ -197,6 +197,20 @@
     "connection": {
       "removed": "You're no longer in this room. The host may have removed you, or the room has closed.",
       "lost": "Lost the live connection to this room. Reload the page to reconnect."
+    },
+    "playAgain": {
+      "button": "Play again",
+      "hostStarted": "The host started a new game.",
+      "youStarted": "You already started the next game.",
+      "join": "Join the next game",
+      "goToNext": "Go to the next game",
+      "errors": {
+        "startFailed": "Couldn't start the next game. Check your connection and try again.",
+        "unreachable": "Couldn't reach the next game. Check your connection and try again.",
+        "joinFailed": "Couldn't join the next game. It may have closed.",
+        "nameTaken": "Someone in the next game already uses your name."
+      },
+      "joinWithAnotherName": "Join with another name"
     }
   },
   "notFound": {
