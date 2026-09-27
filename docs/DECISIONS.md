@@ -534,3 +534,10 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     only the code changes, and a device keeps its anonymous uid across rooms, so which scores
     the host entered in the finished game would otherwise show a player's numbers early in the
     next one.
+- 2026-09-27 — Production address rommi.vercel.app (second playtest):
+  - rommi.vercel.app is the only production domain. The old card-scorekeeper.vercel.app was
+    removed from the project outright, with no redirect (owner's call): nothing links to it
+    and the test data is being wiped anyway.
+  - Browser storage belongs to an address, so testers start fresh there: a new anonymous id,
+    empty stats, no saved local game. An app installed to the home screen from the old address
+    has to be removed and added again from the new one.
