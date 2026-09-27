@@ -2,13 +2,14 @@
 /**
  * Single job: the host adds a player at any round. Online that's a guest, a player without a phone
  * whose scores the host enters; in a local game every other player is one anyway. Collapsed to one
- * "Lisää pelaaja" button at the end of the card list, it opens inline to a name field with Lisää
- * and Peru. A player added mid-game fills in the rounds they missed, like a late joiner.
+ * "Lisää pelaaja" button at the end of the card list, it opens inline like a score card: a title
+ * row, then the name field with ✓ (add) and ✕ (cancel); Enter adds too. A player added mid-game
+ * fills in the rounds they missed, like a late joiner.
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { Plus } from '@lucide/vue'
+import { Check, Plus, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -85,7 +86,7 @@ async function add(): Promise<void> {
 </script>
 
 <template>
-  <li ref="card" class="bg-card border-border rounded-lg border">
+  <li ref="card" class="bg-card border-border rounded-lg border" @keydown.escape="close">
     <button
       v-if="!isOpen"
       ref="openButton"
@@ -96,45 +97,56 @@ async function add(): Promise<void> {
       <Plus aria-hidden="true" class="size-4 shrink-0" />
       {{ t('room.addPlayer.button') }}
     </button>
-    <form
-      v-else
-      class="flex flex-col gap-3 p-4"
-      novalidate
-      @submit.prevent="add"
-      @keydown.escape="close"
-    >
-      <div class="flex flex-col gap-1">
-        <Label for="add-player-name">{{ t('room.addPlayer.nameLabel') }}</Label>
-        <p v-if="isOnline" class="text-muted-foreground text-sm">
+    <!-- Laid out like an open score card, which holds up with the phone keyboard: no <form> (a
+         form brings iOS its extra autofill bar over the page), a title row, then one row with
+         the field, ✓ and ✕. -->
+    <div v-else class="flex flex-col gap-2 px-4 pb-4">
+      <p class="flex min-h-11 items-center gap-2 pt-4 pb-0">
+        <span class="text-foreground text-base font-medium">{{ t('room.addPlayer.button') }}</span>
+        <span v-if="isOnline" class="text-muted-foreground text-sm">
           {{ t('room.addPlayer.hint') }}
-        </p>
-        <div class="flex gap-2">
-          <Input
-            id="add-player-name"
-            v-model="name"
-            :maxlength="MAX_PLAYER_NAME_LENGTH"
-            type="text"
-            autocomplete="off"
-            enterkeyhint="done"
-            class="h-11 min-w-0 flex-1 text-base"
-            :aria-invalid="hasError"
-            :aria-describedby="hasError ? 'add-player-error' : undefined"
-          />
-          <Button type="submit" class="h-11 shrink-0 px-5" :disabled="isAdding">
-            {{ t('room.addPlayer.add') }}
-          </Button>
-        </div>
+        </span>
+      </p>
+      <div class="flex gap-2">
+        <Label for="add-player-name" class="sr-only">{{ t('room.addPlayer.nameLabel') }}</Label>
+        <Input
+          id="add-player-name"
+          v-model="name"
+          :maxlength="MAX_PLAYER_NAME_LENGTH"
+          type="text"
+          autocomplete="off"
+          autocapitalize="words"
+          enterkeyhint="done"
+          :placeholder="t('room.addPlayer.nameLabel')"
+          class="h-11 min-w-0 flex-1 text-base"
+          :aria-invalid="hasError"
+          :aria-describedby="hasError ? 'add-player-error' : undefined"
+          @keydown.enter.prevent="add"
+        />
+        <Button
+          type="button"
+          size="icon"
+          class="size-11 shrink-0"
+          :disabled="isAdding"
+          :aria-label="t('room.addPlayer.add')"
+          @click="add"
+        >
+          <Check aria-hidden="true" class="size-5" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          class="size-11 shrink-0"
+          :aria-label="t('room.score.cancel')"
+          @click="close"
+        >
+          <X aria-hidden="true" class="size-5" />
+        </Button>
       </div>
       <p v-if="hasError" id="add-player-error" role="alert" class="text-destructive text-sm">
         {{ errorMessage }}
       </p>
-      <button
-        type="button"
-        class="text-muted-foreground hover:text-foreground h-11 text-sm"
-        @click="close"
-      >
-        {{ t('room.score.cancel') }}
-      </button>
-    </form>
+    </div>
   </li>
 </template>

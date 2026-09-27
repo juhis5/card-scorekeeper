@@ -225,7 +225,7 @@
     "addPlayer": {
       "button": "Add player",
       "nameLabel": "Player's name",
-      "hint": "For a player without a phone: you enter their scores.",
+      "hint": "a player without a phone",
       "add": "Add",
       "nameRequired": "Enter the player's name.",
       "failed": "Couldn't add {name}. Try again."

@@ -72,6 +72,17 @@ describe('AddPlayerCard', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add player' }))
   })
 
+  it('adds on Enter too, like a score card', async () => {
+    const added: string[] = []
+    await renderInGame((name) => added.push(name))
+
+    await openAndType('Ripa')
+    await fireEvent.keyDown(screen.getByLabelText("Player's name"), { key: 'Enter' })
+    await flushPromises()
+
+    expect(added).toEqual(['Ripa'])
+  })
+
   it('asks for a name when the field is empty', async () => {
     await renderInGame()
 
