@@ -2,7 +2,7 @@
 /**
  * The persistent Stats screen (see docs/PLAN.md "Stats & history"): this device's own record —
  * games played, wins/win rate, best/worst final score, best/worst single round, average final
- * score — plus a head-to-head list per opponent. Pure read-side UI: all math and Firestore I/O
+ * score — plus a head-to-head list per opponent, then the app-wide highscores. Pure read-side UI: all math and Firestore I/O
  * live in `useStatsStore`; this view only renders its four states (see the error-ux skill) and
  * always surfaces the identity caveats (docs/PLAN.md's "Stats & history" failure modes), since
  * they apply regardless of whether the load itself succeeded.
@@ -11,6 +11,7 @@ import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import HeadToHeadList from '@/components/stats/HeadToHeadList.vue'
+import HighscoresSection from '@/components/stats/HighscoresSection.vue'
 import StatSummary from '@/components/stats/StatSummary.vue'
 import { Button } from '@/components/ui/button'
 import { useStatsStore } from '@/stores/stats'
@@ -63,5 +64,7 @@ onMounted(() => {
         <HeadToHeadList :opponents="opponents" />
       </template>
     </template>
+
+    <HighscoresSection />
   </main>
 </template>

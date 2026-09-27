@@ -298,6 +298,31 @@
       "recordHeader": "V–H–T",
       "recordCompact": "{wins} V – {losses} H – {ties} T",
       "empty": "Ei vielä yhteisiä pelejä muiden pelaajien kanssa."
+    },
+    "highscores": {
+      "heading": "Ennätykset",
+      "lede": "Kaikista sovelluksella pelatuista peleistä.",
+      "loading": "Ladataan ennätyksiä…",
+      "error": "Ennätyksiä ei voitu ladata. Tarkista yhteys ja yritä uudelleen.",
+      "empty": "Ei vielä pelejä.",
+      "rank": "#",
+      "player": "Pelaaja",
+      "points": "Pisteet",
+      "you": "sinä",
+      "lists": {
+        "bestGames": {
+          "title": "Paras peli",
+          "description": "Pienin loppupistemäärä"
+        },
+        "worstGames": {
+          "title": "Häpeäpaalu",
+          "description": "Suurin loppupistemäärä"
+        },
+        "biggestRounds": {
+          "title": "Suurin kierros",
+          "description": "Eniten pisteitä yhdellä kierroksella"
+        }
+      }
     }
   },
   "invite": {

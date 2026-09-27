@@ -108,7 +108,8 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 }
 
 function renderStatsView() {
-  return render(StatsView, { global: { plugins: [i18n] } })
+  // The highscores load on their own (components/stats/HighscoresSection.test.ts).
+  return render(StatsView, { global: { plugins: [i18n], stubs: { HighscoresSection: true } } })
 }
 
 beforeEach(() => {

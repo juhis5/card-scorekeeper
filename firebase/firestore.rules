@@ -454,5 +454,29 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    // Global highscores (fourth round): one public entry per stats row, which anyone signed in
+    // may read, ten at a time. An entry must repeat its own game_player row (and that game's
+    // finishedAt) exactly, and only one of that game's players may publish it, so who may write
+    // a stats row (above) also decides what reaches the board. Append-only, like the rows.
+    match /leaderboard/{entryId} {
+      function matchesItsStatsRow() {
+        let row = get(/databases/$(database)/documents/game_player/$(entryId)).data;
+        let result = get(/databases/$(database)/documents/game_result/$(row.gameId)).data;
+        return request.auth.uid in row.participantUids
+          && request.resource.data.displayName == row.displayName
+          && request.resource.data.finalScore == row.finalScore
+          && request.resource.data.worstRound == row.worstRound
+          && request.resource.data.finishedAt == result.finishedAt;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 10;
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['displayName', 'finalScore', 'worstRound', 'finishedAt'])
+        && matchesItsStatsRow();
+      allow update: if false;
+      allow delete: if false;
+    }
   }
 }
