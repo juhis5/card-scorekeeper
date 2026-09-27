@@ -27,6 +27,7 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore'
+import { MAX_ROUND_SCORE, ROUND_SCORE_STEP, TOTAL_ROUNDS } from '@/lib/rules'
 
 const RULES_PATH = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -254,13 +255,26 @@ describe('roundScores value bounds', () => {
     )
   })
 
-  it('denies a roundScore write with points over the sanity cap', async () => {
+  // The cap is shared with the client's isValidRoundScore, so these two tests pin the parity:
+  // if either side moves alone, one of them fails.
+  it('allows a roundScore write at exactly the client-side cap', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertSucceeds(
+      setDoc(
+        doc(alice, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
+        roundScoreFixture(ALICE_UID, { points: MAX_ROUND_SCORE }),
+      ),
+    )
+  })
+
+  it('denies a roundScore write one step over the client-side cap', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
     await assertFails(
       setDoc(
         doc(alice, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
-        roundScoreFixture(ALICE_UID, { points: 1005 }),
+        roundScoreFixture(ALICE_UID, { points: MAX_ROUND_SCORE + ROUND_SCORE_STEP }),
       ),
     )
   })
@@ -578,13 +592,28 @@ describe('game_player value bounds (bonus coverage)', () => {
     await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
   })
 
+  it('allows the largest finalScore a capped game can produce', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertSucceeds(
+      setDoc(
+        doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID, {
+          finalScore: TOTAL_ROUNDS * MAX_ROUND_SCORE,
+          bestRound: MAX_ROUND_SCORE,
+          worstRound: MAX_ROUND_SCORE,
+        }),
+      ),
+    )
+  })
+
   it('denies a finalScore over the sanity cap', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
     await assertFails(
       setDoc(
         doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
-        gamePlayerFixture(GAME_ID, ALICE_UID, { finalScore: 5001 }),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { finalScore: TOTAL_ROUNDS * MAX_ROUND_SCORE + 1 }),
       ),
     )
   })
@@ -617,7 +646,7 @@ describe('game_player value bounds (bonus coverage)', () => {
     await assertFails(
       setDoc(
         doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
-        gamePlayerFixture(GAME_ID, ALICE_UID, { bestRound: 1001 }),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { bestRound: MAX_ROUND_SCORE + 1 }),
       ),
     )
   })
@@ -628,7 +657,7 @@ describe('game_player value bounds (bonus coverage)', () => {
     await assertFails(
       setDoc(
         doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
-        gamePlayerFixture(GAME_ID, ALICE_UID, { worstRound: 1001 }),
+        gamePlayerFixture(GAME_ID, ALICE_UID, { worstRound: MAX_ROUND_SCORE + 1 }),
       ),
     )
   })

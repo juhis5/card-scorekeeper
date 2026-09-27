@@ -41,6 +41,36 @@ function makeRepository(): LocalGameRepository {
   })
 }
 
+/** A local repository whose saves can be made to reject, standing in for a write the backend
+ * refuses (offline too long, expired room, rules). */
+class FailingRepository extends LocalGameRepository {
+  failure: unknown = null
+
+  override async setRoundScore(input: SetRoundScoreInput): Promise<void> {
+    if (this.failure) throw this.failure
+    return super.setRoundScore(input)
+  }
+
+  override async advanceRound(): Promise<void> {
+    if (this.failure) throw this.failure
+    return super.advanceRound()
+  }
+
+  override async finishGame(): Promise<GameResult> {
+    if (this.failure) throw this.failure
+    return super.finishGame()
+  }
+}
+
+function makeFailingRepository(): FailingRepository {
+  let count = 0
+  return new FailingRepository({
+    now: () => '2026-01-01T00:00:00.000Z',
+    newId: () => `id-${++count}`,
+    storage: makeMemoryStorage(),
+  })
+}
+
 /**
  * A minimal fake `GameRepository` that behaves like a shared Firestore room: every subscriber —
  * host or joiner — sees the same state, so a host-side and a joiner-side Pinia/store pair can be
@@ -195,7 +225,7 @@ describe('RoomView invalid score entry', () => {
     await renderRoom()
     await enterScore('Alice', 1, -5)
 
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('0')
@@ -210,7 +240,7 @@ describe('RoomView invalid score entry', () => {
     await renderRoom()
     await enterScore('Alice', 1, 5.5)
 
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('0')
@@ -224,11 +254,11 @@ describe('RoomView invalid score entry', () => {
 
     await renderRoom()
     await enterScore('Alice', 1, -5)
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
 
     await enterScore('Alice', 1, 10)
 
-    expect(screen.queryByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeNull()
+    expect(screen.queryByText('Enter a multiple of 5 from 0 to 1,000.')).toBeNull()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('10')
@@ -383,6 +413,82 @@ describe('RoomView finishing the game', () => {
     }
 
     expect(screen.getByText('Alice and Bob tie for the win!')).toBeTruthy()
+  })
+})
+
+describe('RoomView when a save fails', () => {
+  async function startFailingGame(): Promise<FailingRepository> {
+    const repository = makeFailingRepository()
+    const game = useGameStore()
+    await game.start(repository, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await renderRoom()
+    return repository
+  }
+
+  it('says the score was not saved and leaves the player unscored', async () => {
+    const repository = await startFailingGame()
+    repository.failure = new Error('offline')
+
+    await enterScore('Alice', 1, 10)
+
+    expect(screen.getByRole('alert').textContent).toContain(
+      "Couldn't save Alice's score. Check your connection and enter it again.",
+    )
+    expect(screen.getByRole('button', { name: "Enter Alice's score" })).toBeTruthy()
+  })
+
+  it('explains that the room is closed when the rules refuse the write', async () => {
+    const repository = await startFailingGame()
+    repository.failure = Object.assign(new Error('denied'), { code: 'permission-denied' })
+
+    await enterScore('Alice', 1, 10)
+
+    expect(screen.getByRole('alert').textContent).toContain(
+      "This room isn't accepting changes anymore. It may have expired.",
+    )
+  })
+
+  it('says the next round did not start and stays on the current round', async () => {
+    const repository = await startFailingGame()
+    await enterScore('Host', 1, 20)
+    await enterScore('Alice', 1, 10)
+    repository.failure = new Error('offline')
+
+    await advanceOrFinish(1)
+
+    expect(screen.getByRole('alert').textContent).toContain(
+      "Couldn't start the next round. Try again.",
+    )
+    expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
+  })
+
+  it('says the game did not finish and keeps the Finish button', async () => {
+    const repository = await startFailingGame()
+    for (let round = 1; round <= 4; round++) {
+      await enterScore('Host', round, 20)
+      await enterScore('Alice', round, 10)
+      await advanceOrFinish(round)
+    }
+    await enterScore('Host', 5, 20)
+    await enterScore('Alice', 5, 10)
+    repository.failure = new Error('offline')
+
+    await advanceOrFinish(5)
+
+    expect(screen.getByRole('alert').textContent).toContain("Couldn't finish the game. Try again.")
+    expect(screen.getByRole('button', { name: 'Finish game' })).toBeTruthy()
+  })
+
+  it('clears the message once a later save succeeds', async () => {
+    const repository = await startFailingGame()
+    repository.failure = new Error('offline')
+    await enterScore('Alice', 1, 10)
+    repository.failure = null
+
+    await enterScore('Alice', 1, 10)
+
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 })
 

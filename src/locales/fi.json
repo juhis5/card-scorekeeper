@@ -80,10 +80,16 @@
       "sectionHeading": "Kierroksen {round} pisteet",
       "inputLabel": "{name}: kierroksen {round} pisteet",
       "scoredLabel": "Syötetty",
-      "invalidError": "Anna viiden kerrannainen (0, 5, 10, 15…).",
+      "invalidError": "Anna viiden kerrannainen väliltä 0–{max}.",
       "cardLabel": "Syötä pisteet: {name}",
       "cardLabelScored": "Muokkaa pisteitä: {name} (syötetty)",
       "cancel": "Peruuta"
+    },
+    "saveError": {
+      "score": "Pelaajan {name} pisteitä ei voitu tallentaa. Tarkista yhteys ja syötä pisteet uudelleen.",
+      "nextRound": "Seuraavaa kierrosta ei voitu aloittaa. Yritä uudelleen.",
+      "finish": "Peliä ei voitu päättää. Yritä uudelleen.",
+      "closed": "Tähän huoneeseen ei voi enää tallentaa. Se on ehkä vanhentunut."
     },
     "photoCount": {
       "trigger": "Kuvaa kortit",

@@ -19,8 +19,8 @@ Styling engine is **Tailwind v4**; the palette lives in **shadcn-vue's CSS-varia
   --background: #f7f9fb; --foreground: #0b0f14;
   --card: #ffffff; --card-foreground: #0b0f14;
   --muted: #eef2f6; --muted-foreground: #566573;
-  --primary: #059669; --primary-foreground: #ffffff;   /* card-table emerald */
-  --destructive: #dc2626; --border: #d5dde5; --input: #d5dde5; --ring: #059669;
+  --primary: #047857; --primary-foreground: #ffffff;   /* card-table emerald (700: AA as text) */
+  --destructive: #dc2626; --border: #d5dde5; --input: #d5dde5; --ring: #047857;
   --radius: 0.625rem;
 }
 .dark {              /* DARK values — the primary craft target */
@@ -43,7 +43,7 @@ Styling engine is **Tailwind v4**; the palette lives in **shadcn-vue's CSS-varia
 @theme { --ease-standard: cubic-bezier(0.2, 0, 0.2, 1); }   /* generates the `ease-standard` utility */
 ```
 
-The CLI writes this scaffolding (v4 uses **oklch** by default — hex or oklch both fine). Our job: **set the values dark-first, keep the token names.** Every pair passes the `a11y-mobile` contrast bar (≥ 4.5:1 text) in **both** themes.
+The CLI writes this scaffolding (v4 uses **oklch** by default — hex or oklch both fine). Our job: **set the values dark-first, keep the token names.** Every text pair the app uses passes the `a11y-mobile` contrast bar (≥ 4.5:1 text, ≥ 3:1 focus ring at `ring/80`) in **both** themes. `src/assets/theme-contrast.test.ts` reads `main.css` and enforces it; add a pair there when a token lands on a new surface.
 
 ## Token map (nothing was lost adopting Tailwind)
 

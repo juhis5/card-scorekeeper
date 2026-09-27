@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { TOTAL_ROUNDS } from '@/lib/rules'
+import { isPermissionDenied } from '@/lib/write-errors'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/repository'
 import type { Standing } from '@/lib/types'
@@ -48,6 +49,8 @@ const {
 const { isReconnecting } = useConnectionStatus()
 
 const announcement = ref('')
+/** Why the last score, Next or Finish didn't save. Cleared by the next save that succeeds. */
+const saveError = ref('')
 const isAdvancing = ref(false)
 const isFinishing = ref(false)
 
@@ -99,10 +102,23 @@ const allPlayersScored = computed(() =>
   standings.value.every((standing) => scoredPlayerIdsThisRound.value.has(standing.player.id)),
 )
 
-async function handleScoreCommit(playerId: PlayerId, points: number): Promise<void> {
-  await game.setRoundScore({ playerId, round: currentRound.value, points })
+/** The rules refuse every write to an expired room; any other failure is worth retrying. */
+function describeSaveFailure(error: unknown, retryMessage: string): string {
+  return isPermissionDenied(error) ? t('room.saveError.closed') : retryMessage
+}
 
+async function handleScoreCommit(playerId: PlayerId, points: number): Promise<void> {
   const player = standings.value.find((standing) => standing.player.id === playerId)?.player
+  try {
+    await game.setRoundScore({ playerId, round: currentRound.value, points })
+  } catch (error) {
+    saveError.value = describeSaveFailure(
+      error,
+      t('room.saveError.score', { name: player?.name ?? '' }),
+    )
+    return
+  }
+  saveError.value = ''
   if (!player) return
 
   const isLeading = standings.value[0]?.player.id === playerId
@@ -115,6 +131,9 @@ async function handleNextRound(): Promise<void> {
   isAdvancing.value = true
   try {
     await game.advanceRound()
+    saveError.value = ''
+  } catch (error) {
+    saveError.value = describeSaveFailure(error, t('room.saveError.nextRound'))
   } finally {
     isAdvancing.value = false
   }
@@ -127,6 +146,9 @@ async function handleFinish(): Promise<void> {
     // region and announces itself the moment it mounts — a second live region saying the same
     // thing would violate "announce sparingly" (a11y-mobile).
     await game.finishGame()
+    saveError.value = ''
+  } catch (error) {
+    saveError.value = describeSaveFailure(error, t('room.saveError.finish'))
   } finally {
     isFinishing.value = false
   }
@@ -223,6 +245,8 @@ onMounted(() => {
           />
         </ul>
       </section>
+
+      <p v-if="saveError" role="alert" class="text-destructive text-sm">{{ saveError }}</p>
 
       <div aria-live="polite" class="sr-only">{{ announcement }}</div>
 

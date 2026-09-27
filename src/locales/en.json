@@ -80,10 +80,16 @@
       "sectionHeading": "Round {round} scores",
       "inputLabel": "{name}'s round {round} score",
       "scoredLabel": "Scored",
-      "invalidError": "Enter a multiple of 5 (0, 5, 10, 15…).",
+      "invalidError": "Enter a multiple of 5 from 0 to {max}.",
       "cardLabel": "Enter {name}'s score",
       "cardLabelScored": "Edit {name}'s score (scored)",
       "cancel": "Cancel"
+    },
+    "saveError": {
+      "score": "Couldn't save {name}'s score. Check your connection and enter it again.",
+      "nextRound": "Couldn't start the next round. Try again.",
+      "finish": "Couldn't finish the game. Try again.",
+      "closed": "This room isn't accepting changes anymore. It may have expired."
     },
     "photoCount": {
       "trigger": "Snap cards",

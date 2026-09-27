@@ -93,7 +93,18 @@ export function winners(players: Player[]): Standing[] {
 /** Every card value is a multiple of this, so any valid leftover-card total must also be one. */
 export const ROUND_SCORE_STEP = 5
 
-/** A leftover-card total: a non-negative whole number that is a multiple of `ROUND_SCORE_STEP`. */
+/** Sanity cap on one round's score (40 jokers), enforced identically by firestore.rules. */
+export const MAX_ROUND_SCORE = 1000
+
+/** A leftover-card total: a whole number from 0 to `MAX_ROUND_SCORE` in steps of
+ * `ROUND_SCORE_STEP`. Negative zero is rejected because Firestore stores it as a double, which
+ * the rules' `is int` check refuses. */
 export function isValidRoundScore(points: number): boolean {
-  return Number.isInteger(points) && points >= 0 && points % ROUND_SCORE_STEP === 0
+  return (
+    Number.isInteger(points) &&
+    !Object.is(points, -0) &&
+    points >= 0 &&
+    points <= MAX_ROUND_SCORE &&
+    points % ROUND_SCORE_STEP === 0
+  )
 }

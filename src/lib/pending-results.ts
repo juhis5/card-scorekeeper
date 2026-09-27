@@ -10,8 +10,12 @@
  */
 import type { GamePlayer, GameResult } from './types'
 import type { KeyValueStorage } from './key-value-storage'
+import { isPermanentWriteError } from './write-errors'
 
 export const PENDING_RESULTS_STORAGE_KEY = 'card-scorekeeper:pending-results'
+/** Results Firestore rejected for good (e.g. a value its rules refuse). Kept, not deleted, so the
+ * record isn't lost, but never retried: one of these must not block every later game's upload. */
+export const FAILED_RESULTS_STORAGE_KEY = 'card-scorekeeper:pending-results-failed'
 
 /** One finished game's permanent record, queued together — always written as a unit. */
 export interface PendingResult {
@@ -60,7 +64,11 @@ function isPendingResult(value: unknown): value is PendingResult {
  * like an empty queue. Malformed entries mixed into an otherwise-valid array are dropped rather
  * than discarding the whole queue. */
 export function readPendingResults(storage: KeyValueStorage): PendingResult[] {
-  const raw = storage.getItem(PENDING_RESULTS_STORAGE_KEY)
+  return readResults(storage, PENDING_RESULTS_STORAGE_KEY)
+}
+
+function readResults(storage: KeyValueStorage, key: string): PendingResult[] {
+  const raw = storage.getItem(key)
   if (!raw) return []
   try {
     const parsed: unknown = JSON.parse(raw)
@@ -70,12 +78,12 @@ export function readPendingResults(storage: KeyValueStorage): PendingResult[] {
   }
 }
 
-function writePendingResults(storage: KeyValueStorage, entries: PendingResult[]): void {
+function writeResults(storage: KeyValueStorage, key: string, entries: PendingResult[]): void {
   // Best-effort, same as LocalGameRepository's own persistence: a storage failure (e.g. iOS
   // Safari private mode) must not throw out of a caller that's mid-way through finishing a game
   // or flushing a queue.
   try {
-    storage.setItem(PENDING_RESULTS_STORAGE_KEY, JSON.stringify(entries))
+    storage.setItem(key, JSON.stringify(entries))
   } catch {
     // Swallowed deliberately — see comment above.
   }
@@ -83,7 +91,20 @@ function writePendingResults(storage: KeyValueStorage, entries: PendingResult[])
 
 /** Queues one finished game's permanent record for later upload. */
 export function appendPendingResult(storage: KeyValueStorage, entry: PendingResult): void {
-  writePendingResults(storage, [...readPendingResults(storage), entry])
+  writeResults(storage, PENDING_RESULTS_STORAGE_KEY, [...readPendingResults(storage), entry])
+}
+
+/** Re-reads the queue rather than writing back an old snapshot, so a game queued while a write
+ * was in flight (a long offline session in an installed PWA) is never overwritten. */
+function removePendingResult(storage: KeyValueStorage, gameId: string): void {
+  const remaining = readPendingResults(storage).filter((entry) => entry.result.gameId !== gameId)
+  writeResults(storage, PENDING_RESULTS_STORAGE_KEY, remaining)
+}
+
+function moveToFailedResults(storage: KeyValueStorage, entry: PendingResult): void {
+  const failed = readResults(storage, FAILED_RESULTS_STORAGE_KEY)
+  writeResults(storage, FAILED_RESULTS_STORAGE_KEY, [...failed, entry])
+  removePendingResult(storage, entry.result.gameId)
 }
 
 /** Uploads one queued `PendingResult`. Implemented by the real Firestore writer in
@@ -95,33 +116,38 @@ export interface PendingResultWriter {
 
 export interface FlushPendingResultsSummary {
   flushed: number
+  /** Moved to the failed list because Firestore rejected them for good. */
+  failed: number
   remaining: number
 }
 
 /**
- * Uploads every queued pending result through `writer`, in queue order. Stops at the first
- * failure — a write rejecting almost always means connectivity dropped again, so trying the rest
- * of the queue immediately would just fail the same way — and persists whatever's left (the
- * failed entry and everything after it) back to the queue for the next flush attempt. An
- * already-empty queue never calls `writer` at all.
+ * Uploads every queued pending result through `writer`, in queue order.
+ * - A transient failure (offline, timeout, unknown) stops the flush: the rest would fail the same
+ *   way, so the failed entry and everything after it stay queued for the next attempt.
+ * - A permanent failure (`isPermanentWriteError`) moves that entry to the failed list and the
+ *   flush continues, so one rejected game can't block every later one.
+ * An already-empty queue never calls `writer` at all.
  */
 export async function flushPendingResults(
   storage: KeyValueStorage,
   writer: PendingResultWriter,
 ): Promise<FlushPendingResultsSummary> {
-  const pending = readPendingResults(storage)
+  let flushed = 0
+  let failed = 0
 
-  let flushedCount = 0
-  for (const entry of pending) {
+  for (const entry of readPendingResults(storage)) {
     try {
       await writer.write(entry)
-      flushedCount += 1
-    } catch {
-      break
+    } catch (error) {
+      if (!isPermanentWriteError(error)) break
+      moveToFailedResults(storage, entry)
+      failed += 1
+      continue
     }
+    removePendingResult(storage, entry.result.gameId)
+    flushed += 1
   }
 
-  const remaining = pending.slice(flushedCount)
-  writePendingResults(storage, remaining)
-  return { flushed: flushedCount, remaining: remaining.length }
+  return { flushed, failed, remaining: readPendingResults(storage).length }
 }

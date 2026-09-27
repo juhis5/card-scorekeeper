@@ -353,3 +353,17 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   passed to that command. Retries dropped from 2 to 0 so a flake fails the job instead of hiding;
   traces are kept on failure and the HTML report is uploaded as an artifact. WebKit stays excluded
   from live sync (the documented flake). Make `e2e` a required check once it has passed a few runs.
+- 2026-09-27 — Review round 2, "scores always land":
+  - One round-score cap on both sides: `MAX_ROUND_SCORE` (1000) in `rules.ts`, `<= 1000` in
+    `firestore.rules`, parity pinned by rules tests that import the constant. `-0` is rejected.
+  - The reconnect flush moves permanently rejected results (`isPermanentWriteError`) to
+    `card-scorekeeper:pending-results-failed` and keeps going; transient errors still stop it. The
+    failed list is kept, not shown in the UI yet. Each success removes its own entry from a fresh
+    read, so a game queued mid-flush survives.
+  - ScoreCard: a blur saves only while the card is open and focus leaves the card; a press inside
+    the card counts as staying (iOS doesn't focus tapped buttons). Cancel/Escape restore the last
+    saved value. `e2e/score-entry.spec.ts` pins this in real browsers.
+  - RoomView shows an inline alert when a score, Next or Finish save fails, and says the room is
+    closed on permission-denied. Listener (onSnapshot) errors are still silent; that's round 3.
+  - Light `--primary`/`--ring` moved to #047857 and focus rings to 80% opacity for WCAG AA;
+    `src/assets/theme-contrast.test.ts` enforces the token pairs.

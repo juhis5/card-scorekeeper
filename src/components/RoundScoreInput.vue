@@ -20,7 +20,9 @@ const {
   isInvalid?: boolean
 }>()
 
-const emit = defineEmits<{ commit: [] }>()
+/** `commit` fires on Enter. `blur` passes the focus event so the parent decides whether leaving
+ * the field should save (see ScoreCard). */
+const emit = defineEmits<{ commit: []; blur: [event: FocusEvent] }>()
 
 const model = defineModel<number | null>({ default: null })
 
@@ -46,7 +48,7 @@ const rawValue = computed<string | number>({
       class="h-11 text-base"
       :aria-invalid="isInvalid"
       :aria-describedby="describedBy"
-      @blur="emit('commit')"
+      @blur="emit('blur', $event)"
       @keyup.enter="emit('commit')"
     />
   </div>

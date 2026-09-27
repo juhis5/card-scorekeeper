@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   appendPendingResult,
+  FAILED_RESULTS_STORAGE_KEY,
   flushPendingResults,
   PENDING_RESULTS_STORAGE_KEY,
   readPendingResults,
@@ -108,7 +109,7 @@ describe('flushPendingResults', () => {
 
     const summary = await flushPendingResults(storage, writer)
 
-    expect(summary).toEqual({ flushed: 0, remaining: 0 })
+    expect(summary).toEqual({ flushed: 0, failed: 0, remaining: 0 })
     expect(writer.write).not.toHaveBeenCalled()
   })
 
@@ -120,7 +121,7 @@ describe('flushPendingResults', () => {
 
     const summary = await flushPendingResults(storage, writer)
 
-    expect(summary).toEqual({ flushed: 2, remaining: 0 })
+    expect(summary).toEqual({ flushed: 2, failed: 0, remaining: 0 })
     expect(readPendingResults(storage)).toEqual([])
   })
 
@@ -132,7 +133,7 @@ describe('flushPendingResults', () => {
 
     const summary = await flushPendingResults(storage, writer)
 
-    expect(summary).toEqual({ flushed: 0, remaining: 1 })
+    expect(summary).toEqual({ flushed: 0, failed: 0, remaining: 1 })
     expect(readPendingResults(storage)).toEqual([failing])
   })
 
@@ -152,8 +153,61 @@ describe('flushPendingResults', () => {
     const summary = await flushPendingResults(storage, writer)
 
     expect(seen).toEqual(['g1', 'g2'])
-    expect(summary).toEqual({ flushed: 1, remaining: 2 })
+    expect(summary).toEqual({ flushed: 1, failed: 0, remaining: 2 })
     expect(readPendingResults(storage)).toEqual([second, third])
+  })
+
+  it('moves a permanently rejected entry aside and keeps flushing the rest', async () => {
+    const storage = makeMemoryStorage()
+    const [rejected, valid] = [pendingResult('g1'), pendingResult('g2')]
+    appendPendingResult(storage, rejected)
+    appendPendingResult(storage, valid)
+    const writer = writerThat((entry) =>
+      entry.result.gameId === 'g1'
+        ? Promise.reject(Object.assign(new Error('denied'), { code: 'permission-denied' }))
+        : Promise.resolve(),
+    )
+
+    const summary = await flushPendingResults(storage, writer)
+
+    expect(summary).toEqual({ flushed: 1, failed: 1, remaining: 0 })
+    expect(readPendingResults(storage)).toEqual([])
+    expect(JSON.parse(storage.getItem(FAILED_RESULTS_STORAGE_KEY) ?? '[]')).toEqual([rejected])
+  })
+
+  it('never retries a moved-aside entry on the next flush', async () => {
+    const storage = makeMemoryStorage()
+    appendPendingResult(storage, pendingResult('g1'))
+    const writer = writerThat(() =>
+      Promise.reject(Object.assign(new Error('denied'), { code: 'permission-denied' })),
+    )
+    await flushPendingResults(storage, writer)
+
+    const summary = await flushPendingResults(storage, writer)
+
+    expect(summary).toEqual({ flushed: 0, failed: 0, remaining: 0 })
+    expect(writer.write).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a result queued while an earlier write is still in flight', async () => {
+    const storage = makeMemoryStorage()
+    appendPendingResult(storage, pendingResult('g1'))
+    let finishWrite: () => void = () => undefined
+    const writer = writerThat(
+      () =>
+        new Promise<void>((resolve) => {
+          finishWrite = resolve
+        }),
+    )
+
+    const flushing = flushPendingResults(storage, writer)
+    const lateArrival = pendingResult('g2')
+    appendPendingResult(storage, lateArrival)
+    finishWrite()
+    const summary = await flushing
+
+    expect(summary).toEqual({ flushed: 1, failed: 0, remaining: 1 })
+    expect(readPendingResults(storage)).toEqual([lateArrival])
   })
 
   it('persists the reduced queue back to storage, visible to a later read', async () => {

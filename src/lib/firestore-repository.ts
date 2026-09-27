@@ -36,6 +36,7 @@ import {
   winners as leadingPlayers,
 } from './rules'
 import { bestAndWorstRound } from './stats'
+import { isPermissionDenied } from './write-errors'
 import type {
   ContractRoundNumber,
   GamePlayer,
@@ -95,16 +96,6 @@ function toPlayer(snapshot: QueryDocumentSnapshot): Player {
 function toRoundScore(snapshot: QueryDocumentSnapshot): RoundScore {
   const data = snapshot.data() as RoundScoreDocData
   return { round: data.round, playerId: data.playerId, points: data.points }
-}
-
-/** True for the `permission-denied` FirestoreError a rejected create/update surfaces as. */
-function isPermissionDenied(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'permission-denied'
-  )
 }
 
 export interface FirestoreGameRepositoryDeps {

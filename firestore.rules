@@ -116,8 +116,10 @@ service cloud.firestore {
         // self-defeating — there's no server to catch a falsified value otherwise), and the doc
         // id is pinned to `{ownerUid}_{round}` so there is structurally exactly one score per
         // player per round — an arbitrary id would let a client double-count a round via extra
-        // sibling docs `runningTotal` would sum together. `points % 5` mirrors `isValidRoundScore`
-        // in src/lib/rules.ts: every card value is a multiple of 5, so no real hand totals otherwise.
+        // sibling docs `runningTotal` would sum together. The `points` bounds mirror
+        // `isValidRoundScore` in src/lib/rules.ts: `<= 1000` is MAX_ROUND_SCORE and `% 5` is
+        // ROUND_SCORE_STEP (every card value is a multiple of 5). Change both sides together;
+        // tests/rules pins the parity by importing those constants.
         allow create, update: if isSignedIn()
           && roomNotExpired(code)
           && request.resource.data.playerId == request.resource.data.ownerUid
@@ -191,7 +193,7 @@ service cloud.firestore {
         && request.resource.data.displayName is string
         && request.resource.data.finalScore is int
         && request.resource.data.finalScore >= 0
-        && request.resource.data.finalScore <= 5000
+        && request.resource.data.finalScore <= 5000 // TOTAL_ROUNDS * MAX_ROUND_SCORE
         && request.resource.data.placement is int
         && request.resource.data.placement >= 1
         && request.resource.data.placement <= 50
