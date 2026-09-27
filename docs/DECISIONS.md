@@ -576,3 +576,8 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   - Guest ids land in a stats row's participantUids alongside the uids; harmless, since nobody
     signs in as one. A guest gets a new id each game, as local players always have, so
     head-to-head lists a guest once per game. No photo count on guest cards.
+  - Known gaps, deferred: an add that times out stays queued in the SDK and may still land, so
+    retrying the same name can then say it's taken (the first attempt got there). And the start
+    form still falls back to a local game if a guest write fails after the room was created,
+    leaving that room behind; the probe has just passed, so it's unlikely, but the better
+    behaviour is to stay in the room and say who couldn't be added.
