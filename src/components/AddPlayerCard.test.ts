@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
@@ -35,6 +35,29 @@ beforeEach(() => {
 })
 
 describe('AddPlayerCard', () => {
+  it("doesn't pull focus back when the host has moved on before the add is confirmed", async () => {
+    const repository = new LocalGameRepository({ storage: memoryStorage() })
+    await useGameStore().start(repository, {
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Juho',
+    })
+    let confirm: (id: string) => void = () => undefined
+    vi.spyOn(repository, 'addGuest').mockImplementation(
+      () => new Promise((resolve) => (confirm = resolve)),
+    )
+    render(AddPlayerCard, { global: { plugins: [i18n] } })
+    const elsewhere = document.body.appendChild(document.createElement('input'))
+
+    await openAndType('Ripa')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    elsewhere.focus()
+    confirm('guest-ripa')
+    await flushPromises()
+
+    expect(document.activeElement).toBe(elsewhere)
+    elsewhere.remove()
+  })
+
   it('adds a player by name, closes and says who was added', async () => {
     const added: string[] = []
     await renderInGame((name) => added.push(name))
