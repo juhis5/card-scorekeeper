@@ -20,6 +20,7 @@ import {
   winners as winnersFor,
 } from '@/lib/rules'
 import { hasPersistedGame, LocalGameRepository } from '@/lib/local-repository'
+import { boardRows } from '@/lib/scoreboard'
 import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
   AddPlayerInput,
@@ -98,6 +99,11 @@ export const useGameStore = defineStore('game', () => {
     })),
   )
   const standings = computed(() => standingsFor(rankedPlayers.value))
+  /** What the scoreboard shows: numbers only for revealed rounds (see lib/scoreboard.ts).
+   * `standings` stays the full live ranking, for seat order, the Next gate and the winner. */
+  const board = computed(() =>
+    boardRows(state.value.players, state.value.roundScores, completedRounds.value),
+  )
   const winners = computed(() => winnersFor(rankedPlayers.value))
 
   function requireRepository(): GameRepository {
@@ -241,6 +247,7 @@ export const useGameStore = defineStore('game', () => {
     completedRounds,
     roundScores,
     standings,
+    board,
     winners,
     start,
     join,

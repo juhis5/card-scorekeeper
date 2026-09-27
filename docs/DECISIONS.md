@@ -463,3 +463,18 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   need the room to exist and the writer to be its host, so the order could simply swap, and
   `writeGameResult` skips docs that already exist, so a retried Finish is safe. This replaces the
   plan's "queue the online result first" idea for the review finding sync-5.
+- 2026-09-27 — Scoreboard reveals scores per round (tester notes 4 and 8):
+  - The board has five round columns before the total. During a round it shows only who has
+    entered (✓, live); numbers, totals and ranking change when the host taps Next, and round 5 on
+    Finish. This supersedes PLAN's "real-time" wording for score numbers: entries and the reveal
+    still sync live with no refresh button, only the numbers wait. Past-round corrections and
+    late joiners' missed rounds show at once, since those rounds are already revealed.
+  - Totals and ranking come from revealed round scores (`lib/scoreboard.ts`), not the stored
+    `totalScore`. A player with a revealed round still missing is unranked (no crown) until it's
+    filled. `standings` stays the full live ranking for seat order, the Next gate and the winner.
+  - Motion now exists: rows slide into the new order and changed totals fade in, both off for
+    reduced motion via unlayered rules in `main.css` (this updates the slice-8 "no score motion"
+    note). ContractBanner is no longer a live region; RoomView announces results, your place and
+    the next contract together, the host hears when every score is in, and a reopened room
+    announces nothing. Next and Finish use `aria-disabled` and wait for a score saved by the same
+    tap, so one tap is enough; tapping early says whose scores are missing.

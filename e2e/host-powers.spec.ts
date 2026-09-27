@@ -47,12 +47,15 @@ test.describe('late joiners and host powers', () => {
 
       await enterRoundScore(hostPage, 'Host', 2, 10)
       await enterOwnRoundScore(joinerPage, 2, 5)
-      await expect(scoreboardRow(hostPage, 'Alice')).toContainText('5')
+      await expect(scoreboardRow(hostPage, 'Alice')).toContainText('Entered')
       await expect(hostPage.getByRole('button', { name: 'Next round' })).toBeDisabled()
 
+      // Round 1 is already revealed, so her missed score shows at once; round 2 waits for Next.
       await fillOwnMissedRound(joinerPage, 1, 15)
-      await expect(scoreboardRow(hostPage, 'Alice')).toContainText('20')
+      await expect(scoreboardRow(hostPage, 'Alice')).toContainText('15')
       await expect(hostPage.getByRole('button', { name: 'Next round' })).toBeEnabled()
+      await hostPage.getByRole('button', { name: 'Next round' }).click()
+      await expect(scoreboardRow(hostPage, 'Alice')).toContainText('20')
     } finally {
       await hostContext.close()
       await joinerContext.close()
@@ -72,8 +75,12 @@ test.describe('late joiners and host powers', () => {
       await joinHostedGame(joinerPage, roomCode, 'Alice')
       await expect(scoreboardRow(hostPage, 'Alice')).toBeVisible()
 
+      // The host's entry reaches Alice's own card live; the boards only show it's in.
       await enterRoundScore(hostPage, 'Alice', 1, 25)
-      await expect(scoreboardRow(joinerPage, 'Alice')).toContainText('25')
+      await expect(
+        joinerPage.getByRole('button', { name: 'Enter your points (25 points saved)' }),
+      ).toBeVisible()
+      await expect(scoreboardRow(joinerPage, 'Alice')).toContainText('Entered')
 
       await hostPage.getByRole('button', { name: /^Edit Alice's score/ }).click()
       await hostPage.getByRole('button', { name: 'Remove Alice' }).click()
