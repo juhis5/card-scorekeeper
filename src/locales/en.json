@@ -5,7 +5,8 @@
       "label": "Dark mode"
     },
     "locale": {
-      "switchLabel": "{code} — tap to switch language"
+      "name": "English",
+      "switchHint": "tap to switch"
     },
     "update": {
       "available": "A new version is available.",
@@ -18,7 +19,20 @@
       "description": "Pages and settings",
       "pages": "Pages",
       "home": "Home",
-      "language": "Language"
+      "language": "Language",
+      "settings": "Settings"
+    },
+    "install": {
+      "label": "Install the app",
+      "steps": {
+        "iosSafariShare": "Tap Share (the square with an arrow) at the bottom of the screen, or under ⋯.",
+        "iosChromeShare": "Tap Share (the square with an arrow) at the right end of the address bar.",
+        "iosOtherShare": "Open the browser's menu and tap Share.",
+        "iosAdd": "Choose Add to Home Screen.",
+        "androidMenu": "Open the browser's menu (⋮).",
+        "androidAdd": "Choose Install app or Add to Home screen."
+      },
+      "after": "Then Rommi opens from your home screen like an app."
     }
   },
   "nav": {

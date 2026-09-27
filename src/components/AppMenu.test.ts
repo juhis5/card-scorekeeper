@@ -47,8 +47,8 @@ describe('AppMenu', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Stats' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Rules' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /switch language/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Dark mode' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Language/ })).toBeTruthy()
+    expect(screen.getByRole('switch', { name: 'Dark mode' })).toBeTruthy()
   })
 
   it('goes to the page and closes when a link is followed', async () => {
@@ -66,7 +66,7 @@ describe('AppMenu', () => {
     await renderMenu()
     await openMenu()
 
-    await fireEvent.click(screen.getByRole('button', { name: /switch language/ }))
+    await fireEvent.click(screen.getByRole('button', { name: /^Language/ }))
 
     expect(screen.getByRole('link', { name: 'Tilastot' })).toBeTruthy()
   })

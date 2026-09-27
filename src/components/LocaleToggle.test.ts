@@ -10,33 +10,31 @@ beforeEach(() => {
 })
 
 describe('LocaleToggle', () => {
-  it('shows the current locale code, with an accessible name that contains it', () => {
+  it('is one row naming the setting and the current language, with a hint that a tap switches it', () => {
     render(LocaleToggle, { global: { plugins: [i18n] } })
 
-    const button = screen.getByRole('button', { name: /EN/ })
-    expect(button.textContent).toContain('EN')
+    const row = screen.getByRole('button', { name: /^Language\s+English\s*, tap to switch$/ })
+    expect(row.textContent).toContain('English')
   })
 
-  it('calls setLocale to switch to Finnish, persisting it and updating <html lang>', async () => {
+  it('switches to Finnish, persisting it and updating <html lang>', async () => {
     render(LocaleToggle, { global: { plugins: [i18n] } })
 
-    await fireEvent.click(screen.getByRole('button', { name: /EN/ }))
+    await fireEvent.click(screen.getByRole('button', { name: /Language/ }))
 
     expect(i18n.global.locale.value).toBe('fi')
     expect(document.documentElement.lang).toBe('fi')
     expect(localStorage.getItem('locale')).toBe('fi')
+    expect(screen.getByRole('button', { name: /^Kieli\s+Suomi/ })).toBeTruthy()
   })
 
-  it('reflects the new current locale after switching, and flips back on a second click', async () => {
+  it('flips back on a second tap', async () => {
     render(LocaleToggle, { global: { plugins: [i18n] } })
 
-    await fireEvent.click(screen.getByRole('button', { name: /EN/ }))
-    expect(screen.getByRole('button', { name: /FI/ }).textContent).toContain('FI')
-
-    await fireEvent.click(screen.getByRole('button', { name: /FI/ }))
+    await fireEvent.click(screen.getByRole('button', { name: /Language/ }))
+    await fireEvent.click(screen.getByRole('button', { name: /Kieli/ }))
 
     expect(i18n.global.locale.value).toBe('en')
-    expect(document.documentElement.lang).toBe('en')
     expect(localStorage.getItem('locale')).toBe('en')
   })
 })

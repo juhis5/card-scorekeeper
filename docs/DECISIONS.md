@@ -680,3 +680,21 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   - The rules change is additive: an older app keeps working against the new rules, and its
     players' "Join the next game" finds the seat already there. The new app needs the new rules,
     so they go to production before the release.
+- 2026-09-28 — Menu rows and installing the app (third playtest: "language/theme as clickable
+  menu items"; "the PWA doesn't work on an iPhone with Chrome"):
+  - Kieli and Tumma tila are whole-width rows like the page links. Tapping the Kieli row flips the
+    language. Tumma tila is a shadcn Switch whose label is the whole row. Its off track uses
+    `muted-foreground`, so the white thumb shows in the light theme.
+  - "Asenna sovellus" in the menu. Android Chrome and desktop Chromium fire
+    `beforeinstallprompt`. We catch it at startup (the install store, `listen` in main.ts),
+    because it can fire before the menu opens, and the row opens that prompt. No iPhone browser
+    ever fires it, since they all run on WebKit. There the row opens two steps: Share, then Add to
+    Home Screen. Share sits in a different place per browser: in Chrome, the right end of the
+    address bar (Google's help); in Safari, the bottom or under ⋯; elsewhere, the browser's menu.
+    Android browsers without the prompt get "browser menu → Install app / Add to Home screen". The
+    row is hidden once the app runs installed, or where there's no way to install (desktop
+    Firefox).
+  - The installed app is called "Rommi" (manifest name and short_name, and
+    `apple-mobile-web-app-title` for the iPhone home screen).
+  - The tester's iPhone case can only be checked on the phone: the steps are for iOS 16.4 and
+    later.
