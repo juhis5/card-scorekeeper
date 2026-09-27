@@ -237,7 +237,7 @@ async function enterScore(name: string, round: number, points: number): Promise<
   }
   const input = screen.getByLabelText(`${name}'s round ${round} score`)
   await fireEvent.update(input, String(points))
-  await fireEvent.blur(input)
+  await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
   await flushPromises()
 }
 
@@ -324,19 +324,33 @@ describe('RoomView moving to the next round', () => {
     return container.querySelector('[aria-live="polite"]')?.textContent ?? ''
   }
 
-  it('moves on with one tap when the last score is still being typed', async () => {
+  it('throws away a score still being typed when Next is tapped: only ✓ saves', async () => {
     await startWithAlice()
     await renderRoom()
     await enterScore('Host', 1, 20)
     await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '10')
 
-    // The tap on Next blurs the input, which saves the score, just before the click lands.
-    void fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
-    await fireEvent.click(screen.getByRole('button', { name: 'Next round' }))
+    const next = screen.getByRole('button', { name: 'Next round' })
+    await fireEvent.pointerUp(next)
+    await fireEvent.click(next)
     await flushPromises()
 
-    expect(screen.getByRole('heading', { name: 'Round 2 scores' })).toBeTruthy()
+    expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
+    expect(screen.getByText('Still waiting for scores from Alice.')).toBeTruthy()
+  })
+
+  it('keeps one card open at a time', async () => {
+    await startWithAlice()
+    await renderRoom()
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Host's score" }))
+    await fireEvent.update(screen.getByLabelText("Host's round 1 score"), '20')
+
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
+    await flushPromises()
+
+    expect(screen.queryByLabelText("Host's round 1 score")).toBeNull()
+    expect(screen.getByLabelText("Alice's round 1 score")).toBeTruthy()
   })
 
   it('says whose scores are missing when Next is tapped too early, and stays put', async () => {
@@ -866,7 +880,7 @@ describe('RoomView online mode', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: 'Enter your points' }))
     await fireEvent.update(screen.getByLabelText('Your round 1 points'), '15')
-    await fireEvent.blur(screen.getByLabelText('Your round 1 points'))
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await flushPromises()
 
     expect(screen.getByRole('button', { name: 'Enter your points (15 points saved)' })).toBeTruthy()
@@ -1062,7 +1076,7 @@ describe('RoomView late joiners', () => {
       screen.getByRole('button', { name: 'Enter your points for missed round 1' }),
     )
     await fireEvent.update(screen.getByLabelText('Your round 1 points'), '15')
-    await fireEvent.blur(screen.getByLabelText('Your round 1 points'))
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await flushPromises()
 
     expect(joinerGame.roundScores).toContainEqual({ playerId: aliceId, round: 1, points: 15 })

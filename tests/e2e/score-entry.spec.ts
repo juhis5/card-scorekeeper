@@ -83,7 +83,9 @@ test.describe('score entry on a card', () => {
     )
   })
 
-  test('tapping another card saves the open one and opens the one tapped', async ({ page }) => {
+  test('tapping another card throws the open one away and opens the one tapped', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: "Enter Host's score" }).click()
     await page.getByLabel("Host's round 1 score").fill('20')
 
@@ -91,7 +93,8 @@ test.describe('score entry on a card', () => {
 
     await expect(page.getByLabel("Maiju's round 1 score")).toBeVisible()
     await expect(page.getByLabel("Maiju's round 1 score")).toBeFocused()
-    await expect(page.getByRole('button', { name: "Edit Host's score (20 points)" })).toBeVisible()
+    await expect(page.getByLabel("Host's round 1 score")).toHaveCount(0)
+    await expect(page.getByRole('button', { name: "Enter Host's score" })).toBeVisible()
   })
 
   test('Cancel discards the typed score and returns focus to the card', async ({ page }) => {

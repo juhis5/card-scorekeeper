@@ -27,6 +27,7 @@ import WinnerBanner from '@/components/room/WinnerBanner.vue'
 import { Button } from '@/components/ui/button'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
+import { provideOpenCard } from '@/composables/useSingleOpenCard'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/data/local-game-route'
 import {
   isEveryRoundScored,
@@ -41,6 +42,7 @@ import type { PlayerId } from '@/lib/data/repository'
 import type { ContractRoundNumber, Player, Standing } from '@/lib/game/types'
 
 const { t, n, locale } = useI18n()
+provideOpenCard()
 const route = useRoute()
 const game = useGameStore()
 const {
@@ -332,8 +334,8 @@ async function handleRemovePlayer(player: Player): Promise<void> {
   scoreEntryHeading.value?.focus()
 }
 
-/** A score typed but not saved yet is saved by the input's blur, which lands just before the tap
- * on Next or Finish. Waiting for that save makes one tap enough. */
+/** A score saved just before the tap on Next or Finish may still be on its way; wait for it. A
+ * number typed but not saved is thrown away by that tap (only ✓ saves), so it doesn't count. */
 async function isReadyToAdvance(): Promise<boolean> {
   await pendingSave
   isWaitingHintShown.value = !allPlayersScored.value

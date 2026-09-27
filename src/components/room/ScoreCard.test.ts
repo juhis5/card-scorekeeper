@@ -59,6 +59,10 @@ async function keyThenRemovalBlur(sendKey: () => Promise<unknown>): Promise<void
   await pending
 }
 
+async function save(): Promise<void> {
+  await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+}
+
 function headerButton(): HTMLElement {
   return screen.getByRole('button', { name: /^(enter|edit) alice's score/i })
 }
@@ -103,12 +107,10 @@ describe('ScoreCard', () => {
 
     await expandCard()
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '10')
-    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
-    await fireEvent.click(document.body)
+    await save()
     await flushPromises()
 
     expect(emitted().commit).toEqual([[ALICE.id, 1, 10]])
-    // Card collapses after commit, once the tap that left it has landed
     expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
   })
 
@@ -127,7 +129,7 @@ describe('ScoreCard', () => {
 
     await expandCard()
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '9')
-    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await save()
 
     expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
   })
@@ -137,7 +139,7 @@ describe('ScoreCard', () => {
 
     await expandCard()
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '1005')
-    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await save()
 
     expect(emitted().commit).toBeUndefined()
     expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
@@ -148,11 +150,11 @@ describe('ScoreCard', () => {
 
     await expandCard()
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '9')
-    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await save()
     expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
 
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '10')
-    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await save()
     expect(screen.queryByText('Enter a multiple of 5 from 0 to 1,000.')).toBeNull()
   })
 
@@ -189,20 +191,15 @@ describe('ScoreCard', () => {
     expect(document.activeElement).toBe(headerButton())
   })
 
-  it('does not pull focus back when a blur commit moves focus elsewhere', async () => {
-    renderCard()
-    const elsewhere = document.createElement('button')
-    document.body.appendChild(elsewhere)
+  it('keeps the card open with its number when the field just loses focus, as when the keyboard closes', async () => {
+    const { emitted } = renderCard()
 
     await expandCard()
-    const input = screen.getByLabelText("Alice's round 1 score")
-    input.focus()
-    await fireEvent.update(input, '10')
-    elsewhere.focus()
-    await flushPromises()
+    await fireEvent.update(scoreInput(), '10')
+    await fireEvent.blur(scoreInput())
 
-    expect(document.activeElement).toBe(elsewhere)
-    elsewhere.remove()
+    expect(emitted().commit).toBeUndefined()
+    expect(scoreInput().value).toBe('10')
   })
 
   it('cancels expansion when Cancel is clicked', async () => {
@@ -295,48 +292,30 @@ describe('ScoreCard with the keyboard up', () => {
   })
 })
 
-describe('ScoreCard, leaving the field by tapping elsewhere', () => {
-  it('saves at once but closes only after that tap has landed, so the list does not shift under it', async () => {
+describe('ScoreCard, a tap outside', () => {
+  it('closes the card and throws the typed number away: only ✓ or Enter saves', async () => {
     const { emitted } = renderCard()
 
     await expandCard()
     await fireEvent.update(scoreInput(), '25')
-    await fireEvent.blur(scoreInput())
-
-    expect(emitted().commit).toEqual([[ALICE.id, 1, 25]])
-    expect(screen.queryByLabelText("Alice's round 1 score")).not.toBeNull()
-
-    await fireEvent.click(document.body)
+    await fireEvent.pointerUp(document.body)
     await flushPromises()
+
+    expect(emitted().commit).toBeUndefined()
     expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
+    await expandCard()
+    expect(scoreInput().value).toBe('')
   })
 
-  it('stays open when the tap lands back on the same card', async () => {
+  it('leaves the card open for a tap inside it', async () => {
     renderCard()
 
     await expandCard()
     await fireEvent.update(scoreInput(), '25')
-    await fireEvent.blur(scoreInput())
-    await fireEvent.click(headerButton())
+    await fireEvent.pointerUp(headerButton())
     await flushPromises()
 
-    expect(screen.queryByLabelText("Alice's round 1 score")).not.toBeNull()
-  })
-
-  it('closes by itself when no tap follows, as when leaving with the keyboard', async () => {
-    vi.useFakeTimers()
-    try {
-      renderCard()
-      await expandCard()
-      await fireEvent.update(scoreInput(), '25')
-      await fireEvent.blur(scoreInput())
-
-      await vi.advanceTimersByTimeAsync(1000)
-
-      expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(scoreInput().value).toBe('25')
   })
 })
 
@@ -353,7 +332,7 @@ describe('ScoreCard for a missed round', () => {
 
     await fireEvent.click(screen.getByRole('button', { name: "Fill in Alice's missed round 2" }))
     await fireEvent.update(screen.getByLabelText("Alice's round 2 score"), '15')
-    await fireEvent.blur(screen.getByLabelText("Alice's round 2 score"))
+    await save()
 
     expect(emitted().commit).toEqual([[ALICE.id, 2, 15]])
   })
@@ -415,7 +394,7 @@ describe('ScoreCard, discarding and saving a draft', () => {
 
     await expandCard()
     await fireEvent.update(scoreInput(), '10')
-    await fireEvent.blur(scoreInput())
+    await save()
     await expandCard()
     await fireEvent.update(scoreInput(), '20')
     await fireEvent.keyDown(container.firstElementChild!, { key: 'Escape' })

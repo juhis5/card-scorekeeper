@@ -12,13 +12,13 @@ function renderControl() {
 }
 
 describe('RemovePlayerControl', () => {
-  it('asks for confirmation before removing, with focus on the safe choice', async () => {
+  it('asks in a dialog before removing, with focus on the safe choice', async () => {
     const { emitted } = renderControl()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Remove Alice' }))
     await flushPromises()
 
-    expect(screen.getByText('Remove Alice and their scores from this game?')).toBeTruthy()
+    expect(screen.getByRole('alertdialog', { name: 'Remove Alice?' })).toBeTruthy()
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Keep Alice' }))
     expect(emitted().remove).toBeUndefined()
   })
@@ -40,7 +40,7 @@ describe('RemovePlayerControl', () => {
     await flushPromises()
 
     expect(emitted().remove).toBeUndefined()
-    expect(screen.queryByText('Remove Alice and their scores from this game?')).toBeNull()
+    expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove Alice' }))
   })
 })

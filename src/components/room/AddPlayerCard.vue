@@ -3,8 +3,9 @@
  * Single job: the host adds a player at any round. Online that's a guest, a player without a phone
  * whose scores the host enters; in a local game every other player is one anyway. Collapsed to one
  * "Lisää pelaaja" button at the end of the card list, it opens inline like a score card: a title
- * row, then the name field with ✓ (add) and ✕ (cancel); Enter adds too. A player added mid-game
- * fills in the rounds they missed, like a late joiner.
+ * row, then the name field with ✓ (add) and ✕ (cancel); Enter adds too. Like a score card, a tap
+ * outside or another card opening closes it. A player added mid-game fills in the rounds they
+ * missed, like a late joiner.
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -17,6 +18,7 @@ import { cleanPlayerName, NameTakenError } from '@/lib/game/player-names'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/game/rules'
 import { isPermissionDenied } from '@/lib/data/write-errors'
 import { useKeepInView } from '@/composables/useKeepInView'
+import { useSingleOpenCard } from '@/composables/useSingleOpenCard'
 import { useGameStore } from '@/stores/game'
 
 const emit = defineEmits<{ added: [name: string] }>()
@@ -32,6 +34,12 @@ const isAdding = ref(false)
 const openButton = useTemplateRef<HTMLButtonElement>('openButton')
 const cardElement = useTemplateRef<HTMLLIElement>('card')
 const { reveal } = useKeepInView(cardElement)
+useSingleOpenCard({
+  id: () => 'add-player',
+  element: cardElement,
+  isOpen,
+  onDismiss: () => close({ restoreFocus: false }),
+})
 
 const hasError = computed(() => errorMessage.value !== '')
 
@@ -45,11 +53,12 @@ async function open(): Promise<void> {
 }
 
 /** The form unmounts, so hand focus back to the button that opened it: when focus was in the
- * form, or nowhere (iOS Safari doesn't focus a tapped button). Not when the host has moved on: the
- * new player's card appears before a slow add is confirmed, and they may be typing there. */
-async function close(): Promise<void> {
+ * form, or nowhere (iOS Safari doesn't focus a tapped button). Not when the host has moved on: a
+ * tap elsewhere, or the new player's card appearing before a slow add is confirmed. */
+async function close({ restoreFocus = true } = {}): Promise<void> {
   const focused = document.activeElement
-  const isFocusHere = focused === document.body || (cardElement.value?.contains(focused) ?? false)
+  const isFocusHere =
+    restoreFocus && (focused === document.body || (cardElement.value?.contains(focused) ?? false))
   isOpen.value = false
   name.value = ''
   errorMessage.value = ''
@@ -90,7 +99,7 @@ async function add(): Promise<void> {
     ref="card"
     :data-card-open="isOpen || undefined"
     class="bg-card border-border rounded-lg border"
-    @keydown.escape="close"
+    @keydown.escape="close()"
   >
     <button
       v-if="!isOpen"
@@ -144,7 +153,7 @@ async function add(): Promise<void> {
           size="icon"
           class="size-11 shrink-0"
           :aria-label="t('room.score.cancel')"
-          @click="close"
+          @click="close()"
         >
           <X aria-hidden="true" class="size-5" />
         </Button>

@@ -203,11 +203,10 @@
     },
     "remove": {
       "trigger": "Remove {name}",
-      "confirmText": "Remove {name} and their scores from this game?",
-      "keep": "Keep",
       "keepLabel": "Keep {name}",
-      "confirm": "Remove",
-      "confirmLabel": "Yes, remove {name}"
+      "confirmLabel": "Yes, remove {name}",
+      "title": "Remove {name}?",
+      "description": "Their scores in this game go too. This can't be undone."
     },
     "opening": "Opening room {code}…",
     "notSeated": {
@@ -249,7 +248,8 @@
       "description": "This round's points, one player at a time.",
       "saveAndNext": "Save and next",
       "skip": "Skip {name}",
-      "next": "Next: {name}"
+      "next": "Next: {name}",
+      "skipButton": "Skip"
     }
   },
   "notFound": {

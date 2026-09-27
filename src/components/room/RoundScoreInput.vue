@@ -27,9 +27,8 @@ const {
   placeholder?: string
 }>()
 
-/** `commit` fires on Enter. `blur` passes the focus event so the parent decides whether leaving
- * the field should save (see ScoreCard). */
-const emit = defineEmits<{ commit: []; blur: [event: FocusEvent] }>()
+/** `commit` fires on Enter. */
+const emit = defineEmits<{ commit: [] }>()
 
 const model = defineModel<number | null>({ default: null })
 
@@ -57,7 +56,6 @@ const rawValue = computed<string | number>({
         :placeholder="placeholder"
         :aria-invalid="isInvalid"
         :aria-describedby="describedBy"
-        @blur="emit('blur', $event)"
         @keyup.enter="emit('commit')"
       />
       <slot />

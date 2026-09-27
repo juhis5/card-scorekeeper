@@ -153,7 +153,9 @@
  * specificity (CSS cascade-layer semantics), so this is the one override that actually applies. */
 @media (prefers-reduced-motion: reduce) {
   [data-slot='sheet-overlay'],
-  [data-slot='sheet-content'] {
+  [data-slot='sheet-content'],
+  [data-slot='alert-dialog-overlay'],
+  [data-slot='alert-dialog-content'] {
     animation: none;
     transition: none;
   }

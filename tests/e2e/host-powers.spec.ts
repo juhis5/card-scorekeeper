@@ -19,9 +19,8 @@ import {
 /** A late joiner fills in their own missed round, so the card reads "Enter your points…". */
 async function fillOwnMissedRound(page: Page, round: number, points: number): Promise<void> {
   await page.getByRole('button', { name: `Enter your points for missed round ${round}` }).click()
-  const input = page.getByLabel(`Your round ${round} points`)
-  await input.fill(String(points))
-  await input.blur()
+  await page.getByLabel(`Your round ${round} points`).fill(String(points))
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 }
 
 // Not run under the `webkit` project, like live-sync.spec.ts: see playwright.config.ts.

@@ -54,7 +54,29 @@ describe('EnterAllScoresSheet', () => {
     expect(document.activeElement).toBe(input)
   })
 
-  it('skips with → without saving', async () => {
+  it('hands focus back to the field on the tap on ✓, before the save comes back', async () => {
+    await renderSheet(
+      [JANI, RIPA],
+      vi.fn(() => new Promise<boolean>(() => undefined)),
+    )
+    const saveButton = screen.getByRole('button', { name: 'Save and next' })
+
+    await fireEvent.update(field(), '15')
+    saveButton.focus()
+    await fireEvent.click(saveButton)
+
+    expect(document.activeElement).toBe(field())
+  })
+
+  it('keeps Skip away from ✓, in the bottom row beside who is next', async () => {
+    await renderSheet([JANI, RIPA])
+
+    const skip = screen.getByRole('button', { name: 'Skip Jani' })
+    expect(skip.textContent).toContain('Skip')
+    expect(skip.parentElement?.textContent).toContain('Next: Ripa')
+  })
+
+  it('skips without saving', async () => {
     const { save } = await renderSheet([JANI, RIPA])
 
     await fireEvent.click(screen.getByRole('button', { name: 'Skip Jani' }))
