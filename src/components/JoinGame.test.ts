@@ -67,6 +67,14 @@ beforeEach(() => {
 })
 
 describe('JoinGame validation', () => {
+  it("prefills the room code from the link a room page offers ('Join room 7K4RQ')", async () => {
+    const router = makeTestRouter()
+    await router.push('/?code=7K4RQ')
+    render(JoinGame, { global: { plugins: [i18n, router] } })
+
+    expect((screen.getByLabelText('Room code') as HTMLInputElement).value).toBe('7K4RQ')
+  })
+
   it('rejects a malformed room code before ever calling the backend', async () => {
     renderJoinGame()
 

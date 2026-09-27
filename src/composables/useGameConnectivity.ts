@@ -36,6 +36,7 @@ import { probeBackendReachable } from '@/lib/connectivity'
 import { createHostRepository, createJoinRepository } from '@/lib/game-mode'
 import type { HostGameMode, JoinGameMode } from '@/lib/game-mode'
 import { LocalGameRepository } from '@/lib/local-repository'
+import type { ResumableGameRepository } from '@/lib/repository'
 
 async function loadFirebase() {
   const [{ getFirebaseAuth, getDb, checkBackendReachable }, { FirestoreGameRepository }] =
@@ -92,5 +93,17 @@ export function useGameConnectivity() {
     }
   }
 
-  return { hostRepository, joinRepository, localRepository }
+  /** Resume path: the room from the URL after a reload. No probe first: finding the seat reads
+   * through Firestore's local cache when the connection is down, which is what a mid-game reload
+   * needs. `null` when Firebase itself can't load. */
+  async function resumeRepository(roomCode: string): Promise<ResumableGameRepository | null> {
+    try {
+      const { auth, db, FirestoreGameRepository } = await loadFirebase()
+      return new FirestoreGameRepository({ db, auth, roomCode })
+    } catch {
+      return null
+    }
+  }
+
+  return { hostRepository, joinRepository, localRepository, resumeRepository }
 }

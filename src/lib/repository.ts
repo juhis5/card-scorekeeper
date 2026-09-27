@@ -54,8 +54,10 @@ export interface GameRepository {
   /** Adds a person other than the host to the game (local host adding each remaining player in
    * turn, or one device joining online) and returns their playerId. */
   addPlayer(input: AddPlayerInput): Promise<PlayerId>
-  /** Emits the current GameState immediately, then again on every subsequent mutation, until unsubscribed. */
-  subscribe(onChange: (state: GameState) => void): Unsubscribe
+  /** Emits the current GameState immediately, then again on every subsequent mutation, until
+   * unsubscribed. `onError` hears about a live connection that has stopped (online only), e.g.
+   * this device's seat was removed or the room closed. */
+  subscribe(onChange: (state: GameState) => void, onError?: (error: unknown) => void): Unsubscribe
   setRoundScore(input: SetRoundScoreInput): Promise<void>
   /** Host only: removes a seat and all its scores (a stalled or mistaken player). Rejects for the
    * host's own seat, which the game can't run without. */
@@ -66,4 +68,21 @@ export interface GameRepository {
   finishGame(): Promise<GameResult>
   /** Tears down any subscription/connection this repository holds. */
   leave(): void
+}
+
+/** This device's seat in an online room, found again after a reload. */
+export interface Seat {
+  playerId: PlayerId
+  isHost: boolean
+}
+
+/** An online repository that can find this device's existing seat, so a reload resumes the game
+ * instead of losing it. */
+export interface ResumableGameRepository extends GameRepository {
+  /** `null` when this device has no seat in the room, or the room doesn't exist. */
+  findSeat(): Promise<Seat | null>
+}
+
+export function isResumable(repository: GameRepository): repository is ResumableGameRepository {
+  return 'findSeat' in repository
 }

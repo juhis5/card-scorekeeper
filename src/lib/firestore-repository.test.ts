@@ -26,6 +26,7 @@ const docMock = vi.fn((_db: unknown, path: string) => ({ path }))
 const getDocsMock = vi.fn()
 const updateDocMock = vi.fn().mockResolvedValue(undefined)
 const setDocMock = vi.fn().mockResolvedValue(undefined)
+const onSnapshotMock = vi.fn<(...args: unknown[]) => () => void>(() => () => undefined)
 const getDocMock = vi.fn()
 const batchDeleteMock = vi.fn()
 const batchCommitMock = vi.fn().mockResolvedValue(undefined)
@@ -36,7 +37,7 @@ vi.mock('firebase/firestore', () => ({
   doc: (db: unknown, path: string) => docMock(db, path),
   getDoc: (ref: unknown) => getDocMock(ref),
   getDocs: (ref: unknown) => getDocsMock(ref),
-  onSnapshot: vi.fn(),
+  onSnapshot: (...args: unknown[]) => onSnapshotMock(...args),
   orderBy: vi.fn(),
   query: (...args: unknown[]) => args[0],
   setDoc: (...args: unknown[]) => setDocMock(...args),
@@ -79,6 +80,100 @@ beforeEach(() => {
   getDocMock.mockResolvedValue({ exists: () => false, data: () => undefined })
 })
 
+function snapshot(data: Record<string, unknown> | undefined) {
+  return { exists: () => data !== undefined, data: () => data }
+}
+
+const permissionDenied = Object.assign(new Error('denied'), { code: 'permission-denied' })
+
+describe('FirestoreGameRepository.findSeat', () => {
+  function repository(uid: string) {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid } } as never,
+      roomCode: ROOM_CODE,
+    })
+  }
+
+  it("finds this device's seat and reads host status from the room", async () => {
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path === `room/${ROOM_CODE}`
+          ? snapshot({ hostUid: HOST_UID })
+          : snapshot({ name: 'Host', ownerUid: HOST_UID }),
+      ),
+    )
+
+    await expect(repository(HOST_UID).findSeat()).resolves.toEqual({
+      playerId: HOST_UID,
+      isHost: true,
+    })
+  })
+
+  it('reports a seated joiner as not the host', async () => {
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path === `room/${ROOM_CODE}`
+          ? snapshot({ hostUid: HOST_UID })
+          : snapshot({ name: 'Alice', ownerUid: ALICE_UID }),
+      ),
+    )
+
+    await expect(repository(ALICE_UID).findSeat()).resolves.toEqual({
+      playerId: ALICE_UID,
+      isHost: false,
+    })
+  })
+
+  it('finds no seat when the rules refuse to show it (this device never joined)', async () => {
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      ref.path === `room/${ROOM_CODE}`
+        ? Promise.resolve(snapshot({ hostUid: HOST_UID }))
+        : Promise.reject(permissionDenied),
+    )
+
+    await expect(repository(ALICE_UID).findSeat()).resolves.toBeNull()
+  })
+
+  it('finds no seat when the room does not exist', async () => {
+    getDocMock.mockResolvedValue(snapshot(undefined))
+
+    await expect(repository(ALICE_UID).findSeat()).resolves.toBeNull()
+  })
+})
+
+describe('FirestoreGameRepository.addPlayer when already seated', () => {
+  it('keeps the existing seat instead of rewriting it, so rejoining after a reload works', async () => {
+    getDocMock.mockResolvedValue(snapshot({ name: 'Alice', ownerUid: ALICE_UID, joinOrder: 7 }))
+    const repo = new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: ALICE_UID } } as never,
+      roomCode: ROOM_CODE,
+    })
+
+    await expect(repo.addPlayer({ name: 'Alice', deviceUuid: 'd' })).resolves.toBe(ALICE_UID)
+    expect(setDocMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('FirestoreGameRepository.subscribe errors', () => {
+  it("reports a listener error, such as losing this device's seat, to the caller", () => {
+    const onError = vi.fn()
+    const repo = new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: ALICE_UID } } as never,
+      roomCode: ROOM_CODE,
+    })
+
+    repo.subscribe(() => undefined, onError)
+    const errorCallbacks = onSnapshotMock.mock.calls.map((call) => (call as unknown[])[2])
+    ;(errorCallbacks[1] as (error: unknown) => void)(permissionDenied)
+
+    expect(errorCallbacks).toHaveLength(3)
+    expect(onError).toHaveBeenCalledWith(permissionDenied)
+  })
+})
+
 describe('FirestoreGameRepository write timeouts', () => {
   const TIMEOUT_MS = 1000
 
@@ -102,19 +197,21 @@ describe('FirestoreGameRepository write timeouts', () => {
   }
 
   it('gives up creating a room when the write never reaches the server', async () => {
-    const creating = repository().createGame({ hostDeviceUuid: 'd', hostDisplayName: 'Host' })
-    const assertion = await expect(creating).rejects.toMatchObject({ code: 'deadline-exceeded' })
+    const outcome = repository()
+      .createGame({ hostDeviceUuid: 'd', hostDisplayName: 'Host' })
+      .catch((error: unknown) => error)
 
     await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
-    await assertion
+    expect(await outcome).toMatchObject({ code: 'deadline-exceeded' })
   })
 
   it('gives up taking a seat when the write never reaches the server', async () => {
-    const joining = repository(ROOM_CODE).addPlayer({ name: 'Alice', deviceUuid: 'd' })
-    const assertion = await expect(joining).rejects.toMatchObject({ code: 'deadline-exceeded' })
+    const outcome = repository(ROOM_CODE)
+      .addPlayer({ name: 'Alice', deviceUuid: 'd' })
+      .catch((error: unknown) => error)
 
     await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
-    await assertion
+    expect(await outcome).toMatchObject({ code: 'deadline-exceeded' })
   })
 })
 

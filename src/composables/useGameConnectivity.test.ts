@@ -85,3 +85,15 @@ describe('useGameConnectivity().joinRepository', () => {
     vi.unstubAllGlobals()
   })
 })
+
+describe('useGameConnectivity().resumeRepository', () => {
+  it('builds an online repository for the room in the URL, without re-probing', async () => {
+    const repository = await useGameConnectivity().resumeRepository('7K4RQ')
+
+    expect(repository).not.toBeNull()
+    expect(FirestoreGameRepository).toHaveBeenCalledWith(
+      expect.objectContaining({ roomCode: '7K4RQ' }),
+    )
+    expect(checkBackendReachableMock).not.toHaveBeenCalled()
+  })
+})

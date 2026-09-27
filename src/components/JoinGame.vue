@@ -8,7 +8,7 @@
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,11 +22,13 @@ import { isPermanentWriteError } from '@/lib/write-errors'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const identity = useIdentityStore()
 const game = useGameStore()
 const { joinRepository } = useGameConnectivity()
 
-const roomCodeInput = ref('')
+// A room page's "Join room ABCDE" link passes the code along, so the player only adds a name.
+const roomCodeInput = ref(typeof route.query.code === 'string' ? route.query.code : '')
 const joinerName = ref(identity.displayName)
 const attemptedSubmit = ref(false)
 const isSubmitting = ref(false)

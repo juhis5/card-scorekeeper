@@ -52,8 +52,9 @@ import type {
   AddPlayerInput,
   CreatedGame,
   GameConfig,
-  GameRepository,
   PlayerId,
+  ResumableGameRepository,
+  Seat,
   SetRoundScoreInput,
   Unsubscribe,
 } from './repository'
@@ -118,7 +119,7 @@ export interface FirestoreGameRepositoryDeps {
  * waits on before entering a room (create, join) get a bound; the caller then falls back. */
 const DEFAULT_WRITE_TIMEOUT_MS = 10_000
 
-export class FirestoreGameRepository implements GameRepository {
+export class FirestoreGameRepository implements ResumableGameRepository {
   private readonly db: Firestore
   private readonly auth: Auth
   private readonly now: () => number
@@ -187,6 +188,9 @@ export class FirestoreGameRepository implements GameRepository {
     await ensureSignedIn(this.auth)
     const uid = this.requireUid()
     const roomCode = this.requireRoomCode()
+    // Rejoining after a reload: keep the seat. Rewriting it would change joinOrder, which the
+    // rules refuse, and would reorder the player.
+    if (await this.isSeated(uid)) return uid
     await withTimeout(
       setDoc(doc(this.db, `room/${roomCode}/players/${uid}`), {
         name: input.name,
@@ -200,8 +204,31 @@ export class FirestoreGameRepository implements GameRepository {
     return uid
   }
 
-  subscribe(onChange: (state: GameState) => void): Unsubscribe {
+  async findSeat(): Promise<Seat | null> {
+    await ensureSignedIn(this.auth)
+    const uid = this.requireUid()
     const roomCode = this.requireRoomCode()
+    const room = await getDoc(doc(this.db, `room/${roomCode}`))
+    const roomData = room.data() as RoomDocData | undefined
+    if (!roomData || !(await this.isSeated(uid))) return null
+    return { playerId: uid, isHost: roomData.hostUid === uid }
+  }
+
+  /** The rules only let members read seats, so a non-member reading their own seat is refused:
+   * that means "not seated", not an error. */
+  private async isSeated(uid: string): Promise<boolean> {
+    try {
+      const seat = await getDoc(doc(this.db, `room/${this.requireRoomCode()}/players/${uid}`))
+      return seat.exists()
+    } catch (error) {
+      if (isPermissionDenied(error)) return false
+      throw error
+    }
+  }
+
+  subscribe(onChange: (state: GameState) => void, onError?: (error: unknown) => void): Unsubscribe {
+    const roomCode = this.requireRoomCode()
+    const reportError = (error: unknown) => onError?.(error)
 
     let room: { status: GameStatus; currentRound: ContractRoundNumber } | null = null
     let players: Player[] = []
@@ -214,12 +241,16 @@ export class FirestoreGameRepository implements GameRepository {
       onChange({ status: room.status, currentRound: room.currentRound, players, roundScores })
     }
 
-    const roomUnsub = onSnapshot(doc(this.db, `room/${roomCode}`), (snapshot) => {
-      const data = snapshot.data() as RoomDocData | undefined
-      if (!data) return
-      room = { status: data.status, currentRound: data.currentRound }
-      emit()
-    })
+    const roomUnsub = onSnapshot(
+      doc(this.db, `room/${roomCode}`),
+      (snapshot) => {
+        const data = snapshot.data() as RoomDocData | undefined
+        if (!data) return
+        room = { status: data.status, currentRound: data.currentRound }
+        emit()
+      },
+      reportError,
+    )
 
     const playersUnsub = onSnapshot(
       query(collection(this.db, `room/${roomCode}/players`), orderBy('joinOrder')),
@@ -227,6 +258,7 @@ export class FirestoreGameRepository implements GameRepository {
         players = snapshot.docs.map(toPlayer)
         emit()
       },
+      reportError,
     )
 
     const roundScoresUnsub = onSnapshot(
@@ -235,6 +267,7 @@ export class FirestoreGameRepository implements GameRepository {
         roundScores = snapshot.docs.map(toRoundScore)
         emit()
       },
+      reportError,
     )
 
     const unsubscribe: Unsubscribe = () => {

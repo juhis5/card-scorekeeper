@@ -18,11 +18,10 @@ describe('withTimeout', () => {
   })
 
   it('rejects with a deadline-exceeded error when the promise never settles', async () => {
-    const result = withTimeout(new Promise(() => undefined), 1000)
-    const assertion = await expect(result).rejects.toMatchObject({ code: 'deadline-exceeded' })
+    const outcome = withTimeout(new Promise(() => undefined), 1000).catch((error: unknown) => error)
 
     await vi.advanceTimersByTimeAsync(1000)
-    await assertion
+    expect(await outcome).toMatchObject({ code: 'deadline-exceeded' })
   })
 
   it('reports a timeout as transient, so callers retry or fall back rather than give up', async () => {

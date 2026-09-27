@@ -23,6 +23,7 @@ import ScoreBoard from '@/components/ScoreBoard.vue'
 import WinnerBanner from '@/components/WinnerBanner.vue'
 import { Button } from '@/components/ui/button'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
+import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { isEveryRoundScored, missingRounds, TOTAL_ROUNDS } from '@/lib/rules'
 import { isPermissionDenied } from '@/lib/write-errors'
@@ -44,7 +45,9 @@ const {
   myPlayerId,
   isOnline,
   roomCode,
+  connectionError,
 } = storeToRefs(game)
+const { resumeRepository } = useGameConnectivity()
 // Mid-game connectivity blip, distinct from the never-connected `!isOnline` banner below (see
 // the error-ux skill's "the two offline modes") — only ever shown while `isOnline` (a live room).
 const { isReconnecting } = useConnectionStatus()
@@ -192,24 +195,70 @@ async function handleFinish(): Promise<void> {
   }
 }
 
-// Slice 5 offline robustness: a hard reload mid-LOCAL-game used to lose the in-memory store
-// entirely (repo data survived in localStorage, nothing read it back) — RoomView showed the empty
-// state even though a game was still there to continue. Gated on BOTH "no active game yet" AND
-// the route actually being the local sentinel: without the route check, reloading a real ONLINE
-// room (`/room/<code>`) — also a fresh, game-less store at that point — would resume any stale
-// LOCAL game left in localStorage from an earlier session and silently show the wrong game
-// instead of the online room the URL asked for. Resuming an online room is a different problem
-// (Firestore reconnect, not this), not something `resume()` does at all.
-onMounted(() => {
-  if (!hasActiveGame.value && route.params.code === LOCAL_GAME_ROUTE_CODE) {
+const routeCode = computed(() => String(route.params.code))
+/** Resuming an online room after a reload: 'opening' while this device's seat is looked up,
+ * 'not-seated' when it has none there. */
+const resumeState = ref<'idle' | 'opening' | 'not-seated'>('idle')
+// Online, the store knows the room before its first snapshot arrives (just after joining, or
+// resuming), so "no players yet" means "still opening", not "no game".
+const isOpeningRoom = computed(
+  () =>
+    resumeState.value === 'opening' ||
+    (isOnline.value && !hasActiveGame.value && connectionError.value === null),
+)
+
+async function resumeOnlineRoom(code: string): Promise<void> {
+  resumeState.value = 'opening'
+  const repository = await resumeRepository(code)
+  const isResumed = repository
+    ? await game.resumeOnline(repository, code).catch(() => false)
+    : false
+  resumeState.value = isResumed ? 'idle' : 'not-seated'
+}
+
+// A reload loses the in-memory store. The local sentinel resumes the game kept in localStorage;
+// a real room code resumes this device's seat in that online room. Never the other way round:
+// reloading an online room must not pick up a stale local game.
+onMounted(async () => {
+  if (hasActiveGame.value || roomCode.value === routeCode.value) return
+  if (routeCode.value === LOCAL_GAME_ROUTE_CODE) {
     game.resume()
+    return
   }
+  await resumeOnlineRoom(routeCode.value)
 })
 </script>
 
 <template>
   <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
-    <template v-if="!hasActiveGame">
+    <template v-if="isOpeningRoom">
+      <h1
+        id="main-heading"
+        tabindex="-1"
+        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {{ t('room.opening', { code: routeCode }) }}
+      </h1>
+    </template>
+
+    <template v-else-if="resumeState === 'not-seated'">
+      <h1
+        id="main-heading"
+        tabindex="-1"
+        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {{ t('room.notSeated.heading') }}
+      </h1>
+      <p class="text-muted-foreground">{{ t('room.notSeated.body') }}</p>
+      <RouterLink
+        :to="{ name: 'home', query: { code: routeCode } }"
+        class="text-primary underline underline-offset-4"
+      >
+        {{ t('room.notSeated.join', { code: routeCode }) }}
+      </RouterLink>
+    </template>
+
+    <template v-else-if="!hasActiveGame">
       <h1
         id="main-heading"
         tabindex="-1"
@@ -257,6 +306,17 @@ onMounted(() => {
       >
         <WifiOff aria-hidden="true" class="size-4 shrink-0" />
         {{ t('room.offline.banner') }}
+      </p>
+
+      <p
+        v-if="connectionError"
+        role="alert"
+        class="bg-muted text-foreground border-border flex items-center gap-2 rounded-lg border px-4 py-3 text-sm"
+      >
+        <WifiOff aria-hidden="true" class="size-4 shrink-0" />
+        {{
+          connectionError === 'removed' ? t('room.connection.removed') : t('room.connection.lost')
+        }}
       </p>
 
       <ContractBanner :round="currentRound" :contract-key="currentContract.contractKey" />
