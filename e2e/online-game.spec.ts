@@ -30,9 +30,12 @@ test.describe('a full online game', () => {
 
       await startHostedGame(hostPage, 'Host')
       await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      // Focus lands on the heading before the room opens, and stays there once it has.
+      await expect(hostPage.locator('#main-heading')).toBeFocused()
       const roomCode = await readRoomCode(hostPage)
       await joinHostedGame(joinerPage, roomCode, 'Alice')
       await expect(scoreboardRow(hostPage, 'Alice')).toBeVisible()
+      await expect(joinerPage.locator('#main-heading')).toBeFocused()
 
       await playOnlineRound(hostPage, joinerPage, 1, PLAYERS)
       await playOnlineRound(hostPage, joinerPage, 2, PLAYERS)

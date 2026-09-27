@@ -47,11 +47,13 @@ test.describe('play again', () => {
       await hostPage.getByRole('button', { name: 'Play again' }).click()
       await expect(roundHeading(hostPage, 1)).toBeVisible()
       await expect(hostPage).not.toHaveURL(new RegExp(finishedCode))
+      await expect(hostPage.locator('#main-heading')).toBeFocused()
       const nextCode = await readRoomCode(hostPage)
 
       await expect(joinerPage.getByText('The host started a new game.')).toBeVisible()
       await joinerPage.getByRole('button', { name: 'Join the next game' }).click()
       await expect(joinerPage).toHaveURL(new RegExp(`/room/${nextCode}$`))
+      await expect(joinerPage.locator('#main-heading')).toBeFocused()
       await expect(scoreboardRow(hostPage, 'Alice')).toBeVisible()
 
       await enterOwnRoundScore(joinerPage, 1, 5)

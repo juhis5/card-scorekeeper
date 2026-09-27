@@ -164,6 +164,24 @@ describe('PlayAgain, online host', () => {
   })
 })
 
+describe('PlayAgain, host back in a room that already has a next game', () => {
+  it('goes to the next game instead of starting another', async () => {
+    const finished = await finishedHostedGame(FINISHED_CODE)
+    joinRepository.mockResolvedValue({ kind: 'online', repository: new FakeRoom(NEXT_CODE) })
+    const router = await renderPlayAgain({ myName: 'Juho', otherNames: ['Jani'] })
+
+    finished.finish({ nextRoomCode: NEXT_CODE })
+    await flushPromises()
+    expect(screen.queryByRole('button', { name: 'Play again' })).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: 'Go to the next game' }))
+    await flushPromises()
+
+    expect(joinRepository).toHaveBeenCalledWith(NEXT_CODE)
+    expect(nextRoomRepository).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
+  })
+})
+
 describe('PlayAgain, the other players', () => {
   it('offers nothing until the host starts the next game', async () => {
     await finishedJoinedGame()

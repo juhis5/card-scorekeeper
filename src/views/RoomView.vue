@@ -341,6 +341,13 @@ const isOpeningRoom = computed(
     (isOnline.value && !hasActiveGame.value && connectionError.value === null),
 )
 
+const heading = computed(() => {
+  if (isOpeningRoom.value) return t('room.opening', { code: routeCode.value })
+  if (resumeState.value === 'not-seated') return t('room.notSeated.heading')
+  if (!hasActiveGame.value) return t('room.empty.heading')
+  return t('room.heading')
+})
+
 async function resumeOnlineRoom(code: string): Promise<void> {
   resumeState.value = 'opening'
   const repository = await resumeRepository(code)
@@ -365,24 +372,20 @@ onMounted(async () => {
 
 <template>
   <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
-    <template v-if="isOpeningRoom">
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.opening', { code: routeCode }) }}
-      </h1>
-    </template>
+    <!-- One heading for every state: navigation focuses it before the room's first snapshot
+         arrives, and a new element per state would drop that focus when the room opens. -->
+    <h1
+      id="main-heading"
+      tabindex="-1"
+      class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
+    >
+      {{ heading }}
+    </h1>
+
+    <!-- While the room opens, the heading alone says so. -->
+    <template v-if="isOpeningRoom" />
 
     <template v-else-if="resumeState === 'not-seated'">
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.notSeated.heading') }}
-      </h1>
       <p class="text-muted-foreground">{{ t('room.notSeated.body') }}</p>
       <RouterLink
         :to="{ name: 'home', query: { code: routeCode } }"
@@ -393,13 +396,6 @@ onMounted(async () => {
     </template>
 
     <template v-else-if="!hasActiveGame">
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.empty.heading') }}
-      </h1>
       <p class="text-muted-foreground">{{ t('room.empty.body') }}</p>
       <RouterLink :to="{ name: 'home' }" class="text-primary underline underline-offset-4">
         {{ t('room.empty.backHome') }}
@@ -407,14 +403,6 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <h1
-        id="main-heading"
-        tabindex="-1"
-        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {{ t('room.heading') }}
-      </h1>
-
       <p
         v-if="isOnline"
         class="bg-muted text-foreground border-border rounded-lg border px-4 py-3 text-sm"
