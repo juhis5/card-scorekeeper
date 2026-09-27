@@ -9,7 +9,7 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 - Routing: **Vue Router**. i18n: **vue-i18n** (fi/en, device-default — no hardcoded strings).
 - Runtime: **Node 24** (current LTS; pinned in `.nvmrc`, matches local + CI). Not 22.
 - Package manager: **pnpm**. Always install the **latest stable** versions — version numbers in docs/skills are floors, not pins. Full policy + what's pinned: `docs/TOOLCHAIN.md`.
-- **Frontend hosting: Vercel** (git push → auto-deploy), same workflow as schedule-app. Firestore is host-agnostic, so live sync works fine from Vercel. (All-Firebase via Firebase Hosting is the alternative if we ever want single-vendor.)
+- **Frontend hosting: Vercel** (git push → auto-deploy), same workflow as schedule-app. Gitflow: `develop` → test-rommi.vercel.app (staging Firebase), `main` → rommi.vercel.app (prod), releases fast-forward `main` (see `git-workflow`). Firestore is host-agnostic, so live sync works fine from Vercel. (All-Firebase via Firebase Hosting is the alternative if we ever want single-vendor.)
 - Realtime backend: **Firebase / Firestore** (Spark free tier). Client SDK, no server for core play.
 - Optional photo-count: one **Vercel serverless function** (`/api`) holding the Gemini key, gated by room + session token. Not needed for manual scoring.
 

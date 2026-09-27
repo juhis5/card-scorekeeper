@@ -54,16 +54,16 @@ We host the FE on Vercel (consistency with schedule-app; Firestore is host-agnos
 
 ## Last-mile deploy (human steps)
 
-1. Firebase: two projects, `card-scorekeeper-prod-1673f` (Production) and `card-scorekeeper-staging` (every PR preview). A new Google account must accept the Firebase terms once in the console; the API can't. Then, per project:
+1. Firebase: two projects, `card-scorekeeper-prod-1673f` (Production, `main`) and `card-scorekeeper-staging` (Preview: `develop` and every PR). A new Google account must accept the Firebase terms once in the console; the API can't. Then, per project:
    - `pnpm exec firebase apps:create web card-scorekeeper --project <id>` registers the web app (otherwise the auth deploy creates a "Default Web App").
    - `pnpm exec firebase deploy --only firestore,auth --project <id>` enables the Firestore API, creates the `(default)` database at `firebase.json`'s `location` (europe-north1; permanent, and omitting it means the US), deploys rules and indexes, and turns on anonymous sign-in.
    - `pnpm exec firebase apps:sdkconfig web <appId> --project <id>` prints the values for `VITE_FIREBASE_*`.
    - Always pass `--project`. Never run `firebase use`: it saves an active project for the folder, which overrides the `demo-card-scorekeeper` project the emulator suites need.
-   - Rules deploy to prod from `main`; deploy a PR's rules to staging when it changes them.
+   - Rules: a PR's rules go to staging before it merges into `develop`, and to prod before the release that carries them (see the git-workflow skill).
 2. Push the repo to GitHub.
 3. Vercel → Import Project → pick the repo (Vite preset).
 4. Add env vars, prod project values scoped to Production and staging values scoped to Preview: `VITE_FIREBASE_*` (all), `ENABLE_EXPERIMENTAL_COREPACK=1` (so Vercel uses the exact pnpm from `packageManager`), and if photo-count is on, `GEMINI_API_KEY` + `FIREBASE_SERVICE_ACCOUNT` (and `GEMINI_MODEL` only to override the default). Create the Gemini key in a separate Google Cloud project, restricted to the Generative Language API, with no billing.
-5. Deploy → live URL. Pushes auto-deploy; PRs get previews.
+5. Deploy → live URL. Pushes auto-deploy; PRs get previews. Domains: `rommi.vercel.app` is Production (`main`); `test-rommi.vercel.app` is a Preview domain tied to the `develop` branch, so it uses the Preview (staging) variables. Deployment Protection (Vercel Authentication) is off, so testers reach previews and test-rommi without a Vercel login.
 6. Open a preview deploy with the browser console open and play an online game. `vercel.json` ships the CSP as `Content-Security-Policy-Report-Only`; once no violations show up, rename it to `Content-Security-Policy` (the other security headers are already enforced). `src/security-headers.test.ts` keeps the inline theme script's hash in sync.
 7. Before a public launch: consider Firebase App Check (reCAPTCHA Enterprise) for Firestore, Auth and `/api`; anonymous sign-in plus open room creation can otherwise burn the Spark quota. If you add a Firestore TTL on `room.expiresAt`, read the note in DECISIONS first: online stats are keyed by room code.
 
