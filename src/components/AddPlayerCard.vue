@@ -40,13 +40,17 @@ async function open(): Promise<void> {
   cardElement.value?.scrollIntoView({ block: 'nearest' })
 }
 
-/** The form unmounts, so hand focus back to the button that opened it. */
+/** The form unmounts, so hand focus back to the button that opened it: when focus was in the
+ * form, or nowhere (iOS Safari doesn't focus a tapped button). Not when the host has moved on: the
+ * new player's card appears before a slow add is confirmed, and they may be typing there. */
 async function close(): Promise<void> {
+  const focused = document.activeElement
+  const isFocusHere = focused === document.body || (cardElement.value?.contains(focused) ?? false)
   isOpen.value = false
   name.value = ''
   errorMessage.value = ''
   await nextTick()
-  openButton.value?.focus()
+  if (isFocusHere) openButton.value?.focus()
 }
 
 function describeFailure(error: unknown, playerName: string): string {
