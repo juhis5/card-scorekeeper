@@ -7,6 +7,7 @@
  */
 import { nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Trash2 } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 
 const { playerName } = defineProps<{ playerName: string }>()
@@ -41,7 +42,7 @@ async function keepPlayer(): Promise<void> {
     v-if="isConfirming"
     role="group"
     :aria-label="t('room.remove.confirmText', { name: playerName })"
-    class="flex flex-col gap-2"
+    class="flex basis-full flex-col gap-2 px-3 pb-3"
   >
     <p class="text-foreground text-sm">{{ t('room.remove.confirmText', { name: playerName }) }}</p>
     <div class="flex gap-2">
@@ -66,7 +67,16 @@ async function keepPlayer(): Promise<void> {
       </Button>
     </div>
   </div>
-  <Button v-else ref="trigger" type="button" variant="outline" class="h-11" @click="askToConfirm">
-    {{ t('room.remove.trigger', { name: playerName }) }}
+  <Button
+    v-else
+    ref="trigger"
+    type="button"
+    variant="ghost"
+    size="icon"
+    class="text-destructive size-11"
+    :aria-label="t('room.remove.trigger', { name: playerName })"
+    @click="askToConfirm"
+  >
+    <Trash2 aria-hidden="true" class="size-5" />
   </Button>
 </template>

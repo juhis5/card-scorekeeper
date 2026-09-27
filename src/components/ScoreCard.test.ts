@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { fireEvent, render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen, within } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import ScoreCard from './ScoreCard.vue'
 import { i18n } from '@/i18n'
@@ -391,6 +391,22 @@ describe('ScoreCard photo-count affordance', () => {
 
     await expandCard()
     expect(screen.getByRole('button', { name: 'Snap cards' })).toBeTruthy()
+  })
+
+  it('sits in the name row only while the card is open, with the parent actions beside it', async () => {
+    render(ScoreCard, {
+      props: { player: ALICE, round: 1, canUsePhotoCount: true, roomCode: 'ABCDE' },
+      slots: { actions: '<button type="button">Remove Alice</button>' },
+      global: { plugins: [i18n] },
+    })
+
+    expect(screen.queryByRole('button', { name: 'Snap cards' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Remove Alice' })).toBeNull()
+    await expandCard()
+
+    const nameRow = headerButton().parentElement as HTMLElement
+    expect(within(nameRow).getByRole('button', { name: 'Snap cards' })).toBeTruthy()
+    expect(within(nameRow).getByRole('button', { name: 'Remove Alice' })).toBeTruthy()
   })
 })
 
