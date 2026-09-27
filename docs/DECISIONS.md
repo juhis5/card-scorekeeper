@@ -456,3 +456,10 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   work on prod unchanged, and none of the three need a composite index. Lesson: the emulator can
   be more permissive than production for rules on queries; the planned staging smoke check
   covers that gap.
+- 2026-09-27 — Online Finish writes the stats before marking the room finished. Before, the room
+  flipped to finished first: every device showed the winner at once, so Stats opened right then
+  could miss the game (it surfaced as an e2e flake under load), and a failed stats write could
+  never be retried because a finished room refuses every write. The rules for online stats only
+  need the room to exist and the writer to be its host, so the order could simply swap, and
+  `writeGameResult` skips docs that already exist, so a retried Finish is safe. This replaces the
+  plan's "queue the online result first" idea for the review finding sync-5.

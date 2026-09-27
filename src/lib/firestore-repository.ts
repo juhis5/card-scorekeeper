@@ -340,8 +340,6 @@ export class FirestoreGameRepository implements ResumableGameRepository {
     const roundScoresSnapshot = await getDocs(collection(this.db, `room/${roomCode}/roundScores`))
     const roundScores = roundScoresSnapshot.docs.map(toRoundScore)
 
-    await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
-
     // Recomputed from roundScores, not the players' own writable totalScore field — same reason
     // the game store's rankedPlayers does (see docs/DECISIONS.md's trust-model entry): a
     // permanent stats row is worth getting exactly right regardless of any denormalized field.
@@ -384,7 +382,11 @@ export class FirestoreGameRepository implements ResumableGameRepository {
       }
     })
 
+    // Stats first, then the room. Every device shows the winner the moment the room is finished,
+    // and a player may open Stats right then. And a finished room refuses every write, so if the
+    // stats write fails first the host can still retry Finish (writeGameResult is idempotent).
     await writeGameResult(this.db, result, gamePlayers)
+    await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
 
     return result
   }
