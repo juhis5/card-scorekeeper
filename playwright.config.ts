@@ -104,6 +104,7 @@ export default defineConfig({
         '**/online-game.spec.ts',
         '**/unique-names.spec.ts',
         '**/play-again.spec.ts',
+        '**/guest-seats.spec.ts',
       ],
     },
 

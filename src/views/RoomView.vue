@@ -16,6 +16,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { WifiOff } from '@lucide/vue'
+import AddPlayerCard from '@/components/AddPlayerCard.vue'
 import ContractBanner from '@/components/ContractBanner.vue'
 import PlayAgain from '@/components/PlayAgain.vue'
 import RemovePlayerControl from '@/components/RemovePlayerControl.vue'
@@ -103,6 +104,10 @@ const otherNames = computed(() =>
     .filter(({ player }) => player.id !== myPlayerId.value)
     .map(({ player }) => player.name),
 )
+/** Online Play again seats these in the next room: players without a phone can't join by code. */
+const guestNames = computed(() =>
+  seatedStandings.value.filter(({ player }) => player.isGuest).map(({ player }) => player.name),
+)
 
 /** Earlier rounds an editable player has no score for: a late joiner fills these in, so nobody is
  * ranked on fewer rounds than the others. */
@@ -130,15 +135,20 @@ const allPlayersScored = computed(() =>
 // scores only ever arrive through the subscription, and a host correction must show up too.
 /** Scores this device entered, as "playerId-round". The host may see those numbers on other
  * players' cards; scores players entered themselves stay "scored" there until the round is
- * revealed. Device memory only: after a reload the host sees "scored" for them too. */
+ * revealed. Device memory only: after a reload the host sees "scored" for them too. A guest's
+ * numbers are always the host's own, so those show regardless. */
 const scoresEnteredHere = ref(new Set<string>())
 
 function scoreKey(playerId: PlayerId, round: ContractRoundNumber): string {
   return `${playerId}-${round}`
 }
 
-function canSeePoints(playerId: PlayerId, round: ContractRoundNumber): boolean {
-  return playerId === myPlayerId.value || scoresEnteredHere.value.has(scoreKey(playerId, round))
+function canSeePoints(player: Player, round: ContractRoundNumber): boolean {
+  return (
+    player.id === myPlayerId.value ||
+    player.isGuest === true ||
+    scoresEnteredHere.value.has(scoreKey(player.id, round))
+  )
 }
 
 /** A non-host player's own card reads "Enter your points"; the host sees names on every card. */
@@ -272,6 +282,10 @@ async function saveScore(
   // No ranking here: numbers stay hidden from the board until the round is revealed.
   const saved = t('room.live.scoreSaved', { name: player.name, points: n(points) })
   void announce(isHost.value && allPlayersScored.value ? `${saved} ${allScoredMessage()}` : saved)
+}
+
+function handlePlayerAdded(name: string): void {
+  void announce(t('room.live.playerAdded', { name }))
 }
 
 async function handleRemovePlayer(player: Player): Promise<void> {
@@ -486,7 +500,7 @@ onMounted(async () => {
             :player="standing.player"
             :round="currentRound"
             :scored-points="pointsFor(standing.player.id, currentRound, roundScores)"
-            :show-points="canSeePoints(standing.player.id, currentRound)"
+            :show-points="canSeePoints(standing.player, currentRound)"
             :is-own-card="isOwnCard(standing.player.id)"
             :can-use-photo-count="isOnline && standing.player.id === myPlayerId"
             :room-code="roomCode"
@@ -499,6 +513,7 @@ onMounted(async () => {
               />
             </template>
           </ScoreCard>
+          <AddPlayerCard v-if="isHost" @added="handlePlayerAdded" />
         </ul>
       </section>
 
@@ -515,7 +530,7 @@ onMounted(async () => {
       </p>
 
       <div v-if="isFinished" class="bg-background sticky bottom-0 mt-auto pt-2 pb-2">
-        <PlayAgain :my-name="myName" :other-names="otherNames" />
+        <PlayAgain :my-name="myName" :other-names="otherNames" :guest-names="guestNames" />
       </div>
       <!-- aria-disabled rather than disabled: the tap must still reach the handler, which waits
            for a score saved by that same tap before deciding. -->

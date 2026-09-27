@@ -42,21 +42,25 @@ const isCodeInvalid = computed(
   () => attemptedSubmit.value && !isValidRoomCode(normalizedCode.value),
 )
 const isNameMissing = computed(() => attemptedSubmit.value && trimmedName.value === '')
-/** The room already has a player with this name (ignoring case and extra spaces). */
-const isNameTaken = ref(false)
-const isNameInvalid = computed(() => isNameMissing.value || isNameTaken.value)
-const nameError = computed(() =>
-  isNameMissing.value ? t('home.errors.hostNameRequired') : t('home.join.errors.nameTaken'),
-)
+/** The room already has a player with this name (ignoring case and extra spaces): 'guest' when
+ * it's a player without a phone the host added, so the joiner knows to ask the host. */
+const nameTaken = ref<'player' | 'guest' | null>(null)
+const isNameInvalid = computed(() => isNameMissing.value || nameTaken.value !== null)
+const nameError = computed(() => {
+  if (isNameMissing.value) return t('home.errors.hostNameRequired')
+  return nameTaken.value === 'guest'
+    ? t('home.join.errors.nameTakenByGuest')
+    : t('home.join.errors.nameTaken')
+})
 
 watch(joinerName, () => {
-  isNameTaken.value = false
+  nameTaken.value = null
 })
 
 async function handleSubmit(): Promise<void> {
   attemptedSubmit.value = true
   // Validate the code's shape before ever calling the backend (see the error-ux skill).
-  isNameTaken.value = false
+  nameTaken.value = null
   if (isCodeInvalid.value || isNameMissing.value || isSubmitting.value) return
 
   isSubmitting.value = true
@@ -79,7 +83,7 @@ async function handleSubmit(): Promise<void> {
     await router.push({ name: 'room', params: { code: normalizedCode.value } })
   } catch (error) {
     if (error instanceof NameTakenError) {
-      isNameTaken.value = true
+      nameTaken.value = error.isGuestSeat ? 'guest' : 'player'
       return
     }
     // Otherwise the rules refusing the seat means a wrong or expired code; anything else (a

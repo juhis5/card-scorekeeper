@@ -671,6 +671,185 @@ describe('unique player names', () => {
   })
 })
 
+describe('guest seats: players the host adds, without a phone', () => {
+  const GUEST_ID = 'guest-3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'
+
+  function guestFixture(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      name: 'Mummo',
+      ownerUid: HOST_UID,
+      deviceUuid: GUEST_ID,
+      totalScore: 0,
+      joinOrder: 1,
+      isGuest: true,
+      ...overrides,
+    }
+  }
+
+  /** Seats a guest the way the app does: the seat and its name record, naming the seat. */
+  function seatGuest(
+    db: TestFirestore,
+    {
+      guestId = GUEST_ID,
+      fields = guestFixture({ deviceUuid: guestId }) as Record<string, unknown>,
+      record = { ownerUid: HOST_UID, playerId: guestId } as Record<string, unknown> | null,
+    } = {},
+  ) {
+    const batch = writeBatch(db as unknown as Firestore)
+    batch.set(doc(db, `room/${ROOM_CODE}/players/${guestId}`), fields)
+    if (record) {
+      batch.set(doc(db, `room/${ROOM_CODE}/names/${rulesNameKey(String(fields.name))}`), record)
+    }
+    return batch.commit()
+  }
+
+  const hostDb = () => testEnv.authenticatedContext(HOST_UID).firestore()
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${HOST_UID}`),
+        playerFixture(HOST_UID, { name: 'Host' }),
+      )
+      await setDoc(doc(db(), `room/${ROOM_CODE}/names/${rulesNameKey('Host')}`), {
+        ownerUid: HOST_UID,
+      })
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`),
+        playerFixture(ALICE_UID, { name: 'Alice' }),
+      )
+    })
+  })
+
+  it('lets the host seat a guest together with its name record', async () => {
+    await assertSucceeds(seatGuest(hostDb()))
+  })
+
+  it('denies anyone but the host seating a guest', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      seatGuest(alice, {
+        fields: guestFixture({ ownerUid: ALICE_UID }),
+        record: { ownerUid: ALICE_UID, playerId: GUEST_ID },
+      }),
+    )
+  })
+
+  it('denies a guest id that is not a guest id, so a guest can never pose as a signed-in player', async () => {
+    await assertFails(seatGuest(hostDb(), { guestId: 'bob-uid' }))
+    await assertFails(seatGuest(hostDb(), { guestId: 'guest-1' }))
+    await assertFails(
+      seatGuest(hostDb(), { guestId: 'guest-3F2B8C1E-9A4D-4E6F-8B7A-1C2D3E4F5A6B' }),
+    )
+  })
+
+  it('denies a guest without its name record, or with a record that names no seat', async () => {
+    await assertFails(seatGuest(hostDb(), { record: null }))
+    await assertFails(seatGuest(hostDb(), { record: { ownerUid: HOST_UID } }))
+  })
+
+  it('denies a guest under a name already in the room, ignoring case', async () => {
+    await assertFails(seatGuest(hostDb(), { fields: guestFixture({ name: 'host' }) }))
+  })
+
+  it('denies a guest seat of the wrong shape', async () => {
+    await assertFails(seatGuest(hostDb(), { fields: guestFixture({ isGuest: false }) }))
+    await assertFails(seatGuest(hostDb(), { fields: guestFixture({ deviceUuid: 'someone-else' }) }))
+    await assertFails(seatGuest(hostDb(), { fields: guestFixture({ totalScore: 30 }) }))
+    await assertFails(seatGuest(hostDb(), { fields: guestFixture({ name: ' Mummo' }) }))
+    await assertFails(seatGuest(hostDb(), { fields: guestFixture({ extra: true }) }))
+    const withoutFlag: Record<string, unknown> = guestFixture()
+    delete withoutFlag.isGuest
+    await assertFails(seatGuest(hostDb(), { fields: withoutFlag }))
+  })
+
+  it('denies a new guest once the game is finished or the room has expired', async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ status: 'finished', currentRound: 5 })),
+    )
+    await assertFails(seatGuest(hostDb()))
+
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ expiresAt: pastExpiry() })),
+    )
+    await assertFails(seatGuest(hostDb()))
+  })
+
+  it("denies a name record for a guest seat the writer doesn't own", async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}/players/${GUEST_ID}`), guestFixture()),
+    )
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(doc(alice, `room/${ROOM_CODE}/names/${rulesNameKey('Mummo')}`), {
+        ownerUid: ALICE_UID,
+        playerId: GUEST_ID,
+      }),
+    )
+  })
+
+  it("lets the host enter and correct a guest's score and running total", async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}/players/${GUEST_ID}`), guestFixture()),
+    )
+    const host = hostDb()
+
+    await assertSucceeds(
+      setDoc(doc(host, `room/${ROOM_CODE}/roundScores/${GUEST_ID}_1`), roundScoreFixture(GUEST_ID)),
+    )
+    await assertSucceeds(
+      updateDoc(doc(host, `room/${ROOM_CODE}/players/${GUEST_ID}`), { totalScore: 10 }),
+    )
+  })
+
+  it("denies another player entering a guest's score", async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}/players/${GUEST_ID}`), guestFixture()),
+    )
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `room/${ROOM_CODE}/roundScores/${GUEST_ID}_1`),
+        roundScoreFixture(GUEST_ID),
+      ),
+    )
+  })
+
+  it('lets the host remove a guest, which frees the name', async () => {
+    await seatGuest(hostDb())
+    const host = hostDb()
+
+    await assertSucceeds(deleteDoc(doc(host, `room/${ROOM_CODE}/players/${GUEST_ID}`)))
+    await assertSucceeds(deleteDoc(doc(host, `room/${ROOM_CODE}/names/${rulesNameKey('Mummo')}`)))
+    await assertSucceeds(seatGuest(host, { guestId: 'guest-00000000-0000-4000-8000-000000000000' }))
+  })
+
+  it("lets the host write a guest's stats row when the game finishes", async () => {
+    const participants = [HOST_UID, ALICE_UID, GUEST_ID]
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${GUEST_ID}`), guestFixture())
+      await setDoc(
+        doc(db(), `game_result/${ROOM_CODE}`),
+        gameResultFixture({ gameId: ROOM_CODE, participantUids: participants }),
+      )
+    })
+
+    await assertSucceeds(
+      setDoc(
+        doc(hostDb(), `game_player/${ROOM_CODE}_${GUEST_ID}`),
+        gamePlayerFixture(ROOM_CODE, GUEST_ID, {
+          participantUids: participants,
+          displayName: 'Mummo',
+        }),
+      ),
+    )
+  })
+})
+
 describe('players update validation', () => {
   beforeEach(async () => {
     await seed(async (db) => {

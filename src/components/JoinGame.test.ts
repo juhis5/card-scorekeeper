@@ -22,6 +22,7 @@ function makeFakeOnlineRepository(): GameRepository {
   return {
     createGame: vi.fn(),
     addPlayer: vi.fn().mockResolvedValue('alice-uid'),
+    addGuest: vi.fn(),
     removePlayer: vi.fn(),
     subscribe: vi.fn((onChange: (state: GameState) => void) => {
       onChange({
@@ -148,6 +149,21 @@ describe('JoinGame with a name already in the room', () => {
     ).toBeTruthy()
     expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('true')
     expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('tells the joiner to ask the host when the name belongs to a player without a phone', async () => {
+    const repo = makeFakeOnlineRepository()
+    repo.addPlayer = vi.fn().mockRejectedValue(new NameTakenError('Mummo', { isGuestSeat: true }))
+    joinRepository.mockResolvedValue({ kind: 'online', repository: repo })
+    renderJoinGame()
+
+    await fillAndSubmit('7K4RQ', 'Mummo')
+
+    expect(
+      screen.getByText(
+        'The host already added a player with that name. Ask the host to remove them, then join.',
+      ),
+    ).toBeTruthy()
   })
 
   it('clears the message once the name is changed', async () => {

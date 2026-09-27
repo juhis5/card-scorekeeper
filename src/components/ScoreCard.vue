@@ -213,7 +213,16 @@ function handleKeyDown(event: KeyboardEvent): void {
       :aria-label="headerLabel"
       @click="expand"
     >
-      <span class="text-foreground truncate text-base font-medium">{{ title }}</span>
+      <span class="flex min-w-0 items-center gap-2">
+        <span class="text-foreground truncate text-base font-medium">{{ title }}</span>
+        <span
+          v-if="player.isGuest"
+          aria-hidden="true"
+          class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 text-xs"
+        >
+          {{ t('room.guest') }}
+        </span>
+      </span>
       <span v-if="isMissedRound" class="text-muted-foreground shrink-0 text-sm">
         {{ t('room.score.missedRoundLabel', { round }) }}
       </span>

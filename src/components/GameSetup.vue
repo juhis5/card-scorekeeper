@@ -6,13 +6,11 @@
  * Repositories are chosen here, in JoinGame and in PlayAgain (the next room after a finished
  * game); everything else talks only to the store.
  *
- * The "other players" fields only matter for the offline fallback — online, other players join
- * later via the room code, not by the host typing their names upfront (see docs/PLAN.md's "Reachable
- * → normal synced room ... players join by code"; also, `FirestoreGameRepository.addPlayer` seats
- * *this device's own* auth uid, so the host looping it for named players would be wrong online,
- * not just unnecessary). Which path we're on isn't known until the probe resolves, so "at least one
- * other player" is enforced only once we learn we're local — never blocking an online host from
- * starting solo and waiting for joiners.
+ * The "other players" fields are players without a phone of their own: the host scores for them.
+ * Online they become guest seats in the new room (players with a phone join with the room code
+ * instead); in a local game every other player is one. Which path we're on isn't known until the
+ * probe resolves, so "at least one other player" is enforced only once we learn we're local, never
+ * blocking an online host from starting solo and waiting for joiners.
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -69,9 +67,9 @@ const namedOtherPlayers = computed(() =>
   otherPlayers.value.map((field) => field.name.trim()).filter((name) => name.length > 0),
 )
 const isHostNameInvalid = computed(() => attemptedSubmit.value && trimmedHostName.value === '')
-/** Positions of names that repeat an earlier one (0 is the host), ignoring case and extra spaces:
- * a local game has no server to check, so this form does. Shown after a local start was refused,
- * then live, so fixing a field clears its message. */
+/** Positions of names that repeat an earlier one (0 is the host), ignoring case and extra spaces.
+ * Checked here before anything is created, online too. Shown after a start was refused, then
+ * live, so fixing a field clears its message. */
 const repeatedNameIndexes = computed(() =>
   duplicateNameIndexes([hostName.value, ...otherPlayers.value.map((field) => field.name)]),
 )
@@ -101,13 +99,7 @@ async function startGame(mode: HostGameMode): Promise<void> {
     hostDeviceUuid: identity.deviceUuid,
     hostDisplayName: trimmedHostName.value,
   })
-  if (mode.kind === 'offline') {
-    // Local (offline) play has no other real devices — each added player gets its own synthetic
-    // id so their stats stay distinguishable from the host's, rather than aliasing hostDeviceUuid.
-    for (const name of namedOtherPlayers.value) {
-      await game.addPlayer({ name, deviceUuid: crypto.randomUUID() })
-    }
-  }
+  for (const name of namedOtherPlayers.value) await game.addGuest({ name })
   const roomCodeParam =
     mode.kind === 'online' ? (game.roomCode ?? LOCAL_GAME_ROUTE_CODE) : LOCAL_GAME_ROUTE_CODE
   await router.push({ name: 'room', params: { code: roomCodeParam } })
@@ -120,7 +112,7 @@ async function startOrFallBack(mode: HostGameMode): Promise<void> {
     areOtherPlayersInvalid.value = true
     return
   }
-  if (mode.kind === 'offline' && repeatedNameIndexes.value.size > 0) {
+  if (repeatedNameIndexes.value.size > 0) {
     areRepeatedNamesShown.value = true
     return
   }

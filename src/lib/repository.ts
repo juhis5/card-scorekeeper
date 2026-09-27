@@ -36,6 +36,11 @@ export interface AddPlayerInput {
   deviceUuid: string
 }
 
+/** A player without a device of their own: the host adds them and enters their scores. */
+export interface AddGuestInput {
+  name: string
+}
+
 export interface SetRoundScoreInput {
   playerId: PlayerId
   round: ContractRoundNumber
@@ -54,6 +59,10 @@ export interface GameRepository {
   /** Adds a person other than the host to the game (local host adding each remaining player in
    * turn, or one device joining online) and returns their playerId. */
   addPlayer(input: AddPlayerInput): Promise<PlayerId>
+  /** Host only: seats a player without a device of their own, whose scores the host enters. At
+   * the start or mid-game; a mid-game guest fills in the rounds they missed, like a late joiner.
+   * Rejects with NameTakenError for a name already in the game. */
+  addGuest(input: AddGuestInput): Promise<PlayerId>
   /** Emits the current GameState immediately, then again on every subsequent mutation, until
    * unsubscribed. `onError` hears about a live connection that has stopped (online only), e.g.
    * this device's seat was removed or the room closed. */

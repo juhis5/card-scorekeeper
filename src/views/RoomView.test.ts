@@ -11,6 +11,7 @@ import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { runningTotal } from '@/lib/rules'
 import { i18n } from '@/i18n'
 import type {
+  AddGuestInput,
   AddPlayerInput,
   CreatedGame,
   GameConfig,
@@ -106,6 +107,19 @@ class FakeOnlineRepository implements GameRepository {
     this.state = {
       ...this.state,
       players: [...this.state.players, { id: playerId, name: input.name, totalScore: 0 }],
+    }
+    this.emit()
+    return playerId
+  }
+
+  async addGuest(input: AddGuestInput): Promise<PlayerId> {
+    const playerId = `guest-${this.nextPlayerNumber++}`
+    this.state = {
+      ...this.state,
+      players: [
+        ...this.state.players,
+        { id: playerId, name: input.name, totalScore: 0, isGuest: true },
+      ],
     }
     this.emit()
     return playerId
@@ -1050,6 +1064,74 @@ describe('RoomView late joiners', () => {
     await renderAs(hostPinia)
 
     expect(screen.getByRole('button', { name: "Fill in Alice's missed round 1" })).toBeTruthy()
+  })
+})
+
+describe('RoomView players the host adds', () => {
+  const ROOM_CODE = '7K4RQ'
+
+  async function renderOnlineHost() {
+    const repository = new FakeOnlineRepository(ROOM_CODE)
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const game = useGameStore()
+    await game.start(repository, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    const router = makeTestRouter()
+    await router.push(`/room/${ROOM_CODE}`)
+    render(RoomView, {
+      global: { plugins: [pinia, router, i18n], stubs: { RouterLink: RouterLinkStub } },
+    })
+    return { repository, game }
+  }
+
+  it('adds a player mid-game, who then fills in the rounds they missed', async () => {
+    const game = useGameStore()
+    await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await renderRoom()
+    await enterScore('Host', 1, 20)
+    await enterScore('Alice', 1, 10)
+    await advanceOrFinish(1)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Add player' }))
+    await fireEvent.update(screen.getByLabelText("Player's name"), 'Ripa')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await flushPromises()
+
+    expect(screen.getByRole('button', { name: "Fill in Ripa's missed round 1" })).toBeTruthy()
+    expect(screen.getByText('Ripa added.')).toBeTruthy()
+  })
+
+  it("shows the host a guest's numbers, even ones not entered on this device", async () => {
+    const { repository, game } = await renderOnlineHost()
+    const guestId = await game.addGuest({ name: 'Mummo' })
+
+    await repository.setRoundScore({ playerId: guestId, round: 1, points: 15 })
+    await flushPromises()
+
+    expect(screen.getByRole('button', { name: "Edit Mummo's score (15 points)" })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /Mummo/ }).textContent).toContain('guest')
+  })
+
+  it('offers Add player to the host only', async () => {
+    const repository = new FakeOnlineRepository(ROOM_CODE)
+    const hostPinia = createPinia()
+    setActivePinia(hostPinia)
+    await useGameStore().start(repository, {
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Host',
+    })
+    const joinerPinia = createPinia()
+    setActivePinia(joinerPinia)
+    await useGameStore().join(repository, ROOM_CODE, { name: 'Alice', deviceUuid: 'device-a' })
+    const router = makeTestRouter()
+    await router.push(`/room/${ROOM_CODE}`)
+
+    render(RoomView, {
+      global: { plugins: [joinerPinia, router, i18n], stubs: { RouterLink: RouterLinkStub } },
+    })
+
+    expect(screen.queryByRole('button', { name: 'Add player' })).toBeNull()
   })
 })
 

@@ -33,7 +33,7 @@
       "heading": "Uusi peli",
       "hostNameLabel": "Oma nimesi",
       "otherPlayersHeading": "Muut pelaajat",
-      "otherPlayersHint": "Tarvitaan vain, jos tämä laite päätyy isännöimään paikallista peliä — verkossa muut liittyvät huonekoodilla.",
+      "otherPlayersHint": "Pelaajat ilman omaa puhelinta: syötät heidän pisteensä. Muut liittyvät huonekoodilla.",
       "otherPlayersEmpty": "Ei vielä muita pelaajia — lisää vähintään yksi aloittaaksesi.",
       "nameLabel": "Pelaajan {number} nimi",
       "removeLabel": "Poista pelaaja {number}",
@@ -54,7 +54,8 @@
         "invalidCode": "Anna 5-merkkinen huonekoodi täsmälleen näytetyn mukaisena.",
         "unreachable": "Peliä ei tavoitettu — tarkista yhteytesi ja yritä uudelleen.",
         "joinFailed": "Huoneeseen ei voitu liittyä. Tarkista koodi ja yritä uudelleen.",
-        "nameTaken": "Joku pelissä käyttää jo tätä nimeä. Lisää esimerkiksi sukunimen alkukirjain tai lempinimi."
+        "nameTaken": "Joku pelissä käyttää jo tätä nimeä. Lisää esimerkiksi sukunimen alkukirjain tai lempinimi.",
+        "nameTakenByGuest": "Isäntä on jo lisännyt tämännimisen pelaajan. Pyydä isäntää poistamaan hänet ja liity sitten."
       }
     },
     "errors": {
@@ -175,7 +176,8 @@
       "allScored": "Kaikki ovat syöttäneet kierroksen {round} pisteet.",
       "roundResults": "Kierroksen {round} tulokset: {names} johtaa {total} pisteellä. | Kierroksen {round} tulokset: {names} johtavat {total} pisteellä.",
       "yourPlacement": "Olet sijalla {placement}.",
-      "playerRemoved": "Pelaaja {name} poistettiin pelistä."
+      "playerRemoved": "Pelaaja {name} poistettiin pelistä.",
+      "playerAdded": "{name} lisätty."
     },
     "empty": {
       "heading": "Ei käynnissä olevaa paikallista peliä",
@@ -213,7 +215,16 @@
         "nameTaken": "Joku seuraavassa pelissä käyttää jo nimeäsi."
       },
       "joinWithAnotherName": "Liity toisella nimellä"
-    }
+    },
+    "addPlayer": {
+      "button": "Lisää pelaaja",
+      "nameLabel": "Pelaajan nimi",
+      "hint": "Pelaajalle ilman omaa puhelinta: syötät hänen pisteensä.",
+      "add": "Lisää",
+      "nameRequired": "Syötä pelaajan nimi.",
+      "failed": "Pelaajaa {name} ei voitu lisätä. Yritä uudelleen."
+    },
+    "guest": "vieras"
   },
   "notFound": {
     "heading": "Sivua ei löytynyt",

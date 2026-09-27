@@ -233,6 +233,112 @@ describe('FirestoreGameRepository unique names', () => {
   })
 })
 
+describe('FirestoreGameRepository guest seats', () => {
+  const GUEST_ID = 'guest-3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'
+
+  function hostRepository() {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      roomCode: ROOM_CODE,
+      now: () => 1234,
+      newGuestId: () => GUEST_ID.slice('guest-'.length),
+    })
+  }
+
+  it('seats a guest owned by the host, with a name record naming the seat, in one batch', async () => {
+    const playerId = await hostRepository().addGuest({ name: ' Mummo ' })
+
+    expect(playerId).toBe(GUEST_ID)
+    expect(
+      batchSetMock.mock.calls.map(([ref, data]) => [(ref as { path: string }).path, data]),
+    ).toEqual([
+      [
+        `room/${ROOM_CODE}/players/${GUEST_ID}`,
+        {
+          name: 'Mummo',
+          ownerUid: HOST_UID,
+          deviceUuid: GUEST_ID,
+          totalScore: 0,
+          joinOrder: 1234,
+          isGuest: true,
+        },
+      ],
+      [`room/${ROOM_CODE}/names/n_mummo`, { ownerUid: HOST_UID, playerId: GUEST_ID }],
+    ])
+    expect(batchCommitMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("reports a name that's already in the room, even the host's own, as NameTakenError", async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+    getDocMock.mockResolvedValue(snapshot({ ownerUid: HOST_UID }))
+
+    const error = await hostRepository()
+      .addGuest({ name: 'Host' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(NameTakenError)
+  })
+
+  it('tells a joiner when the name they want belongs to a guest', async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path === `room/${ROOM_CODE}/names/n_mummo`
+          ? snapshot({ ownerUid: HOST_UID, playerId: GUEST_ID })
+          : snapshot(undefined),
+      ),
+    )
+    const joiner = new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: ALICE_UID } } as never,
+      roomCode: ROOM_CODE,
+    })
+
+    const error = await joiner
+      .addPlayer({ name: 'Mummo', deviceUuid: 'd' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(NameTakenError)
+    expect((error as InstanceType<typeof NameTakenError>).isGuestSeat).toBe(true)
+  })
+
+  it('marks guest seats in the state it passes on', () => {
+    const onChange = vi.fn()
+    hostRepository().subscribe(onChange)
+    const [onRoom, onPlayers] = onSnapshotMock.mock.calls.map(
+      (call) => (call as unknown[])[1] as (snapshot: unknown) => void,
+    )
+
+    onRoom?.({ data: () => ({ status: 'waiting', currentRound: 1 }) })
+    onPlayers?.({
+      docs: [
+        playerDoc(HOST_UID, 'Host', 'd'),
+        {
+          id: GUEST_ID,
+          data: () => ({
+            name: 'Mummo',
+            ownerUid: HOST_UID,
+            deviceUuid: GUEST_ID,
+            totalScore: 0,
+            joinOrder: 1,
+            isGuest: true,
+          }),
+        },
+      ],
+    })
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        players: [
+          { id: HOST_UID, name: 'Host', totalScore: 0 },
+          { id: GUEST_ID, name: 'Mummo', totalScore: 0, isGuest: true },
+        ],
+      }),
+    )
+  })
+})
+
 describe('FirestoreGameRepository.subscribe errors', () => {
   it("reports a listener error, such as losing this device's seat, to the caller", () => {
     const onError = vi.fn()

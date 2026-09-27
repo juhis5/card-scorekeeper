@@ -5,6 +5,7 @@ import { lastRoom, rememberRoom } from '@/lib/last-room'
 import { LocalGameRepository, STORAGE_KEY } from '@/lib/local-repository'
 import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
+  AddGuestInput,
   AddPlayerInput,
   CreatedGame,
   GameConfig,
@@ -56,6 +57,13 @@ class FakeGameRepository implements GameRepository {
   async addPlayer(input: AddPlayerInput): Promise<string> {
     this.callOrder.push('addPlayer')
     const player = { id: `player-${input.name}`, name: input.name, totalScore: 0 }
+    this.emit({ ...this.state, players: [...this.state.players, player] })
+    return player.id
+  }
+
+  async addGuest(input: AddGuestInput): Promise<string> {
+    this.callOrder.push(`addGuest:${input.name}`)
+    const player = { id: `guest-${input.name}`, name: input.name, totalScore: 0, isGuest: true }
     this.emit({ ...this.state, players: [...this.state.players, player] })
     return player.id
   }
@@ -321,6 +329,19 @@ describe('useGameStore.roundScores', () => {
     })
 
     expect(game.roundScores).toEqual([{ round: 1, playerId: 'a', points: 12 }])
+  })
+})
+
+describe('useGameStore.addGuest', () => {
+  it('seats a player without a phone through the repository', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+
+    const playerId = await game.addGuest({ name: 'Mummo' })
+
+    expect(playerId).toBe('guest-Mummo')
+    expect(game.standings.map(({ player }) => player.name)).toContain('Mummo')
   })
 })
 
@@ -733,6 +754,15 @@ describe('useGameStore.playAgain', () => {
     expect(finished.leaveCalls).toBe(0)
     expect(game.roomCode).toBe(FINISHED_CODE)
     expect(game.status).toBe('finished')
+  })
+
+  it("seats the finished game's guests in the next room before pointing the others at it", async () => {
+    const { game, finished, next } = await finishedOnlineGame()
+
+    await game.playAgain(next, HOST_CONFIG, ['Mummo', 'Ukki'])
+
+    expect(next.callOrder).toEqual(['createGame', 'addGuest:Mummo', 'addGuest:Ukki', 'subscribe'])
+    expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
   })
 
   it("exposes the finished room's link to the next room", async () => {
