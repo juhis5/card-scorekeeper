@@ -111,7 +111,18 @@ describe('ScoreCard', () => {
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '9')
     await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
 
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
+  })
+
+  it('rejects a score over the 1000-point cap instead of saving it', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '1005')
+    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+
+    expect(emitted().commit).toBeUndefined()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
   })
 
   it('clears the error when a valid score is entered', async () => {
@@ -120,11 +131,11 @@ describe('ScoreCard', () => {
     await expandCard()
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '9')
     await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
 
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '10')
     await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
-    expect(screen.queryByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeNull()
+    expect(screen.queryByText('Enter a multiple of 5 from 0 to 1,000.')).toBeNull()
   })
 
   it('returns focus to the card header when Escape collapses it', async () => {
@@ -260,7 +271,7 @@ describe('ScoreCard, confirming a photo-count result', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
 
     expect(emitted().commit).toBeUndefined()
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
   })
 
   it('rejects a fractional edited total', async () => {
@@ -277,6 +288,6 @@ describe('ScoreCard, confirming a photo-count result', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
 
     expect(emitted().commit).toBeUndefined()
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
   })
 })

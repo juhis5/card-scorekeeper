@@ -16,7 +16,7 @@ import { useI18n } from 'vue-i18n'
 import { Check } from '@lucide/vue'
 import PhotoCountSheet from '@/components/PhotoCountSheet.vue'
 import RoundScoreInput from '@/components/RoundScoreInput.vue'
-import { isValidRoundScore } from '@/lib/rules'
+import { isValidRoundScore, MAX_ROUND_SCORE } from '@/lib/rules'
 import type { ContractRoundNumber, Player } from '@/lib/types'
 
 const {
@@ -38,7 +38,7 @@ const {
 
 const emit = defineEmits<{ commit: [playerId: string, points: number] }>()
 
-const { t } = useI18n()
+const { t, n } = useI18n()
 const points = ref<number | null>(null)
 const errorMessage = ref('')
 const isExpanded = ref(false)
@@ -86,7 +86,7 @@ function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
     return
   }
   if (!isValidRoundScore(points.value)) {
-    errorMessage.value = t('room.score.invalidError')
+    errorMessage.value = t('room.score.invalidError', { max: n(MAX_ROUND_SCORE) })
     return
   }
   emit('commit', player.id, points.value)

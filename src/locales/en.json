@@ -80,7 +80,7 @@
       "sectionHeading": "Round {round} scores",
       "inputLabel": "{name}'s round {round} score",
       "scoredLabel": "Scored",
-      "invalidError": "Enter a multiple of 5 (0, 5, 10, 15…).",
+      "invalidError": "Enter a multiple of 5 from 0 to {max}.",
       "cardLabel": "Enter {name}'s score",
       "cardLabelScored": "Edit {name}'s score (scored)",
       "cancel": "Cancel"

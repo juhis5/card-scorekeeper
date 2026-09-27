@@ -4,6 +4,7 @@ import {
   FACE_CARD_VALUE,
   JOKER_VALUE,
   LOW_NUMBER_CARD_VALUE,
+  MAX_ROUND_SCORE,
   ROUND_SCORE_STEP,
   TEN_VALUE,
   TOTAL_ROUNDS,
@@ -42,6 +43,16 @@ describe('isValidRoundScore', () => {
     expect(isValidRoundScore(3)).toBe(false)
     expect(isValidRoundScore(12)).toBe(false)
     expect(isValidRoundScore(101)).toBe(false)
+  })
+
+  it('accepts the cap of 1000 points and rejects anything above it, matching firestore.rules', () => {
+    expect(MAX_ROUND_SCORE).toBe(1000)
+    expect(isValidRoundScore(MAX_ROUND_SCORE)).toBe(true)
+    expect(isValidRoundScore(MAX_ROUND_SCORE + ROUND_SCORE_STEP)).toBe(false)
+  })
+
+  it('rejects negative zero, which Firestore stores as a double and the rules reject', () => {
+    expect(isValidRoundScore(-0)).toBe(false)
   })
 })
 

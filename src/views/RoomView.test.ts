@@ -195,7 +195,7 @@ describe('RoomView invalid score entry', () => {
     await renderRoom()
     await enterScore('Alice', 1, -5)
 
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('0')
@@ -210,7 +210,7 @@ describe('RoomView invalid score entry', () => {
     await renderRoom()
     await enterScore('Alice', 1, 5.5)
 
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('0')
@@ -224,11 +224,11 @@ describe('RoomView invalid score entry', () => {
 
     await renderRoom()
     await enterScore('Alice', 1, -5)
-    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
 
     await enterScore('Alice', 1, 10)
 
-    expect(screen.queryByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeNull()
+    expect(screen.queryByText('Enter a multiple of 5 from 0 to 1,000.')).toBeNull()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('10')
