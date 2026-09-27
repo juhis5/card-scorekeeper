@@ -31,6 +31,9 @@ __screenshots__/
 test-results/
 playwright-report/
 
+# agent worktrees (full repo copies created by Claude Code)
+.claude/worktrees/
+
 # build/lint caches
 *.tsbuildinfo
 .eslintcache
