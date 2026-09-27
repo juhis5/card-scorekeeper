@@ -118,6 +118,9 @@
   --dur: 200ms;
   /* The sticky app header's height (a 44px row plus its top padding). */
   --app-header-height: 3.25rem;
+  /* Space under a room while a card is open on a touch screen, so even the last card can scroll up
+     under the header, above where the keyboard opens. */
+  --open-card-room: 60vh;
 }
 @theme {
   --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);

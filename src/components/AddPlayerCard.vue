@@ -38,10 +38,10 @@ const hasError = computed(() => errorMessage.value !== '')
 async function open(): Promise<void> {
   isOpen.value = true
   await nextTick()
-  // Like an open score card: the whole form clear of the header and the Next bar, then a plain
-  // focus, so the phone's own keyboard scrolling has the last word.
+  // Like an open score card: placed first (on a phone: up under the header), then focused without
+  // the browser's own scroll.
   reveal()
-  document.getElementById('add-player-name')?.focus()
+  document.getElementById('add-player-name')?.focus({ preventScroll: true })
 }
 
 /** The form unmounts, so hand focus back to the button that opened it: when focus was in the
@@ -86,7 +86,12 @@ async function add(): Promise<void> {
 </script>
 
 <template>
-  <li ref="card" class="bg-card border-border rounded-lg border" @keydown.escape="close">
+  <li
+    ref="card"
+    :data-card-open="isOpen || undefined"
+    class="bg-card border-border rounded-lg border"
+    @keydown.escape="close"
+  >
     <button
       v-if="!isOpen"
       ref="openButton"

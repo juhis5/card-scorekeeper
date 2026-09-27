@@ -117,10 +117,10 @@ async function expand(): Promise<void> {
   points.value = savedPoints.value
   isExpanded.value = true
   await nextTick()
-  // First the whole card, ✓ and ✕ included, clear of the header and the Next bar; then a plain
-  // focus, so the phone's own keyboard scrolling runs last and brings the field above it.
+  // Placed first (on a phone: up under the header, above where the keyboard will be), then focused
+  // without the browser's own scroll, which would move it again (Chromium tucks it under the header).
   reveal()
-  document.getElementById(inputId.value)?.focus()
+  document.getElementById(inputId.value)?.focus({ preventScroll: true })
 }
 
 /** Collapsing unmounts the focused control, so hand focus back to the header — otherwise it
@@ -235,6 +235,7 @@ function handleKeyDown(event: KeyboardEvent): void {
 <template>
   <li
     ref="card"
+    :data-card-open="isExpanded || undefined"
     class="bg-card border-border rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
     :class="isExpanded ? 'ring-ring ring-2' : 'hover:bg-muted'"
     @keydown="handleKeyDown"

@@ -617,15 +617,21 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     red and black, and each card has a spoken name ("hertta seitsemän").
 - 2026-09-27 — The open card and the phone keyboard (third playtest: "the input fields are behind
   the mobile keyboard"):
-  - Opening a card first moves it clear of the sticky header and the Next bar (`useKeepInView`,
-    the pure `scrollToReveal`), then focuses the field with a plain `focus()`, so the phone's own
-    keyboard scrolling runs last. Round 2's `focus({ preventScroll: true })` had turned that off.
+  - What finally held (your iPhone tests): a phone only scrolls a field out from behind its
+    keyboard when the finger tapped that field, not when the app focuses it after a card opens. So
+    the lowest cards' fields stayed hidden while higher ones were fine. On a touch screen an
+    opening card now scrolls up to just under the header before its field is focused
+    (`useKeepInView`, the pure `scrollToTop`). The keyboard only covers the lower part of the
+    screen, so it never covers the field. While a card is open the room gets space below it
+    (`--open-card-room`), so even the last card can come up. The focus itself then skips the
+    browser's scroll, which would move the card again. With a mouse a card just moves clear of the
+    header and the Next bar (`scrollToReveal`).
   - Tried and removed: following `window.visualViewport` resizes while the keyboard was up. On an
     iPhone it also resizes while scrolling (the toolbars sliding), so the page jumped back
     mid-scroll. A unit test pins that a resize never scrolls the page.
   - The real cover-up on the iPhone was the sticky Next bar: with the keyboard up it sits right
-    above the keyboard, on top of the field. The room's bottom bars stop sticking while any field
-    in the room has focus (`:has(input:focus)`) and drop back to the end of the list.
+    above the keyboard, on top of the field. The room's bottom bars stop sticking while a card is
+    open (`:has([data-card-open])`) and drop back to the end of the list.
   - Android Chrome gets `interactive-widget=resizes-content`, so its keyboard resizes the page.
   - Found on the way: leaving a field by tapping another card saved and closed the first card on
     the press, the list shifted, and the tap landed elsewhere. The score still saves at once,
