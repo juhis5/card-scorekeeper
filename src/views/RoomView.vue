@@ -133,9 +133,9 @@ function isOwnCard(playerId: PlayerId): boolean {
   return !isHost.value && playerId === myPlayerId.value
 }
 
-/** Set while a score save is in flight, so its own announcement can say "everyone has entered"
- * instead of a second message racing it. */
-let isSavingScore = false
+/** Set while this device saves a score or removes a player: either can complete the round, and
+ * its own announcement then says "everyone has entered" instead of a second message racing it. */
+let isLocalChangeInFlight = false
 let pendingSave: Promise<void> = Promise.resolve()
 /** Shown when Next or Finish is tapped before every score is in. */
 const isWaitingHintShown = ref(false)
@@ -210,7 +210,7 @@ watch(
 // the same message.
 watch(allPlayersScored, (isReady, wasReady) => {
   if (isReady) isWaitingHintShown.value = false
-  if (isReady && !wasReady && isHost.value && hasActiveGame.value && !isSavingScore) {
+  if (isReady && !wasReady && isHost.value && hasActiveGame.value && !isLocalChangeInFlight) {
     void announce(allScoredMessage())
   }
 })
@@ -240,7 +240,7 @@ async function saveScore(
   points: number,
 ): Promise<void> {
   const player = standings.value.find((standing) => standing.player.id === playerId)?.player
-  isSavingScore = true
+  isLocalChangeInFlight = true
   try {
     await game.setRoundScore({ playerId, round, points })
   } catch (error) {
@@ -250,7 +250,7 @@ async function saveScore(
     )
     return
   } finally {
-    isSavingScore = false
+    isLocalChangeInFlight = false
   }
   saveError.value = ''
   scoresEnteredHere.value.add(scoreKey(playerId, round))
@@ -262,14 +262,18 @@ async function saveScore(
 }
 
 async function handleRemovePlayer(player: Player): Promise<void> {
+  isLocalChangeInFlight = true
   try {
     await game.removePlayer(player.id)
   } catch (error) {
     saveError.value = describeSaveFailure(error, t('room.saveError.remove', { name: player.name }))
     return
+  } finally {
+    isLocalChangeInFlight = false
   }
   saveError.value = ''
-  void announce(t('room.live.playerRemoved', { name: player.name }))
+  const removed = t('room.live.playerRemoved', { name: player.name })
+  void announce(allPlayersScored.value ? `${removed} ${allScoredMessage()}` : removed)
   // The removed player's card (and the focused control in it) is gone; keep the host's place.
   await nextTick()
   scoreEntryHeading.value?.focus()

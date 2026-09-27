@@ -766,6 +766,22 @@ describe('RoomView online mode', () => {
     expect(screen.getByText('Alice was removed from the game.')).toBeTruthy()
   })
 
+  it('says both "removed" and "everyone has entered" when the last player still to score is removed', async () => {
+    const { hostPinia, hostGame } = await setUpOnlineRoom()
+    await hostGame.setRoundScore({ playerId: 'host-uid', round: 1, points: 20 })
+    setActivePinia(hostPinia)
+    const { container } = await renderAs(hostPinia)
+
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove Alice' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Yes, remove Alice' }))
+    await flushPromises()
+
+    const message = container.querySelector('[aria-live="polite"]')?.textContent ?? ''
+    expect(message).toContain('Alice was removed from the game.')
+    expect(message).toContain('Everyone has entered round 1 scores.')
+  })
+
   it("never offers removing the host's own seat", async () => {
     const { hostPinia } = await setUpOnlineRoom()
     setActivePinia(hostPinia)

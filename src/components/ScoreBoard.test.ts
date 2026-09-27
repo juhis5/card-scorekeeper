@@ -69,6 +69,14 @@ describe('ScoreBoard', () => {
     expect(cells[0]?.textContent?.trim()).toBe('0')
   })
 
+  it('writes a 1000-point round without a thousands separator, so it fits its narrow column', () => {
+    renderBoard(1, [{ playerId: 'a', round: 1, points: 1000 }])
+
+    const alice = bodyRows().find((row) => row.textContent?.includes('Alice'))
+    const cells = within(alice as HTMLElement).getAllByRole('cell')
+    expect(cells[0]?.textContent?.trim()).toBe('1000')
+  })
+
   it('marks the leader with an icon and text, not color alone', () => {
     renderBoard(1)
 
