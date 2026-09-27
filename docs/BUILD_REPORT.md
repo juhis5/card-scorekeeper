@@ -126,3 +126,6 @@ The report above describes the 2026-07-24 build and is left as written. Since th
 - Item 3 of "What's left": Vercel KV is no longer offered. Use a Redis integration from the Vercel
   Marketplace (for example Upstash) for the shared rate-limit store.
 - A full review on 2026-09-27 listed the remaining work; it is tracked outside this file.
+- Items 3 and 5, after review round 5: the owner kept the in-memory rate limits for launch (see
+  DECISIONS). The `/api` ESM loading bug is fixed and `pnpm test:api-load` checks it in CI; a real
+  Vercel deploy is still unverified.

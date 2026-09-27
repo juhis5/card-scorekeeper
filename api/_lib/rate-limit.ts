@@ -1,11 +1,9 @@
 /**
  * Layers 2/3 of the vercel-gemini skill's gate: per-room and global rate limits. The decision
  * (`decideRateLimit`) is a pure fixed-window function, unit-tested directly with injected clock
- * values — no store, no mocking. `RateLimitStore` is the injectable persistence seam:
- * `InMemoryRateLimitStore` below is for tests and local `vercel dev` only. Production should wire
- * a Vercel KV / Upstash-backed implementation of the same interface (see the vercel-gemini skill
- * — "Use Vercel KV / Upstash (in-memory won't span instances or cold starts)"); not built in this
- * slice (see the handoff notes) so this function ships without a live KV dependency.
+ * values — no store, no mocking. `RateLimitStore` is the injectable persistence seam: production
+ * uses `InMemoryRateLimitStore` below, a per-instance cap the owner accepted (docs/DECISIONS.md,
+ * review round 5). A shared Upstash/Redis store can implement the same interface if that changes.
  */
 
 export interface RateLimitWindowState {
@@ -51,10 +49,9 @@ export interface RateLimitStore {
 }
 
 /**
- * In-memory `RateLimitStore` — correct within a single process, which is enough for unit tests
- * and `vercel dev`. NOT a real cap in production: Vercel runs multiple horizontally-scaled
- * instances and cold-starts fresh ones, none of which share this Map (see the module doc comment
- * and the handoff notes — this is a known, flagged limitation, not an oversight).
+ * In-memory `RateLimitStore` — exact within one process. In production each Vercel instance, and
+ * each cold start, gets its own Map, so the caps are per instance; Gemini's free-tier quota is the
+ * real ceiling (see the module doc comment).
  */
 export class InMemoryRateLimitStore implements RateLimitStore {
   private readonly windows = new Map<string, RateLimitWindowState>()

@@ -8,12 +8,13 @@
  *
  * Gate order (cheapest checks first, per the vercel-gemini skill's "layered protection"):
  *   1. method + request shape (no I/O)               → 405 / 400
- *   2. Firebase ID token (Admin SDK verify)            → 401
- *   3. room exists/active + caller is a member         → 403
- *   4. per-room, then global rate limit                → 429
- *   5. image size cap                                  → 413
- *   6. Gemini call + output validation                 → 502 / 422
- *   7. success — server-recomputed cards + total       → 200
+ *   2. image size cap (no I/O)                         → 413
+ *   3. Firebase ID token (Admin SDK verify)            → 401
+ *   4. room exists/active + caller is a member         → 403
+ *   5. per-room, then global rate limit                → 429
+ *   6. Gemini call (timeout / busy / other)            → 504 / 503 / 502
+ *   7. model output validation                         → 422
+ *   8. success — server-recomputed cards + total       → 200
  */
 import { parseBearerToken, parseCountRequestBody } from './request.js'
 import { authenticateRequest, evaluateRoomGate, type RoomSnapshot } from './gate.js'

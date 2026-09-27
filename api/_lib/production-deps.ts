@@ -4,20 +4,16 @@
  * (see the tdd skill) without this file's real-credential requirements ever being imported by a
  * test.
  *
- * KNOWN LIMITATION (see the rate-limit.ts doc comment and the handoff notes): `rateLimitStore`
- * below is the in-memory implementation. It only bounds calls within a single warm Vercel
- * instance — the per-room and, especially, the GLOBAL cap are not real ceilings across Vercel's
- * horizontally-scaled/cold-started instances until this is swapped for a Vercel KV/Upstash-backed
- * `RateLimitStore`. Not built in this slice (out of scope — "don't require live KV"); flagged
- * here and in the handoff so it isn't mistaken for a real production guarantee.
+ * `rateLimitStore` is in memory, so the per-room and global caps hold per warm instance, not
+ * across instances or cold starts. Accepted by the owner for a friends' game (docs/DECISIONS.md,
+ * review round 5); see rate-limit.ts.
  */
 import { createGeminiClient, DEFAULT_GEMINI_MODEL } from './gemini.js'
 import { getAdminApp, getRoomSnapshot, verifyIdToken } from './firebase-admin.js'
 import { InMemoryRateLimitStore } from './rate-limit.js'
 import type { CountHandlerDeps } from './handler.js'
 
-// Module-scoped, so it's reused across warm invocations of the same instance (see the doc
-// comment above for why that's still not a real cross-instance cap).
+// Module-scoped, so warm invocations of the same instance share it.
 const rateLimitStore = new InMemoryRateLimitStore()
 
 export function createProductionDeps(): CountHandlerDeps {

@@ -38,6 +38,7 @@ Two very different classes — don't mix them up:
 |------|-------|-------|-------|
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_*` | **Public** | Client | Firebase web config is public by design; security is Firestore rules. `VITE_` = shipped to browser, that's fine here. |
 | `GEMINI_API_KEY` | Secret | Server only | Free-tier, no billing. Never `VITE_`. |
+| `GEMINI_MODEL` | Config | Server only | Optional; overrides the default Gemini model when Google renames or retires one. |
 | `FIREBASE_SERVICE_ACCOUNT` | Secret | Server only | Admin SDK creds (JSON) for the room-validation check. Never `VITE_`, never in the client. |
 
 - The public/secret split is the thing to get right: web config in `VITE_*`, admin creds + Gemini key server-only.
@@ -56,7 +57,7 @@ We host the FE on Vercel (consistency with schedule-app; Firestore is host-agnos
 1. Create the Firebase project; copy the web config into `VITE_FIREBASE_*`. Deploy Firestore rules (`firebase deploy --only firestore:rules`).
 2. Push the repo to GitHub.
 3. Vercel → Import Project → pick the repo (Vite preset).
-4. Add env vars: `VITE_FIREBASE_*` (all), and if photo-count is on, `GEMINI_API_KEY` + `FIREBASE_SERVICE_ACCOUNT`.
+4. Add env vars: `VITE_FIREBASE_*` (all), and if photo-count is on, `GEMINI_API_KEY` + `FIREBASE_SERVICE_ACCOUNT` (and `GEMINI_MODEL` only to override the default). Create the Gemini key in a separate Google Cloud project, restricted to the Generative Language API, with no billing.
 5. Deploy → live URL. Pushes auto-deploy; PRs get previews.
 6. Open a preview deploy with the browser console open and play an online game. `vercel.json` ships the CSP as `Content-Security-Policy-Report-Only`; once no violations show up, rename it to `Content-Security-Policy` (the other security headers are already enforced). `src/security-headers.test.ts` keeps the inline theme script's hash in sync.
 7. Before a public launch: consider Firebase App Check (reCAPTCHA Enterprise) for Firestore, Auth and `/api`; anonymous sign-in plus open room creation can otherwise burn the Spark quota. If you add a Firestore TTL on `room.expiresAt`, read the note in DECISIONS first: online stats are keyed by room code.
