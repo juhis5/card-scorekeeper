@@ -448,3 +448,11 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   longer imported. `test:api-load` now runs with `--no-experimental-require-module`, which
   reproduces the failure locally. Pinning `jwks-rsa`'s `jose` to v5 was the alternative; rejected
   as a pin on an old major.
+- 2026-09-27 — Stats results query: production Firestore refuses `documentId() in [...]`
+  combined with the `participantUids array-contains` filter (`permission-denied`), while the
+  emulator allows it, so every suite passed and Stats broke for anyone with a finished online
+  game. Stats now loads `game_result` with the participant filter alone (one query, the exact set
+  of games the player was in; the rules test for it already existed). The `game_player` queries
+  work on prod unchanged, and none of the three need a composite index. Lesson: the emulator can
+  be more permissive than production for rules on queries; the planned staging smoke check
+  covers that gap.
