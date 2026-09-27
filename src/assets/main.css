@@ -116,6 +116,9 @@
 :root {
   --dur-fast: 120ms;
   --dur: 200ms;
+  /* The sticky app header's height (a 44px row plus its top padding): the room's pinned board
+     sticks right under it. */
+  --app-header-height: 3.25rem;
 }
 @theme {
   --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);

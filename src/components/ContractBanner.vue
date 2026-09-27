@@ -15,9 +15,7 @@ const { t, n } = useI18n()
 <template>
   <!-- Not a live region: RoomView announces the new round and its contract together with the
        revealed results, in one message. -->
-  <p
-    class="bg-muted text-foreground border-border rounded-lg border px-4 py-3 text-base font-medium"
-  >
+  <p class="bg-muted text-foreground border-border rounded-lg border px-3 py-2 text-sm font-medium">
     {{
       t('room.roundBanner', { round: n(round), total: n(TOTAL_ROUNDS), contract: t(contractKey) })
     }}

@@ -49,8 +49,11 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
     <!-- Persistent chrome (see the routing skill), reachable from every route incl. mid-game:
          Back, the room code while in an online room, and the menu with the pages (Stats is a
          device-wide record, not tied to any one room) and the settings. No title link: Back
-         already leads home, and the app's name sits in the menu. -->
-    <header class="mx-auto flex w-full max-w-md items-center gap-1 px-4 pt-2">
+         already leads home, and the app's name sits in the menu. Sticky, so it stays while a
+         page scrolls. -->
+    <header
+      class="bg-background sticky top-0 z-20 mx-auto flex h-(--app-header-height) w-full max-w-md items-center gap-1 px-4 pt-2"
+    >
       <BackButton v-if="!isHome" class="-ml-2" />
       <RoomCodeBar v-if="headerRoomCode" :code="headerRoomCode" />
       <div v-else class="min-w-0 flex-1" />
