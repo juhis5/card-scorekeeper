@@ -28,7 +28,7 @@ import {
 import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
 import { writeGameResult } from './firestore-stats'
-import { generateRoomCode as defaultGenerateRoomCode } from './room-code'
+import { generateRoomCode as defaultGenerateRoomCode, ROOM_TTL_MS } from './room-code'
 import { CONTRACTS, TOTAL_ROUNDS, placements as placementsFor, runningTotal } from './rules'
 import { bestAndWorstRound } from './stats'
 import { withTimeout } from './timeout'
@@ -52,10 +52,6 @@ import type {
   SetRoundScoreInput,
   Unsubscribe,
 } from './repository'
-
-/** Rooms are short-lived by design (see docs/PLAN.md "Protecting your Gemini free tier") — a
- * leaked room code stops working a few hours after the game that used it. */
-const ROOM_TTL_MS = 6 * 60 * 60 * 1000
 
 /** Bounds the room-code retry loop below — collisions are astronomically rare (see room-code.ts's
  * alphabet/length); this is a backstop against an infinite loop, not an expected path. */

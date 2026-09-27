@@ -478,3 +478,16 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     the next contract together, the host hears when every score is in, and a reopened room
     announces nothing. Next and Finish use `aria-disabled` and wait for a score saved by the same
     tap, so one tap is enough; tapping early says whose scores are missing.
+- 2026-09-27 — Back and Continue game (tester note 3, review finding ui-8):
+  - The header has a Back control on every screen except Home. It goes to the previous screen in
+    this tab, or Home when the page was opened directly (a room link, a new tab), detected by
+    Vue Router's `history.state.back` being null. Owner's call: previous screen, but never out of
+    the app.
+  - Leaving a room doesn't end its game. Home shows "Game in progress" with the game still running
+    in this session, the last online room this device was in (remembered in localStorage for
+    the room lifetime, forgotten when the game finishes or the seat is lost) and an unfinished
+    local game. The room lifetime constant moved to the pure `room-code.ts`.
+  - Starting a new local game while an unfinished one is saved now asks first; before, it
+    silently overwrote it. Online games never touch the saved local game, so they don't ask.
+  - At 360px the header is full, so the Stats link is an icon on phones (still named "Stats") and
+    the title truncates.

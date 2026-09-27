@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { hasPersistedGame, LocalGameRepository, STORAGE_KEY } from './local-repository'
+import {
+  hasPersistedGame,
+  hasUnfinishedPersistedGame,
+  LocalGameRepository,
+  STORAGE_KEY,
+} from './local-repository'
 import type { KeyValueStorage } from './local-repository'
 import { readPendingResults } from './pending-results'
 import type { ContractRoundNumber, GameState } from './types'
@@ -435,6 +440,31 @@ describe('LocalGameRepository.getResumeInfo / hasPersistedGame', () => {
     storage.setItem(STORAGE_KEY, JSON.stringify({ unexpected: 'shape' }))
 
     expect(hasPersistedGame(storage)).toBe(false)
+  })
+})
+
+describe('hasUnfinishedPersistedGame', () => {
+  it('is false before a game is created, true while one is in progress', async () => {
+    const storage = makeMemoryStorage()
+    expect(hasUnfinishedPersistedGame(storage)).toBe(false)
+
+    await makeRepository({ storage }).createGame(HOST_CONFIG)
+
+    expect(hasUnfinishedPersistedGame(storage)).toBe(true)
+  })
+
+  it('is false once the game is finished', async () => {
+    const storage = makeMemoryStorage()
+    const repository = makeRepository({ storage })
+    const created = await repository.createGame(HOST_CONFIG)
+    for (const round of [1, 2, 3, 4, 5] as const) {
+      await repository.setRoundScore({ playerId: created.hostPlayerId, round, points: 10 })
+      if (round < 5) await repository.advanceRound()
+    }
+
+    await repository.finishGame()
+
+    expect(hasUnfinishedPersistedGame(storage)).toBe(false)
   })
 })
 

@@ -137,6 +137,15 @@ export function hasPersistedGame(storage: KeyValueStorage = browserLocalStorage(
   return stored !== null && stored.gameId !== ''
 }
 
+/** True when `storage` holds a local game that was started and isn't finished: the one Home
+ * offers to continue, and the one a new local game would replace. */
+export function hasUnfinishedPersistedGame(
+  storage: KeyValueStorage = browserLocalStorage(),
+): boolean {
+  const stored = readStoredGame(storage)
+  return stored !== null && stored.gameId !== '' && stored.state.status !== 'finished'
+}
+
 export interface LocalGameRepositoryDeps {
   now?: () => string
   newId?: () => string

@@ -9,6 +9,11 @@ export const ROOM_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 
 export const ROOM_CODE_LENGTH = 5
 
+/** Rooms are short-lived by design (see docs/PLAN.md "Protecting your Gemini free tier"): a
+ * leaked room code stops working a few hours after the game that used it. firestore.rules caps
+ * a room's expiry at 7 hours. */
+export const ROOM_TTL_MS = 6 * 60 * 60 * 1000
+
 export interface RoomCodeDeps {
   /** Returns a random integer in [0, maxExclusive). Defaults to `Math.random`-backed; inject a
    * fixed sequence in tests so room codes are deterministic (see the `tdd` skill). */

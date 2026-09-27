@@ -14,7 +14,8 @@
     }
   },
   "nav": {
-    "stats": "Tilastot"
+    "stats": "Tilastot",
+    "back": "Takaisin"
   },
   "contract": {
     "round1": "Kaksi kolmen sarjaa",
@@ -38,7 +39,10 @@
       "removeLabel": "Poista pelaaja {number}",
       "addPlayerButton": "Lisää pelaaja",
       "startButton": "Aloita peli",
-      "checkingConnection": "Tarkistetaan yhteyttä…"
+      "checkingConnection": "Tarkistetaan yhteyttä…",
+      "replaceConfirm": "Aloitetaanko uusi peli? Tällä laitteella kesken oleva peli menetetään.",
+      "replaceStart": "Aloita uusi peli",
+      "replaceKeep": "Jatka peliä"
     },
     "join": {
       "heading": "Liity peliin",
@@ -56,6 +60,11 @@
       "hostNameRequired": "Anna nimesi jatkaaksesi.",
       "otherPlayersRequired": "Lisää vähintään yksi muu pelaaja.",
       "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen."
+    },
+    "continue": {
+      "heading": "Peli kesken",
+      "room": "Jatka huonetta {code}",
+      "local": "Jatka tämän laitteen peliä"
     }
   },
   "room": {
