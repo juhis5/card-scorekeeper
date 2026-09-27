@@ -615,3 +615,17 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     not wild. Nothing about going out or laying off is on the page yet.
   - Cards are white in both themes, like real cards; the suit symbol tells suits apart, not only
     red and black, and each card has a spoken name ("hertta seitsemän").
+- 2026-09-27 — The open card and the phone keyboard (third playtest: "the input fields are behind
+  the mobile keyboard"):
+  - A plain focus again, so the phone moves the field above its keyboard as it would anywhere.
+    Round 2's `focus({ preventScroll: true })` had turned that off.
+  - `useKeepInView` then keeps the whole open card showing between the sticky header and the
+    bottom bar within `window.visualViewport`, re-checking whenever it resizes. On an iPhone the
+    keyboard shrinks only the visual viewport, not the page. The scroll maths is the pure
+    `scrollToReveal`. Android Chrome also gets `interactive-widget=resizes-content`, so its
+    keyboard resizes the page and the bottom bar rides above it.
+  - Found while doing this: leaving a field by tapping another card saved and closed the first
+    card on the press, the list shifted, and the tap landed elsewhere. The score still saves at
+    once, but the card now closes only after that tap's click has landed (or after 500 ms when
+    no tap follows, as with the keyboard), and stays open when the tap lands back on it.
+  - The keyboard part can only be checked on real phones.

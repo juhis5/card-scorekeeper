@@ -57,6 +57,17 @@ test.describe('score entry on a card', () => {
     await startLocalGame(page)
   })
 
+  test('tapping another card saves the open one and opens the one tapped', async ({ page }) => {
+    await page.getByRole('button', { name: "Enter Host's score" }).click()
+    await page.getByLabel("Host's round 1 score").fill('20')
+
+    await maijuCard(page).click()
+
+    await expect(page.getByLabel("Maiju's round 1 score")).toBeVisible()
+    await expect(page.getByLabel("Maiju's round 1 score")).toBeFocused()
+    await expect(page.getByRole('button', { name: "Edit Host's score (20 points)" })).toBeVisible()
+  })
+
   test('Cancel discards the typed score and returns focus to the card', async ({ page }) => {
     await typeMaijuScore(page, '25')
     await page.getByRole('button', { name: 'Cancel' }).click()

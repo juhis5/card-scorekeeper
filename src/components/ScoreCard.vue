@@ -16,12 +16,13 @@
  * Renders as an `<li>` — the parent wraps the cards in a `<ul role="list">` grid. No round
  * watcher: the parent keys each card by player + round, so a new round remounts it fresh.
  */
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, X } from '@lucide/vue'
 import PhotoCountSheet from '@/components/PhotoCountSheet.vue'
 import RoundScoreInput from '@/components/RoundScoreInput.vue'
 import { Button } from '@/components/ui/button'
+import { useKeepInView } from '@/composables/useKeepInView'
 import { isValidRoundScore, MAX_ROUND_SCORE } from '@/lib/rules'
 import type { ContractRoundNumber, Player } from '@/lib/types'
 
@@ -69,6 +70,7 @@ const isExpanded = ref(false)
 let isPressInsidePanel = false
 const cardElement = useTemplateRef<HTMLLIElement>('card')
 const headerButton = useTemplateRef<HTMLButtonElement>('header')
+const { reveal } = useKeepInView(cardElement, isExpanded)
 
 const inputId = computed(() => `score-card-${player.id}`)
 const errorId = computed(() => `${inputId.value}-error`)
@@ -115,10 +117,11 @@ async function expand(): Promise<void> {
   points.value = savedPoints.value
   isExpanded.value = true
   await nextTick()
-  // The room's Next bar sticks to the bottom of the screen, so bring the whole open card, Save
-  // included, into view above it (its scroll margin) rather than just the field.
-  document.getElementById(inputId.value)?.focus({ preventScroll: true })
-  cardElement.value?.scrollIntoView({ block: 'nearest' })
+  // A plain focus, so the phone brings the field above its keyboard as it would anywhere; then
+  // the whole card, ✓ and ✕ included, is moved clear of the header and the Next bar, and again
+  // once the keyboard is up (useKeepInView).
+  document.getElementById(inputId.value)?.focus()
+  reveal()
 }
 
 /** Collapsing unmounts the focused control, so hand focus back to the header — otherwise it
@@ -135,20 +138,51 @@ function isInsideCard(target: EventTarget | null): boolean {
   return target instanceof Node && (cardElement.value?.contains(target) ?? false)
 }
 
-function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
+/** Validates and emits the typed score; false when there's nothing valid to save. */
+function savePoints(): boolean {
   if (points.value === null) {
     // Not yet typed anything — a no-op, not an error.
     errorMessage.value = ''
-    return
+    return false
   }
   if (!isValidRoundScore(points.value)) {
     errorMessage.value = t('room.score.invalidError', { max: n(MAX_ROUND_SCORE) })
-    return
+    return false
   }
+  errorMessage.value = ''
   savedPoints.value = points.value
   emit('commit', player.id, round, points.value)
-  void collapse({ restoreFocus })
+  return true
 }
+
+function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
+  if (savePoints()) void collapse({ restoreFocus })
+}
+
+/** Longer than a tap takes from press to release; after it, a card left by keyboard closes. */
+const TAP_SETTLE_MS = 500
+let cancelPendingCollapse: (() => void) | null = null
+
+/** Leaving the field by tapping another card blurs it on the press. Closing right then would shift
+ * the list under the finger and the tap would land on whatever moved there, so close only once
+ * that tap's click has landed, unless it landed back on this card. */
+function collapseAfterTap(): void {
+  cancelPendingCollapse?.()
+  const finish = (event?: Event) => {
+    cancelPendingCollapse?.()
+    if (event && isInsideCard(event.target)) return
+    void collapse({ restoreFocus: false })
+  }
+  const timer = setTimeout(finish, TAP_SETTLE_MS)
+  window.addEventListener('click', finish, { once: true })
+  cancelPendingCollapse = () => {
+    clearTimeout(timer)
+    window.removeEventListener('click', finish)
+    cancelPendingCollapse = null
+  }
+}
+
+onBeforeUnmount(() => cancelPendingCollapse?.())
 
 function markPressInsideCard(): void {
   isPressInsidePanel = true
@@ -182,7 +216,7 @@ function handleInputBlur(event: FocusEvent): void {
   // Enter already saved, or after Cancel/Escape discarded, so it must do nothing.
   if (!isExpanded.value) return
   if (wasPressInsidePanel || isInsideCard(event.relatedTarget)) return
-  commitPoints({ restoreFocus: false })
+  if (savePoints()) collapseAfterTap()
 }
 
 /** The photo is only ever a SUGGESTION (see CLAUDE.md) — confirming feeds the number through the
@@ -202,7 +236,7 @@ function handleKeyDown(event: KeyboardEvent): void {
 <template>
   <li
     ref="card"
-    class="bg-card border-border scroll-mb-20 rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
+    class="bg-card border-border rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
     :class="isExpanded ? 'ring-ring ring-2' : 'hover:bg-muted'"
     @keydown="handleKeyDown"
     @pointerdown="markPressInsideCard"

@@ -52,6 +52,7 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
          already leads home, and the app's name sits in the menu. Sticky: the only part of a page
          that stays put while the rest scrolls (owner's call, second playtest). -->
     <header
+      data-app-header
       class="bg-background sticky top-0 z-20 mx-auto flex h-(--app-header-height) w-full max-w-md items-center gap-1 px-4 pt-2"
     >
       <BackButton v-if="!isHome" class="-ml-2" />

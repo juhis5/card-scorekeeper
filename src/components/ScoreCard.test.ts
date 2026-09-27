@@ -104,9 +104,11 @@ describe('ScoreCard', () => {
     await expandCard()
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '10')
     await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await fireEvent.click(document.body)
+    await flushPromises()
 
     expect(emitted().commit).toEqual([[ALICE.id, 1, 10]])
-    // Card collapses after commit
+    // Card collapses after commit, once the tap that left it has landed
     expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
   })
 
@@ -275,6 +277,51 @@ describe('ScoreCard, the Save button', () => {
 
     expect(screen.queryByRole('alert')).toBeNull()
     expect(emitted().commit).toBeUndefined()
+  })
+})
+
+describe('ScoreCard, leaving the field by tapping elsewhere', () => {
+  it('saves at once but closes only after that tap has landed, so the list does not shift under it', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    await fireEvent.blur(scoreInput())
+
+    expect(emitted().commit).toEqual([[ALICE.id, 1, 25]])
+    expect(screen.queryByLabelText("Alice's round 1 score")).not.toBeNull()
+
+    await fireEvent.click(document.body)
+    await flushPromises()
+    expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
+  })
+
+  it('stays open when the tap lands back on the same card', async () => {
+    renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    await fireEvent.blur(scoreInput())
+    await fireEvent.click(headerButton())
+    await flushPromises()
+
+    expect(screen.queryByLabelText("Alice's round 1 score")).not.toBeNull()
+  })
+
+  it('closes by itself when no tap follows, as when leaving with the keyboard', async () => {
+    vi.useFakeTimers()
+    try {
+      renderCard()
+      await expandCard()
+      await fireEvent.update(scoreInput(), '25')
+      await fireEvent.blur(scoreInput())
+
+      await vi.advanceTimersByTimeAsync(1000)
+
+      expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
