@@ -756,3 +756,22 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     whenever the app comes back to the screen (while visible and online). A waiting version shows
     as "Päivitä sovellus" in the menu, as well as in the banner. `useServiceWorker` became the
     `app-update` store, since App and the menu both need it.
+- 2026-09-28 — Global highscores (fourth round; the owner chose best game, hall of shame and
+  biggest round, and left "most wins" for later because its cost grows with every game):
+  - A new public collection, `leaderboard/{gameId}_{deviceUuid}`: one entry per stats row
+    (`displayName`, `finalScore`, `worstRound`, `finishedAt`), written right after the row when a
+    game finishes, online or by the reconnect flush. Anyone signed in may read it, 10 documents per
+    query at most, so each list is one query of 10 reads.
+  - Trust: firestore.rules only accepts an entry that repeats its own `game_player` row (and that
+    game's `finishedAt`) exactly, published by one of that game's players. So who may write a stats
+    row decides what reaches the board. A host could still enter made-up scores in their own game;
+    that was accepted when choosing a global board.
+  - Privacy: names on the board are visible to everyone using the app; the entry id also carries
+    the game's code and the player's anonymous uid.
+  - An entry is an extra: if it can't be written (production rules not yet deployed, a dropped
+    connection) the game still finishes, and that entry is left out rather than retried.
+  - Stats shows the three lists below this device's own stats, with their own loading and error
+    states (`HighscoresSection`, the `highscores` store). Ties share a rank; this device's own
+    entries say "you".
+  - Entries start with this release. At the release, the production games played since the wipe
+    get their entries copied in once.

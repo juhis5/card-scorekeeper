@@ -12,12 +12,17 @@
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { deleteApp, initializeApp, type FirebaseApp } from 'firebase/app'
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth'
+import { connectAuthEmulator, getAuth, signInAnonymously, type Auth } from 'firebase/auth'
 import {
+  collection,
   connectFirestoreEmulator,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
+  limit,
+  orderBy,
+  query,
   type Firestore,
 } from 'firebase/firestore'
 import { FirestoreGameRepository } from '@/lib/data/firestore-repository'
@@ -184,6 +189,21 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
       bestRound: 10,
       worstRound: 10,
     })
+
+    // The highscores are public: someone who never played here reads them too.
+    const stranger = makeDevice()
+    await signInAnonymously(stranger.auth)
+    const entry = await getDoc(doc(stranger.db, `leaderboard/${roomCode}_${aliceUid}`))
+    expect(entry.data()).toEqual({
+      displayName: 'Alice',
+      finalScore: 50,
+      worstRound: 10,
+      finishedAt: result.finishedAt,
+    })
+    const board = await getDocs(
+      query(collection(stranger.db, 'leaderboard'), orderBy('finalScore'), limit(10)),
+    )
+    expect(board.size).toBeGreaterThan(0)
 
     hostRepo.leave()
     joinerRepo.leave()

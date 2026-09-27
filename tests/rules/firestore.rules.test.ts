@@ -24,6 +24,8 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   setDoc,
   updateDoc,
@@ -1504,6 +1506,75 @@ describe('play again: the host brings everyone along to the next room', () => {
       await assertFails(getDoc(doc(alice, `room/${NEXT_CODE}/players/${HOST_UID}`)))
       await assertFails(getDocs(collection(alice, `room/${NEXT_CODE}/players`)))
     })
+  })
+})
+
+describe('leaderboard: the public highscores', () => {
+  const ENTRY_ID = `${GAME_ID}_${ALICE_UID}`
+
+  function entryFixture(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      displayName: 'Alice',
+      finalScore: 42,
+      worstRound: 20,
+      finishedAt: '2026-01-01T00:00:00.000Z',
+      ...overrides,
+    }
+  }
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture())
+      await setDoc(doc(db(), `game_player/${ENTRY_ID}`), gamePlayerFixture(GAME_ID, ALICE_UID))
+    })
+  })
+
+  function writeEntryAs(uid: string, fields: Record<string, unknown> = entryFixture()) {
+    const db = testEnv.authenticatedContext(uid).firestore()
+    return setDoc(doc(db, `leaderboard/${ENTRY_ID}`), fields)
+  }
+
+  it('lets a player of the game publish an entry that repeats their stats row', async () => {
+    await assertSucceeds(writeEntryAs(ALICE_UID))
+  })
+
+  it('denies an entry that differs from its stats row, so no score can be made up', async () => {
+    await assertFails(writeEntryAs(ALICE_UID, entryFixture({ finalScore: 5 })))
+    await assertFails(writeEntryAs(ALICE_UID, entryFixture({ worstRound: 5 })))
+    await assertFails(writeEntryAs(ALICE_UID, entryFixture({ displayName: 'Mallory' })))
+    await assertFails(
+      writeEntryAs(ALICE_UID, entryFixture({ finishedAt: '2030-01-01T00:00:00.000Z' })),
+    )
+    await assertFails(writeEntryAs(ALICE_UID, { ...entryFixture(), placement: 1 }))
+  })
+
+  it('denies an entry for a stats row that does not exist, or from someone not in the game', async () => {
+    const db = testEnv.authenticatedContext(ALICE_UID).firestore()
+    await assertFails(setDoc(doc(db, `leaderboard/${GAME_ID}_nobody`), entryFixture()))
+    await assertFails(writeEntryAs('mallory-uid'))
+  })
+
+  it('keeps entries as they are: no edits, no deletes', async () => {
+    await seed(async (db) => setDoc(doc(db(), `leaderboard/${ENTRY_ID}`), entryFixture()))
+    const db = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(updateDoc(doc(db, `leaderboard/${ENTRY_ID}`), { finalScore: 0 }))
+    await assertFails(deleteDoc(doc(db, `leaderboard/${ENTRY_ID}`)))
+  })
+
+  it('lets anyone signed in read a top 10, but no bigger or unbounded list', async () => {
+    await seed(async (db) => setDoc(doc(db(), `leaderboard/${ENTRY_ID}`), entryFixture()))
+    const stranger = testEnv.authenticatedContext('stranger-uid').firestore()
+    const board = collection(stranger, 'leaderboard')
+
+    await assertSucceeds(getDocs(query(board, orderBy('finalScore'), limit(10))))
+    await assertFails(getDocs(query(board, orderBy('finalScore'), limit(11))))
+    await assertFails(getDocs(board))
+    await assertFails(
+      getDocs(
+        query(collection(testEnv.unauthenticatedContext().firestore(), 'leaderboard'), limit(10)),
+      ),
+    )
   })
 })
 

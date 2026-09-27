@@ -103,6 +103,29 @@ describe('writeGameResult', () => {
     expect(Math.min(...playerIndices)).toBeGreaterThan(resultIndex)
   })
 
+  it("publishes each player's highscore entry after their stats row, repeating it", async () => {
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    const paths = setDocMock.mock.calls.map((call) => pathOf(call[0]))
+    expect(paths.indexOf('leaderboard/g1_device-a')).toBeGreaterThan(
+      paths.indexOf('game_player/g1_device-a'),
+    )
+    expect(setDocMock).toHaveBeenCalledWith(
+      { db: DB, path: 'leaderboard/g1_device-b' },
+      { displayName: 'Bob', finalScore: 20, worstRound: 8, finishedAt: '2026-01-01T00:00:00.000Z' },
+    )
+  })
+
+  it('still finishes when the highscores refuse an entry', async () => {
+    setDocMock.mockImplementation((ref: unknown) =>
+      pathOf(ref).startsWith('leaderboard/')
+        ? Promise.reject(new Error('permission-denied'))
+        : Promise.resolve(undefined),
+    )
+
+    await expect(writeGameResult(DB, RESULT, PLAYERS)).resolves.toBeUndefined()
+  })
+
   it('writes nothing beyond the game_result doc when there are no players', async () => {
     await writeGameResult(DB, RESULT, [])
 

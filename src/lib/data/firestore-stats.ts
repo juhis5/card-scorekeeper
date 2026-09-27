@@ -1,6 +1,6 @@
 /**
  * Writes the permanent stats records (`game_result` + `game_player`, see docs/PLAN.md "Stats &
- * history") to Firestore. Shared by two call sites that both need exactly this shape:
+ * history") to Firestore, and each row's public highscore entry (`leaderboard`). Shared by two call sites that both need exactly this shape:
  * `FirestoreGameRepository.finishGame` (an online game finishing normally) and the reconnect
  * flush wiring (`pending-results.ts`'s `flushPendingResults`, for a `LocalGameRepository` game
  * finished offline and only now reaching a connection) — see docs/DECISIONS.md's "Reconnect =
@@ -62,6 +62,23 @@ async function ensureGamePlayerWritten(
   })
 }
 
+/** Repeats a stats row on the public highscores; firestore.rules only accepts an exact copy. */
+async function ensureLeaderboardEntryWritten(
+  db: Firestore,
+  result: GameResult,
+  player: GamePlayer,
+): Promise<void> {
+  const ref = doc(db, `leaderboard/${player.gameId}_${player.deviceUuid}`)
+  const existing = await getDoc(ref)
+  if (existing.exists()) return
+  await setDoc(ref, {
+    displayName: player.displayName,
+    finalScore: player.finalScore,
+    worstRound: player.worstRound,
+    finishedAt: result.finishedAt,
+  })
+}
+
 /** Writes one finished game's permanent records: the `game_result` doc, then every player's
  * `game_player` row (in parallel with each other — they don't depend on one another, only on the
  * already-committed `game_result`). Safe to call repeatedly for the same result (see doc
@@ -75,5 +92,12 @@ export async function writeGameResult(
   // these rows), so firestore.rules can show a result only to the people who played it.
   const participantUids = players.map((player) => player.deviceUuid)
   await ensureGameResultWritten(db, result, participantUids)
-  await Promise.all(players.map((player) => ensureGamePlayerWritten(db, player, participantUids)))
+  await Promise.all(
+    players.map(async (player) => {
+      await ensureGamePlayerWritten(db, player, participantUids)
+      // Highscores are an extra: an entry that can't be written (rules without the leaderboard, a
+      // dropped connection) must never keep a game from finishing, so it's left out, not retried.
+      await ensureLeaderboardEntryWritten(db, result, player).catch(() => undefined)
+    }),
+  )
 }

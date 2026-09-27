@@ -298,6 +298,31 @@
       "recordHeader": "W–L–T",
       "recordCompact": "{wins} W – {losses} L – {ties} T",
       "empty": "No shared games yet with other players."
+    },
+    "highscores": {
+      "heading": "Highscores",
+      "lede": "Across every game played with the app.",
+      "loading": "Loading highscores…",
+      "error": "Couldn't load the highscores. Check your connection and try again.",
+      "empty": "No games yet.",
+      "rank": "#",
+      "player": "Player",
+      "points": "Points",
+      "you": "you",
+      "lists": {
+        "bestGames": {
+          "title": "Best game",
+          "description": "Lowest final score"
+        },
+        "worstGames": {
+          "title": "Hall of shame",
+          "description": "Highest final score"
+        },
+        "biggestRounds": {
+          "title": "Biggest round",
+          "description": "Most points in one round"
+        }
+      }
     }
   },
   "invite": {
