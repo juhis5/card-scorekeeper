@@ -62,7 +62,7 @@ Reproduce before declaring it fixed: run it many times, shuffled — `for s in $
 ## Wiring
 
 - `vitest.config.ts`: `environment: 'happy-dom'`, `globals: true`.
-- Scripts: `"test": "vitest"`, `"test:run": "vitest run"`, `"test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'"`, `"test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'"`, `"lint:check": "eslint ."`. Build runs `vue-tsc`.
+- Scripts: `"test": "vitest"`, `"test:run": "vitest run"`, `"test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'"`, `"test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'"`, `"test:e2e:ci"` (the CI variant: production build, Chromium + Firefox), `"lint:check": "eslint ."`. Build runs `vue-tsc`.
 - Co-locate unit tests: `foo.ts` + `foo.test.ts`. Rules tests and E2E in their own folders.
 
 ## This project (card-scorekeeper)

@@ -120,6 +120,8 @@ The report above describes the 2026-07-24 build and is left as written. Since th
   `tests/integration/beacon.setup.ts`. See DECISIONS 2026-09-27.
 - CI uses current node24 Actions pinned by SHA, and gates on `pnpm lint:check` and
   `pnpm format:check` (no auto-fix).
+- The e2e suite runs in CI too (an `e2e` job, Chromium + Firefox, no retries) against a production
+  build. Reproduce it locally with `pnpm test:e2e:ci`.
 - Suite sizes: 319 unit, 74 api, 47 rules, 2 integration, 5 e2e.
 - Item 3 of "What's left": Vercel KV is no longer offered. Use a Redis integration from the Vercel
   Marketplace (for example Upstash) for the shared rate-limit store.

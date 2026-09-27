@@ -33,12 +33,12 @@ export default defineConfig({
   },
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
-  /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  /* No retries anywhere: a retry turns a flaky test green and hides it (see the tdd skill). */
+  retries: 0,
   /* Opt out of parallel tests on CI. */
   workers: process.env.CI ? 1 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
-  reporter: 'html',
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Maximum time each action such as `click()` can take. Defaults to 0 (no limit). */
@@ -51,8 +51,9 @@ export default defineConfig({
      * less common port pair makes that collision vanishingly unlikely. */
     baseURL: process.env.CI ? 'http://localhost:4183' : 'http://localhost:5183',
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Keep a trace for every failed test (there are no retries). CI uploads the HTML report,
+     * traces included, as an artifact. See https://playwright.dev/docs/trace-viewer */
+    trace: 'retain-on-failure',
 
     /* Only on CI systems run the tests headless */
     headless: !!process.env.CI,
@@ -134,7 +135,10 @@ export default defineConfig({
   webServer: {
     /**
      * Use the dev server by default for faster feedback loop.
-     * Use the preview server on CI for more realistic testing.
+     * On CI, build and then serve the production build (service worker included) for more
+     * realistic testing. The build must run inside this command: Vite bakes `VITE_*` values in
+     * at build time, and `env` below is only applied to this command's process, so a build made
+     * earlier in the job would not point at the emulators.
      * Playwright will re-use the local server if there is already a dev-server running.
      *
      * Ports pinned away from Vite's 5173/4173 defaults — see the `baseURL` comment above for why.
@@ -145,9 +149,12 @@ export default defineConfig({
      * back to its own default port (confirmed empirically: it started on 5173 and Playwright's
      * `webServer` then timed out waiting on 5183). Calling `vite` directly sidesteps that.
      */
-    command: process.env.CI ? 'pnpm exec vite preview --port 4183' : 'pnpm exec vite --port 5183',
+    command: process.env.CI
+      ? 'pnpm exec vite build && pnpm exec vite preview --port 4183'
+      : 'pnpm exec vite --port 5183',
     port: process.env.CI ? 4183 : 5183,
     reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000, // room for the CI build before the preview server starts
     // Points the app at the local Firestore/Auth emulators (see firebase.json) instead of live
     // Firebase, and supplies a fake-but-well-formed web config for the same demo project as
     // `.firebaserc` — required for e2e/live-sync.spec.ts's two-client sync test, which needs a

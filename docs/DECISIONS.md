@@ -347,3 +347,9 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   `GITHUB_TOKEN`, `workflow_dispatch`, and non-fixing `lint:check` / `format:check` gates. The v4
   pins declared node20, which GitHub removed from runners on 2026-09-23; CI had not run since
   2026-07-24.
+- 2026-09-27 — e2e added to CI as its own `e2e` job (`pnpm test:e2e:ci`): Chromium + Firefox against
+  the emulators and a production build. Playwright's CI server command now runs `vite build` before
+  `vite preview`, because Vite bakes `VITE_*` values in at build time and the emulator config is only
+  passed to that command. Retries dropped from 2 to 0 so a flake fails the job instead of hiding;
+  traces are kept on failure and the HTML report is uploaded as an artifact. WebKit stays excluded
+  from live sync (the documented flake). Make `e2e` a required check once it has passed a few runs.

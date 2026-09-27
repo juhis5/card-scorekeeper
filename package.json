@@ -22,6 +22,7 @@
     "test:integration": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.integration.config.ts'",
     "e2e": "playwright test",
     "test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'",
+    "test:e2e:ci": "CI=1 firebase emulators:exec --only firestore,auth 'playwright test --project=chromium --project=firefox'",
     "prepare": "husky"
   },
   "dependencies": {
