@@ -65,6 +65,15 @@ describe('probeBackendReachable, online device', () => {
     await expect(resultPromise).resolves.toBe(true)
   })
 
+  it('by default waits out a cold connection of a few seconds, so a slow network still gets an online game', async () => {
+    const checkBackend = () => new Promise<void>((resolve) => setTimeout(resolve, 5000))
+    const resultPromise = probeBackendReachable({ isOnline: () => true, checkBackend })
+
+    await vi.advanceTimersByTimeAsync(5000)
+
+    await expect(resultPromise).resolves.toBe(true)
+  })
+
   it('never throws, even when checkBackend throws synchronously instead of rejecting', async () => {
     const result = await probeBackendReachable({
       isOnline: () => true,

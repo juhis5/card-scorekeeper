@@ -786,3 +786,7 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     CI's `visual` job runs in the same image. The `visual` Playwright project only exists with
     `VISUAL=1`, so ordinary e2e runs skip it. The image tag in ci.yml follows the
     @playwright/test version.
+- 2026-09-28 — The connection check waits up to 8 s, not 3 s. A CI trace showed why: the anonymous
+  sign-in took 0.1 s, but the first Firestore read on a cold connection took 2.7 s, so the host
+  landed in a local game that nobody can join. A slow phone network hits the same. "Checking the
+  connection…" shows meanwhile, and a device known to be offline still skips the wait.

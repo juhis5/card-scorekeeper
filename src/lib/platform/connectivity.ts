@@ -7,7 +7,9 @@
  */
 
 /** How long to wait for `checkBackend` before treating the backend as unreachable. */
-const DEFAULT_TIMEOUT_MS = 3000
+/** A cold Firestore connection alone can take close to 3 s (seen in CI), and giving up too soon puts
+ * a host in a local game nobody can join. A device known to be offline still skips the wait. */
+const DEFAULT_TIMEOUT_MS = 8000
 
 export interface ProbeBackendReachableDeps {
   /** Defaults to `navigator.onLine`. Checked first — a device the OS already reports as offline
