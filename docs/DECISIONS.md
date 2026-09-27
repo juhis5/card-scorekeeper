@@ -581,3 +581,18 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     form still falls back to a local game if a guest write fails after the room was created,
     leaving that room behind; the probe has just passed, so it's unlikely, but the better
     behaviour is to stay in the room and say who couldn't be added.
+- 2026-09-27 — Room code in the header, invite sheet, join links (second playtest):
+  - In an online room the header shows "Huone 7K4RQ" with a copy button and Kutsu, on every
+    device, and the in-page code banner is gone. Kutsu opens a bottom sheet with a QR code of the
+    join link (for people at the same table), the code in large type, Kopioi koodi, and Jaa
+    linkki: the phone's share sheet, or copying the link where there is none. Owner's call over
+    two plain buttons or a sheet only.
+  - The link is `/join/CODE`, built from the current address, so previews and test-rommi link to
+    themselves. That page asks only for a name. A device already seated there goes straight to
+    the room; a finished, expired or missing room says so first (a new `roomAvailability()`
+    read), and when the room can't be read at all, the form shows and a join says why. The
+    not-seated screen and Play again's "Join with another name" point there too.
+  - The QR comes from `uqr` (small, no dependencies), loaded only when the sheet opens, and is
+    drawn as one SVG path from its module grid, dark on white in both themes. Copying uses the
+    Clipboard API with a hidden-textarea fallback (`useCopyText`), not VueUse's useClipboard,
+    which only tries the Clipboard API after a permission query Firefox and Safari lack.

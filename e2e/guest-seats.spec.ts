@@ -6,7 +6,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import {
-  ROOM_CODE_PATTERN,
+  expectOnlineRoom,
   enterOwnRoundScore,
   enterRoundScore,
   hostForm,
@@ -57,7 +57,7 @@ test.describe('players without a phone', () => {
       await hostForm(hostPage).getByLabel('Your name', { exact: true }).fill('Host')
       await hostForm(hostPage).getByLabel('Player 1 name').fill('Mummo')
       await hostForm(hostPage).getByRole('button', { name: 'Start game' }).click()
-      await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      await expectOnlineRoom(hostPage)
       await expect(scoreboardRow(hostPage, 'Mummo')).toContainText('guest')
 
       const roomCode = await readRoomCode(hostPage)

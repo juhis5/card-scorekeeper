@@ -5,6 +5,9 @@
  * `useGameStore().join()`. Online-only — unlike hosting, there is no local fallback to join (see
  * `lib/game-mode.ts`'s `createJoinRepository` doc comment), so an unreachable backend here is a
  * friendly error, not a silent local game.
+ *
+ * With `roomCode` set (the /join/CODE page an invite link opens) the code is fixed: the form asks
+ * only for a name, and the page's own heading names the room.
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -21,6 +24,11 @@ import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
 import { NameTakenError } from '@/lib/player-names'
 import { isPermanentWriteError } from '@/lib/write-errors'
 
+const { roomCode } = defineProps<{
+  /** A room code from an invite link: the field is hidden and this is joined. */
+  roomCode?: string
+}>()
+
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
@@ -36,7 +44,7 @@ const isSubmitting = ref(false)
 const isCheckingConnection = ref(false)
 const submitError = ref('')
 
-const normalizedCode = computed(() => normalizeRoomCode(roomCodeInput.value))
+const normalizedCode = computed(() => normalizeRoomCode(roomCode ?? roomCodeInput.value))
 const trimmedName = computed(() => joinerName.value.trim())
 const isCodeInvalid = computed(
   () => attemptedSubmit.value && !isValidRoomCode(normalizedCode.value),
@@ -101,11 +109,11 @@ async function handleSubmit(): Promise<void> {
 <template>
   <form class="flex flex-col gap-4" novalidate @submit.prevent="handleSubmit">
     <Card>
-      <CardHeader>
+      <CardHeader v-if="!roomCode">
         <CardTitle>{{ t('home.join.heading') }}</CardTitle>
       </CardHeader>
       <CardContent class="flex flex-col gap-4">
-        <div class="flex flex-col gap-1.5">
+        <div v-if="!roomCode" class="flex flex-col gap-1.5">
           <Label for="join-room-code">{{ t('home.join.roomCodeLabel') }}</Label>
           <Input
             id="join-room-code"

@@ -87,6 +87,7 @@ function makeRouter() {
     routes: [
       { path: '/', name: 'home', component: { template: '<div />' } },
       { path: '/room/:code', name: 'room', component: { template: '<div />' } },
+      { path: '/join/:code', name: 'join', component: { template: '<div />' } },
     ],
   })
 }
@@ -245,7 +246,7 @@ describe('PlayAgain, the other players', () => {
       'Someone in the next game already uses your name.',
     )
     expect(screen.getByRole('link', { name: 'Join with another name' }).getAttribute('href')).toBe(
-      `/?code=${NEXT_CODE}`,
+      `/join/${NEXT_CODE}`,
     )
     expect(useGameStore().roomCode).toBe(FINISHED_CODE)
   })

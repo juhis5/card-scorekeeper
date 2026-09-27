@@ -729,13 +729,12 @@ describe('RoomView online mode', () => {
     })
   }
 
-  it('shows the room code prominently for the host', async () => {
+  it('shows no local-game banner in an online room (the header shows its code)', async () => {
     const { hostPinia } = await setUpOnlineRoom()
     setActivePinia(hostPinia)
 
     await renderAs(hostPinia)
 
-    expect(screen.getByText(`Room code: ${ROOM_CODE}`)).toBeTruthy()
     expect(
       screen.queryByText(
         "Playing a local game on this device. Others can't join, and photo count is off.",
@@ -1167,7 +1166,6 @@ describe('RoomView reconnecting indicator (slice 5 offline robustness)', () => {
         "Playing a local game on this device. Others can't join, and photo count is off.",
       ),
     ).toBeNull()
-    expect(screen.getByText(`Room code: ${ROOM_CODE}`)).toBeTruthy()
   })
 
   it('clears the reconnecting status once an online event fires', async () => {

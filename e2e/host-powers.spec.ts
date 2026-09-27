@@ -7,7 +7,7 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import {
-  ROOM_CODE_PATTERN,
+  expectOnlineRoom,
   enterOwnRoundScore,
   enterRoundScore,
   joinHostedGame,
@@ -36,7 +36,7 @@ test.describe('late joiners and host powers', () => {
       const joinerPage = await joinerContext.newPage()
 
       await startHostedGame(hostPage, 'Host')
-      await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      await expectOnlineRoom(hostPage)
       const roomCode = await readRoomCode(hostPage)
       await enterRoundScore(hostPage, 'Host', 1, 20)
       await hostPage.getByRole('button', { name: 'Next round' }).click()
@@ -70,7 +70,7 @@ test.describe('late joiners and host powers', () => {
       const joinerPage = await joinerContext.newPage()
 
       await startHostedGame(hostPage, 'Host')
-      await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      await expectOnlineRoom(hostPage)
       const roomCode = await readRoomCode(hostPage)
       await joinHostedGame(joinerPage, roomCode, 'Alice')
       await expect(scoreboardRow(hostPage, 'Alice')).toBeVisible()

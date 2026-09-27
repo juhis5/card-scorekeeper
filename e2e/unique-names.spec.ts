@@ -8,7 +8,7 @@ import {
   joinForm,
   joinHostedGame,
   readRoomCode,
-  ROOM_CODE_PATTERN,
+  expectOnlineRoom,
   scoreboardRow,
   startHostedGame,
 } from './helpers'
@@ -25,7 +25,7 @@ test.describe('unique names in a room', () => {
       const joinerPage = await joinerContext.newPage()
 
       await startHostedGame(hostPage, 'Juho')
-      await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      await expectOnlineRoom(hostPage)
       const roomCode = await readRoomCode(hostPage)
 
       await joinHostedGame(joinerPage, roomCode, ' juho ')

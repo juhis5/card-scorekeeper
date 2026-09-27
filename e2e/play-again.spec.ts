@@ -6,7 +6,7 @@
  */
 import { expect, test } from '@playwright/test'
 import {
-  ROOM_CODE_PATTERN,
+  expectOnlineRoom,
   enterOwnRoundScore,
   enterRoundScore,
   joinHostedGame,
@@ -29,7 +29,7 @@ test.describe('play again', () => {
       const joinerPage = await joinerContext.newPage()
 
       await startHostedGame(hostPage, 'Host')
-      await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      await expectOnlineRoom(hostPage)
       const finishedCode = await readRoomCode(hostPage)
       await joinHostedGame(joinerPage, finishedCode, 'Alice')
       await expect(scoreboardRow(hostPage, 'Alice')).toBeVisible()

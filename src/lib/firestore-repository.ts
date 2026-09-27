@@ -55,6 +55,7 @@ import type {
   PlayerId,
   ReplayableGameRepository,
   ResumableGameRepository,
+  RoomAvailability,
   Seat,
   SetRoundScoreInput,
   Unsubscribe,
@@ -289,6 +290,15 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     const roomData = room.data() as RoomDocData | undefined
     if (!roomData || !(await this.isSeated(uid))) return null
     return { playerId: uid, isHost: roomData.hostUid === uid }
+  }
+
+  async roomAvailability(): Promise<RoomAvailability> {
+    await ensureSignedIn(this.auth)
+    const room = await getDoc(doc(this.db, `room/${this.requireRoomCode()}`))
+    const data = room.data() as RoomDocData | undefined
+    if (!data) return 'missing'
+    if (data.expiresAt.toMillis() <= this.now()) return 'expired'
+    return data.status === 'finished' ? 'finished' : 'open'
   }
 
   /** The rules only let members read seats, so a non-member reading their own seat is refused:

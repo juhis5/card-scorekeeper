@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import {
-  ROOM_CODE_PATTERN,
+  expectOnlineRoom,
   enterOwnRoundScore,
   enterRoundScore,
   joinHostedGame,
@@ -48,7 +48,7 @@ test.describe('two-client live score sync', () => {
       // code — see RoomView.vue).
       await startHostedGame(hostPage, hostName)
       await expect(hostPage.getByRole('heading', { name: 'Rommi scoreboard' })).toBeVisible()
-      await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      await expectOnlineRoom(hostPage)
       const roomCode = await readRoomCode(hostPage)
 
       // Joiner: join that room by code, on a fully independent browser context (own storage,

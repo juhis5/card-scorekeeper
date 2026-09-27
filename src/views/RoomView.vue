@@ -410,7 +410,7 @@ onMounted(async () => {
     <template v-else-if="resumeState === 'not-seated'">
       <p class="text-muted-foreground">{{ t('room.notSeated.body') }}</p>
       <RouterLink
-        :to="{ name: 'home', query: { code: routeCode } }"
+        :to="{ name: 'join', params: { code: routeCode } }"
         class="text-primary underline underline-offset-4"
       >
         {{ t('room.notSeated.join', { code: routeCode }) }}
@@ -425,16 +425,6 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <p
-        v-if="isOnline"
-        class="bg-muted text-foreground border-border rounded-lg border px-4 py-3 text-sm"
-      >
-        <span class="font-semibold">{{
-          t('room.online.codeLabel', { code: roomCode ?? '' })
-        }}</span>
-        <br />
-        <span class="text-muted-foreground">{{ t('room.online.codeHint') }}</span>
-      </p>
       <p
         v-if="isOnline && isReconnecting"
         role="status"

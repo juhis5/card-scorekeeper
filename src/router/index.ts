@@ -11,7 +11,8 @@ declare module 'vue-router' {
     /** Redirect home when no device identity exists yet — set by useIdentityStore in main.ts. */
     requiresIdentity?: boolean
     /** i18n key for this route's heading, announced via a polite live region on navigation. */
-    announceKey?: 'home.heading' | 'room.heading' | 'stats.heading' | 'notFound.heading'
+    announceKey?:
+      'home.heading' | 'room.heading' | 'join.announce' | 'stats.heading' | 'notFound.heading'
   }
 }
 
@@ -32,6 +33,13 @@ const router = createRouter({
       name: 'room',
       component: () => import('@/views/RoomView.vue'),
       meta: { requiresIdentity: true, announceKey: 'room.heading' },
+    },
+    {
+      // The page an invite link or QR code opens: the code is filled in, only a name is asked.
+      path: '/join/:code',
+      name: 'join',
+      component: () => import('@/views/JoinView.vue'),
+      meta: { requiresIdentity: true, announceKey: 'join.announce' },
     },
     {
       path: '/stats',

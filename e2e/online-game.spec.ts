@@ -6,7 +6,7 @@
  */
 import { expect, test } from '@playwright/test'
 import {
-  ROOM_CODE_PATTERN,
+  expectOnlineRoom,
   joinHostedGame,
   openFromMenu,
   playOnlineRound,
@@ -30,7 +30,7 @@ test.describe('a full online game', () => {
       const joinerPage = await joinerContext.newPage()
 
       await startHostedGame(hostPage, 'Host')
-      await expect(hostPage.getByText(ROOM_CODE_PATTERN)).toBeVisible()
+      await expectOnlineRoom(hostPage)
       // Focus lands on the heading before the room opens, and stays there once it has.
       await expect(hostPage.locator('#main-heading')).toBeFocused()
       const roomCode = await readRoomCode(hostPage)
