@@ -113,6 +113,8 @@ export const useGameStore = defineStore('game', () => {
   const winners = computed(() => winnersFor(rankedPlayers.value))
   /** Set once the host of this finished online game started the next one (Play again). */
   const nextRoomCode = computed(() => state.value.nextRoomCode ?? null)
+  /** This device already has a seat in that next room: the host brought everyone along. */
+  const hasSeatInNextRoom = computed(() => state.value.hasSeatInNextRoom === true)
 
   function requireRepository(): GameRepository {
     if (!repository) {
@@ -140,24 +142,36 @@ export const useGameStore = defineStore('game', () => {
   }
 
   /**
-   * Play again, online: creates the next room on `nextRepo` while the finished game stays on
-   * screen, seats the finished game's guests there (players without a phone can't join by
-   * themselves), points the finished room at it so the other devices are asked to join, then
-   * follows the next room as its host. A failed create changes nothing, so the host can retry.
+   * Play again: starts the next game with the same players while the finished one stays on
+   * screen, then follows it as its host. A failed create changes nothing, so the host can retry.
+   *
+   * Online, the next room is linked from the finished one first, then everyone is seated there
+   * as they were (the rules only let the host seat them in the room the finished one points at),
+   * and each phone moves over once it sees its seat. Locally, `otherNames` are seated again.
    */
   async function playAgain(
     nextRepo: GameRepository,
     config: GameConfig,
-    guestNames: readonly string[] = [],
+    otherNames: readonly string[] = [],
   ): Promise<void> {
     const finished = requireRepository()
-    const created = await nextRepo.createGame(config)
-    for (const name of guestNames) await nextRepo.addGuest({ name })
-    if (created.roomCode && isReplayable(finished)) {
-      // The next game goes ahead even when the link doesn't land: an expired room refuses it,
-      // and the next room's code is on screen to share instead.
-      await finished.linkNextRoom(created.roomCode).catch(() => undefined)
+    const finishedRoomCode = roomCode.value
+    if (finishedRoomCode && isReplayable(finished) && isReplayable(nextRepo)) {
+      const created = await nextRepo.createNextGame(config, finishedRoomCode)
+      if (created.roomCode) {
+        // The next game goes ahead even when the link doesn't land: an expired room refuses it,
+        // and the next room's code is on screen to share instead. Guests still come along.
+        await finished.linkNextRoom(created.roomCode).catch(() => undefined)
+      }
+      // Nor when bringing the others fails: the link is set once, so a retry would point the
+      // others at a room the host isn't in. Their phones still have "Join the next game".
+      await nextRepo.carrySeats().catch(() => undefined)
+      leave()
+      hostCreatedGame(nextRepo, created)
+      return
     }
+    const created = await nextRepo.createGame(config)
+    for (const name of otherNames) await nextRepo.addGuest({ name })
     leave()
     hostCreatedGame(nextRepo, created)
   }
@@ -297,6 +311,7 @@ export const useGameStore = defineStore('game', () => {
     board,
     winners,
     nextRoomCode,
+    hasSeatInNextRoom,
     start,
     playAgain,
     join,

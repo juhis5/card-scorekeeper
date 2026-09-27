@@ -105,10 +105,6 @@ const otherNames = computed(() =>
     .filter(({ player }) => player.id !== myPlayerId.value)
     .map(({ player }) => player.name),
 )
-/** Online Play again seats these in the next room: players without a phone can't join by code. */
-const guestNames = computed(() =>
-  seatedStandings.value.filter(({ player }) => player.isGuest).map(({ player }) => player.name),
-)
 
 /** Players the host can still enter this round's score for: what "Syötä kaikki" goes through. */
 const missingThisRound = computed(() =>
@@ -568,7 +564,7 @@ onMounted(async () => {
         data-bottom-bar
         class="bg-background sticky bottom-0 mt-auto pt-2 pb-2 group-has-[[data-card-open]]/room:static"
       >
-        <PlayAgain :my-name="myName" :other-names="otherNames" :guest-names="guestNames" />
+        <PlayAgain :my-name="myName" :other-names="otherNames" />
       </div>
       <!-- aria-disabled rather than disabled: the tap must still reach the handler, which waits
            for a score saved by that same tap before deciding. -->

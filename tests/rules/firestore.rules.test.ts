@@ -1317,6 +1317,196 @@ describe('play again: a finished room points at the next room', () => {
   })
 })
 
+describe('play again: the host brings everyone along to the next room', () => {
+  const NEXT_CODE = 'FGHJK'
+  const BOB_UID = 'bob-uid'
+
+  /** The finished room with Alice seated, and the host's next room it points at. */
+  async function seedRooms({
+    finished = roomFixture({ status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE }),
+    next = roomFixture({ code: NEXT_CODE, previousRoomCode: ROOM_CODE }),
+  }: { finished?: Record<string, unknown>; next?: Record<string, unknown> } = {}) {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), finished)
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`),
+        playerFixture(ALICE_UID, { name: 'Alice', joinOrder: 7 }),
+      )
+      await setDoc(doc(db(), `room/${NEXT_CODE}`), next)
+      await setDoc(
+        doc(db(), `room/${NEXT_CODE}/players/${HOST_UID}`),
+        playerFixture(HOST_UID, { name: 'Host' }),
+      )
+    })
+  }
+
+  /** Seats a player of the finished room in the next one the way the host's app does: the seat
+   * as it was, and a name record that is the player's own. */
+  function carry(
+    uid: string,
+    {
+      as = HOST_UID,
+      fields = playerFixture(uid, { name: 'Alice', joinOrder: 7 }) as Record<string, unknown>,
+      record = { ownerUid: uid } as Record<string, unknown>,
+    } = {},
+  ) {
+    const db = testEnv.authenticatedContext(as).firestore()
+    const batch = writeBatch(db as unknown as Firestore)
+    batch.set(doc(db, `room/${NEXT_CODE}/players/${uid}`), fields)
+    batch.set(doc(db, `room/${NEXT_CODE}/names/${rulesNameKey(String(fields.name))}`), record)
+    return batch.commit()
+  }
+
+  it('lets the host seat a player of the finished room, who is then a member there', async () => {
+    await seedRooms()
+
+    await assertSucceeds(carry(ALICE_UID))
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+    await assertSucceeds(getDocs(collection(alice, `room/${NEXT_CODE}/players`)))
+  })
+
+  it('denies anyone but the host seating someone else', async () => {
+    await seedRooms()
+    await seed(async (db) => {
+      await setDoc(
+        doc(db(), `room/${NEXT_CODE}/players/${BOB_UID}`),
+        playerFixture(BOB_UID, { name: 'Bob' }),
+      )
+    })
+
+    await assertFails(carry(ALICE_UID, { as: BOB_UID }))
+  })
+
+  it('denies someone who was not in the finished room', async () => {
+    await seedRooms()
+
+    await assertFails(carry(BOB_UID, { fields: playerFixture(BOB_UID, { name: 'Bob' }) }))
+  })
+
+  it('denies changing the seat on the way: the name, the device or the owner', async () => {
+    await seedRooms()
+
+    await assertFails(
+      carry(ALICE_UID, { fields: playerFixture(ALICE_UID, { name: 'Alicia', joinOrder: 7 }) }),
+    )
+    await assertFails(
+      carry(ALICE_UID, {
+        fields: playerFixture(ALICE_UID, { name: 'Alice', joinOrder: 7, deviceUuid: 'other' }),
+      }),
+    )
+    await assertFails(
+      carry(ALICE_UID, {
+        fields: playerFixture(HOST_UID, { name: 'Alice', joinOrder: 7 }),
+        record: { ownerUid: HOST_UID },
+      }),
+    )
+    await assertFails(
+      carry(ALICE_UID, {
+        fields: playerFixture(ALICE_UID, { name: 'Alice', joinOrder: 7, totalScore: 40 }),
+      }),
+    )
+  })
+
+  it("denies a name record that is not the player's own", async () => {
+    await seedRooms()
+
+    await assertFails(carry(ALICE_UID, { record: { ownerUid: HOST_UID } }))
+    await assertFails(carry(ALICE_UID, { record: { ownerUid: ALICE_UID, playerId: ALICE_UID } }))
+  })
+
+  it('denies it unless the finished room points at this room, so a player goes along only once', async () => {
+    await seedRooms({ finished: roomFixture({ status: 'finished', currentRound: 5 }) })
+    await assertFails(carry(ALICE_UID))
+
+    await testEnv.clearFirestore()
+    await seedRooms({
+      finished: roomFixture({ status: 'finished', currentRound: 5, nextRoomCode: 'LMNPQ' }),
+    })
+    await assertFails(carry(ALICE_UID))
+  })
+
+  it('denies it once the next game is under way', async () => {
+    await seedRooms({
+      next: roomFixture({ code: NEXT_CODE, previousRoomCode: ROOM_CODE, status: 'playing' }),
+    })
+
+    await assertFails(carry(ALICE_UID))
+  })
+
+  it('denies it into a room that names no room before it', async () => {
+    await seedRooms({ next: roomFixture({ code: NEXT_CODE }) })
+
+    await assertFails(carry(ALICE_UID))
+  })
+
+  describe('the room before, named when the next room is created', () => {
+    async function seedFinished(fields: Record<string, unknown> = {}) {
+      await seed(async (db) => {
+        await setDoc(
+          doc(db(), `room/${ROOM_CODE}`),
+          roomFixture({ status: 'finished', currentRound: 5, ...fields }),
+        )
+      })
+    }
+
+    function createNext(previousRoomCode: unknown, as = HOST_UID) {
+      const db = testEnv.authenticatedContext(as).firestore()
+      return setDoc(
+        doc(db, `room/${NEXT_CODE}`),
+        roomFixture({ code: NEXT_CODE, hostUid: as, previousRoomCode }),
+      )
+    }
+
+    it('lets the host name the finished room they hosted', async () => {
+      await seedFinished()
+
+      await assertSucceeds(createNext(ROOM_CODE))
+    })
+
+    it("denies naming someone else's room, one still being played, or none at all", async () => {
+      await seedFinished()
+      await assertFails(createNext(ROOM_CODE, ALICE_UID))
+      await assertFails(createNext('LMNPQ'))
+      await assertFails(createNext(NEXT_CODE))
+      await assertFails(createNext('abcde'))
+
+      await testEnv.clearFirestore()
+      await seedFinished({ status: 'playing' })
+      await assertFails(createNext(ROOM_CODE))
+    })
+
+    it('denies changing it afterwards', async () => {
+      await seedFinished()
+      await seed(async (db) => {
+        await setDoc(
+          doc(db(), `room/${NEXT_CODE}`),
+          roomFixture({ code: NEXT_CODE, previousRoomCode: ROOM_CODE }),
+        )
+      })
+      const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+      await assertFails(updateDoc(doc(host, `room/${NEXT_CODE}`), { previousRoomCode: 'LMNPQ' }))
+    })
+  })
+
+  describe('a player watching for their seat before they have one', () => {
+    it('lets a player read their own seat, even before they are in the room', async () => {
+      await seedRooms()
+      const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+      await assertSucceeds(getDoc(doc(alice, `room/${NEXT_CODE}/players/${ALICE_UID}`)))
+    })
+
+    it("still denies them anyone else's seat", async () => {
+      await seedRooms()
+      const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+      await assertFails(getDoc(doc(alice, `room/${NEXT_CODE}/players/${HOST_UID}`)))
+      await assertFails(getDocs(collection(alice, `room/${NEXT_CODE}/players`)))
+    })
+  })
+})
+
 describe('roundScores tied to the room', () => {
   beforeEach(async () => {
     await seed(async (db) => {

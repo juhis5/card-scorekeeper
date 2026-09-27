@@ -661,3 +661,22 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     same Add player card fills the table.
   - Play again on this device starts the next game at once with the same players, in the same
     order, instead of going back to a prefilled Home form.
+- 2026-09-28 — Online Play again takes everyone along (third playtest: "no need to wait for the
+  input from the other users"):
+  - The host's Play again creates the next room naming the finished one (`previousRoomCode`),
+    links the finished room to it, then seats everyone from the finished room there as they were:
+    same seat ids, names and order, guests included (a guest keeps its id, so its stats stay
+    together). Each seat is its own write, so one that can't be taken doesn't stop the rest.
+  - Every other phone in the finished room watches for its own seat in the next room (a player
+    may now read their own seat before they have one) and moves there as soon as it appears. "Join
+    the next game" stays for when no seat comes, e.g. the host's phone lost the connection.
+  - Rules: the host may create a seat for another player's uid only in the one room the finished
+    room points at (its `nextRoomCode` is set once), before that game starts, with the same name
+    and device as in the finished room, and a name record that is the player's own. Linking first
+    is what stops a host from seating a former player in any number of rooms, which would let the
+    host write stats rows for games that player never saw. What remains: a host who played with
+    someone can take them along into each next game, one after another. The player sees each of
+    those games on their phone, so we accept that between people at the same table.
+  - The rules change is additive: an older app keeps working against the new rules, and its
+    players' "Join the next game" finds the seat already there. The new app needs the new rules,
+    so they go to production before the release.

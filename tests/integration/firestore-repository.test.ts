@@ -266,4 +266,62 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     hostRepo.leave()
     aliceRepo.leave()
   })
+
+  // Play again brings everyone along only if the order (create, link, carry) meets the real
+  // rules' checks on the finished room, which no mocked test can show.
+  it('brings everyone from the finished room into the next one, and the joiner sees its seat there', async () => {
+    const host = makeDevice()
+    const hostRepo = new FirestoreGameRepository({ db: host.db, auth: host.auth })
+    const created = await hostRepo.createGame({
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Juho',
+    })
+    const roomCode = created.roomCode
+    if (!roomCode) throw new Error('expected an online room code')
+    const alice = makeDevice()
+    const aliceRepo = new FirestoreGameRepository({ db: alice.db, auth: alice.auth, roomCode })
+    const aliceUid = await aliceRepo.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    const guestId = await hostRepo.addGuest({ name: 'Mummo' })
+    const rounds: ContractRoundNumber[] = [1, 2, 3, 4, 5]
+    for (const round of rounds) {
+      await hostRepo.setRoundScore({ playerId: created.hostPlayerId, round, points: 50 })
+      await hostRepo.setRoundScore({ playerId: aliceUid, round, points: 10 })
+      await hostRepo.setRoundScore({ playerId: guestId, round, points: 20 })
+      if (round < 5) await hostRepo.advanceRound()
+    }
+    await hostRepo.finishGame()
+    const aliceSeesHerSeat = waitForState(aliceRepo, (state) => state.hasSeatInNextRoom === true)
+
+    const nextRepo = new FirestoreGameRepository({ db: host.db, auth: host.auth })
+    const next = await nextRepo.createNextGame(
+      { hostDeviceUuid: 'device-host', hostDisplayName: 'Juho' },
+      roomCode,
+    )
+    const nextCode = next.roomCode
+    if (!nextCode) throw new Error('expected an online room code')
+    await hostRepo.linkNextRoom(nextCode)
+    await nextRepo.carrySeats()
+
+    const seen = await aliceSeesHerSeat
+    expect(seen.nextRoomCode).toBe(nextCode)
+    const aliceNextRepo = new FirestoreGameRepository({
+      db: alice.db,
+      auth: alice.auth,
+      roomCode: nextCode,
+    })
+    await expect(aliceNextRepo.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })).resolves.toBe(
+      aliceUid,
+    )
+    const nextState = await waitForState(aliceNextRepo, (state) => state.players.length === 3)
+    expect(nextState.players).toEqual([
+      { id: next.hostPlayerId, name: 'Juho', totalScore: 0 },
+      { id: aliceUid, name: 'Alice', totalScore: 0 },
+      { id: guestId, name: 'Mummo', totalScore: 0, isGuest: true },
+    ])
+
+    hostRepo.leave()
+    aliceRepo.leave()
+    nextRepo.leave()
+    aliceNextRepo.leave()
+  })
 })
