@@ -1,4 +1,17 @@
 {
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "card-scorekeeper.vercel.app"
+        }
+      ],
+      "destination": "https://rommi.vercel.app/:path",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/).*)",
