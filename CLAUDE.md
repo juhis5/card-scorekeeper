@@ -4,7 +4,7 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 
 ## Stack
 
-- Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.
+- Vite + Vue 3.5+ + TypeScript (strict) + Pinia 4 (setup stores). Composition API only.
 - UI: **Tailwind v4 + shadcn-vue** (Reka UI) — copy-in accessible components you own.
 - Routing: **Vue Router**. i18n: **vue-i18n** (fi/en, device-default — no hardcoded strings).
 - Runtime: **Node 24** (current LTS; pinned in `.nvmrc`, matches local + CI). Not 22.
@@ -26,7 +26,7 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 
 ## Skills (in `.claude/skills/`)
 
-- `vue-pinia` — Vue 3.5 / Pinia 3 conventions, lightweight architecture (GameRepository seam), mobile-first.
+- `vue-pinia` — Vue 3.5 / Pinia 4 conventions, lightweight architecture (GameRepository seam), mobile-first.
 - `clean-code` — naming, function size, typing, Prettier/ESLint. Read before writing any code.
 - `tdd` — pragmatic test-first (rules/stats strict, components behavior, rules on emulator, a few E2E).
 - `design-system` — Tailwind v4 + shadcn theme tokens, dark-first theming + light, styling conventions. The visual layer.
@@ -45,5 +45,6 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 ## Commands
 
 - `pnpm dev` — local dev server. `pnpm build` — typecheck (`vue-tsc`) + build. `pnpm preview` — serve build.
+- `pnpm lint:check` / `pnpm format:check` — the non-fixing checks CI runs. `pnpm lint` / `pnpm format` rewrite files.
 - `vercel dev` — run the app + `/api` photo-count function together locally.
 - Firebase emulator suite for testing Firestore rules before deploy.

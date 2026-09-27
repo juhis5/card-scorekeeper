@@ -57,12 +57,12 @@ Common FE causes → the real fix:
 - **Leaked subscriptions/timers/listeners** across tests: unmount components, unsubscribe `onSnapshot` (`onScopeDispose`), clear timers.
 - **Animations/transitions** racing assertions: disable in tests or await completion.
 
-Reproduce before declaring it fixed: run it many times, shuffled — `vitest run <file> --repeat=20 --sequence.shuffle`. Green 20/20 shuffled = fixed. If you genuinely can't fix it now it's a **blocker**, not a merge-through: quarantine only with a tracked issue + owner + deadline, never a silent `.skip`. Default: fix it now.
+Reproduce before declaring it fixed: run it many times, shuffled — `for s in $(seq 1 20); do pnpm exec vitest run <file> --sequence.shuffle --sequence.seed=$s || break; done` (Vitest 4 has no repeat flag). Green 20/20 shuffled = fixed. For an emulator suite, loop the `pnpm test:*` script and count exit codes: a run can print "Tests passed" and still exit 1 on an unhandled error. If you genuinely can't fix it now it's a **blocker**, not a merge-through: quarantine only with a tracked issue + owner + deadline, never a silent `.skip`. Default: fix it now.
 
 ## Wiring
 
 - `vitest.config.ts`: `environment: 'happy-dom'`, `globals: true`.
-- Scripts: `"test": "vitest"`, `"test:run": "vitest run"`, `"test:rules": "firebase emulators:exec 'vitest run rules'"`, `"e2e": "playwright test"`. Build runs `vue-tsc`.
+- Scripts: `"test": "vitest"`, `"test:run": "vitest run"`, `"test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'"`, `"test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'"`, `"lint:check": "eslint ."`. Build runs `vue-tsc`.
 - Co-locate unit tests: `foo.ts` + `foo.test.ts`. Rules tests and E2E in their own folders.
 
 ## This project (card-scorekeeper)

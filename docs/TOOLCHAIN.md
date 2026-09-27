@@ -35,8 +35,11 @@ resolved versions, giving reproducible installs without hand-pinning:
 
 ## CI
 
-- GitHub Actions with `actions/checkout@v4`, `pnpm/action-setup@v4`, `actions/setup-node@v4`.
-  Action **majors** are pinned (standard practice). Node comes from `.nvmrc`.
+- GitHub Actions: `actions/checkout`, `pnpm/action-setup`, `actions/setup-node` (and
+  `actions/setup-java` for the rules job), **pinned by commit SHA** with the release tag in a
+  comment. Node comes from `.nvmrc`.
+- Revisit the pins when you touch CI, and at least whenever GitHub announces a runner Node
+  deprecation: the v4 pins declared node20, which GitHub removed from runners on 2026-09-23.
 - The Firestore-rules job needs **Java + firebase-tools** for the emulator (add when rules
   land — see git-workflow / firestore-realtime).
 

@@ -5,7 +5,7 @@ description: Vue Router conventions — route definitions, lazy-loading/code-spl
 
 # Routing — Vue Router, thin and lazy
 
-Stack: **Vue Router 4**, `createWebHistory` (SPA — pairs with the Vercel SPA rewrite in `vercel-deploy`). Routes in `src/router/index.ts`.
+Stack: **Vue Router 5**, `createWebHistory` (SPA — pairs with the Vercel SPA rewrite in `vercel-deploy`). Routes in `src/router/index.ts`.
 
 ## Conventions
 
@@ -37,4 +37,4 @@ SPA route changes are silent to screen readers. On navigation, move focus to the
 
 ## This project (card-scorekeeper)
 
-Routes: `/` (home — host or join), `/room/:code` (live game), `/stats` (persistent stats), `not-found`. Guard `/room/:code` for a valid/active room (else redirect home) and an existing device identity. **Routing must work offline** — the SPA shell is cached (`pwa`), so client routes resolve with no network; an offline local game still lives under a room route (e.g. a `local` code). Don't put backend calls in guards — offline navigation must not block on the network.
+Routes: `/` (home — host or join), `/room/:code` (live game), `/stats` (persistent stats), `not-found`. The only guard is the identity check: routes with `meta.requiresIdentity` redirect home when there's no device identity. An unknown or finished room is handled inside `RoomView` (its empty state), not in a guard. **Routing must work offline** — the SPA shell is cached (`pwa`), so client routes resolve with no network; an offline local game still lives under a room route (e.g. a `local` code). Don't put backend calls in guards — offline navigation must not block on the network.

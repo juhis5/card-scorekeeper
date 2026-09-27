@@ -1,11 +1,11 @@
 ---
 name: vue-pinia
-description: Conventions for writing Vue 3 + TypeScript + Pinia code in this project. Read before creating or editing any .vue component, Pinia store, composable, or Vite config. Encodes the latest (Vue 3.5+, Pinia 3) best practices plus the mobile-first rules this app requires.
+description: Conventions for writing Vue 3 + TypeScript + Pinia code in this project. Read before creating or editing any .vue component, Pinia store, composable, or Vite config. Encodes the latest (Vue 3.5+, Pinia 4) best practices plus the mobile-first rules this app requires.
 ---
 
 # Vue 3 + TypeScript + Pinia conventions
 
-Stack: **Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 + pnpm**. Composition API only — never Options API.
+Stack: **Vite + Vue 3.5+ + TypeScript (strict) + Pinia 4 + pnpm**. Composition API only — never Options API.
 
 ## Components
 
@@ -60,7 +60,7 @@ export const useRoomStore = defineStore('room', () => {
 ```
 
 - Return `ref`s/`computed`s directly. Destructure in components with `storeToRefs`; call actions off the store.
-- Persist only the device identity (UUID + display name) with `pinia-plugin-persistedstate`. Never persist room/game data locally — Firestore is the source of truth.
+- Persist only the device identity (UUID + display name) with `pinia-plugin-persistedstate`. Never persist **online** room/game data locally — Firestore is the source of truth for online games. The offline exceptions are deliberate: `LocalGameRepository` keeps the local game in localStorage and `lib/pending-results.ts` queues finished local games for upload (see `firestore-realtime`).
 
 ## Composables
 
