@@ -1,9 +1,14 @@
 /**
  * Fixed Rommi (Finnish Rummy) rules — card values, the 5-round contract progression, and
  * winner determination. Pure, deterministic, no I/O. See docs/PLAN.md "confirmed rules".
+ *
+ * The game is played with 2 (sometimes 3) decks shuffled together, so a hand can hold the same
+ * card more than once. Nothing here assumes one copy per card — a hand is scored per physical card.
  */
 import type { Card, Contract, Player, RoundScore, Standing } from './types'
 
+export const LOW_NUMBER_CARD_VALUE = 5
+export const TEN_VALUE = 10
 export const FACE_CARD_VALUE = 10
 export const ACE_VALUE = 15
 export const JOKER_VALUE = 25
@@ -13,7 +18,8 @@ export function cardValue(card: Card): number {
   if (card.rank === 'Joker') return JOKER_VALUE
   if (card.rank === 'A') return ACE_VALUE
   if (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K') return FACE_CARD_VALUE
-  return Number(card.rank)
+  if (card.rank === '10') return TEN_VALUE
+  return LOW_NUMBER_CARD_VALUE
 }
 
 /** Sums the leftover-card points for a hand at the end of a round. */
@@ -82,4 +88,12 @@ export function winners(players: Player[]): Standing[] {
   const [leader] = ranked
   if (!leader) return []
   return ranked.filter((standing) => standing.placement === leader.placement)
+}
+
+/** Every card value is a multiple of this, so any valid leftover-card total must also be one. */
+export const ROUND_SCORE_STEP = 5
+
+/** A leftover-card total: a non-negative whole number that is a multiple of `ROUND_SCORE_STEP`. */
+export function isValidRoundScore(points: number): boolean {
+  return Number.isInteger(points) && points >= 0 && points % ROUND_SCORE_STEP === 0
 }

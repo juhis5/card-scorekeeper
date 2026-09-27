@@ -58,15 +58,16 @@ async function joinHostedGame(page: Page, roomCode: string, joinerName: string):
   await joinForm(page).getByRole('button', { name: 'Join game' }).click()
 }
 
-/** Fills and commits a player's own round-score input. RoundScoreInput (src/components/
- * RoundScoreInput.vue) commits on blur or Enter — trigger blur explicitly rather than pressing
- * Enter, which would also submit the ancestor <form>. */
+/** Expands the player's ScoreCard (collapsed by default), then fills and commits their round-score
+ * input. RoundScoreInput (src/components/RoundScoreInput.vue) commits on blur or Enter — trigger
+ * blur explicitly rather than pressing Enter, which would also submit the ancestor <form>. */
 async function enterRoundScore(
   page: Page,
   playerName: string,
   round: number,
   points: number,
 ): Promise<void> {
+  await page.getByRole('button', { name: `Enter ${playerName}'s score` }).click()
   const input = page.getByLabel(`${playerName}'s round ${round} score`)
   await input.fill(String(points))
   await input.blur()
@@ -113,8 +114,8 @@ test.describe('two-client live score sync', () => {
       await expect(scoreboardRow(hostPage, joinerName)).toBeVisible()
 
       // 2. The joiner enters their own round-1 score; it appears on the HOST's scoreboard live.
-      await enterRoundScore(joinerPage, joinerName, 1, 12)
-      await expect(scoreboardRow(hostPage, joinerName)).toContainText('12')
+      await enterRoundScore(joinerPage, joinerName, 1, 15)
+      await expect(scoreboardRow(hostPage, joinerName)).toContainText('15')
 
       // 3. The host enters their own round-1 score; it appears on the JOINER's scoreboard live.
       await enterRoundScore(hostPage, hostName, 1, 20)

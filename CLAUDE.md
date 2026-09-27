@@ -4,7 +4,7 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 
 ## Stack
 
-- Vite + Vue 3.5+ + TypeScript (strict) + Pinia 3 (setup stores). Composition API only.
+- Vite + Vue 3.5+ + TypeScript (strict) + Pinia 4 (setup stores). Composition API only.
 - UI: **Tailwind v4 + shadcn-vue** (Reka UI) — copy-in accessible components you own.
 - Routing: **Vue Router**. i18n: **vue-i18n** (fi/en, device-default — no hardcoded strings).
 - Runtime: **Node 24** (current LTS; pinned in `.nvmrc`, matches local + CI). Not 22.
@@ -19,14 +19,14 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 - **Target platforms.** Must work on **Android (Chrome), iOS (Safari), and desktop browsers** (Chromium/Firefox/Safari). Responsive ~360px→desktop (cap + center, no overflow on wide screens); camera (photo-count) falls back to a file picker on desktop; usable by touch **and** mouse/keyboard. Test on the three.
 - **Firestore rules are the security boundary**, not the UI. Any player edits their own score; the host edits anyone's — enforced in `firestore.rules`.
 - **Firebase web config is public** (`VITE_FIREBASE_*`) — fine. The **Gemini key is not** — it lives only in the serverless function env.
-- **Fixed rules live in code**, not the DB: the 5 contracts and card values (number=face, J/Q/K=10, Ace=15, Joker=25) go in `src/lib/rules.ts`. Low score wins.
+- **Fixed rules live in code**, not the DB: the 5 contracts and card values (2–9=5, 10=10, J/Q/K=10, Ace=15, Joker=25; played with 2–3 decks, so duplicate cards are normal) go in `src/lib/rules.ts`. Low score wins.
 - **Lightweight layering, small components.** Pure domain in `lib/` (no Vue/network), I/O behind a `GameRepository` interface, Pinia orchestrates, small dumb components. Not formal Clean Architecture — keep the ceremony out. See `vue-pinia` + `clean-code`.
 - Photo card-count is a **suggestion** — always confirm/edit before it commits; manual entry is the never-fails path.
 - **Offline-capable host.** The host can run a full game on one device with no backend — a `LocalGameRepository` + the pure `rules.ts`. Firestore/Gemini are enhancements, not hard dependencies. Stores depend on a `GameRepository` interface so local vs online is a swap. Reconnect pushes only the final result. See `firestore-realtime`.
 
 ## Skills (in `.claude/skills/`)
 
-- `vue-pinia` — Vue 3.5 / Pinia 3 conventions, lightweight architecture (GameRepository seam), mobile-first.
+- `vue-pinia` — Vue 3.5 / Pinia 4 conventions, lightweight architecture (GameRepository seam), mobile-first.
 - `clean-code` — naming, function size, typing, Prettier/ESLint. Read before writing any code.
 - `tdd` — pragmatic test-first (rules/stats strict, components behavior, rules on emulator, a few E2E).
 - `design-system` — Tailwind v4 + shadcn theme tokens, dark-first theming + light, styling conventions. The visual layer.
@@ -45,5 +45,6 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 ## Commands
 
 - `pnpm dev` — local dev server. `pnpm build` — typecheck (`vue-tsc`) + build. `pnpm preview` — serve build.
+- `pnpm lint:check` / `pnpm format:check` — the non-fixing checks CI runs. `pnpm lint` / `pnpm format` rewrite files.
 - `vercel dev` — run the app + `/api` photo-count function together locally.
 - Firebase emulator suite for testing Firestore rules before deploy.

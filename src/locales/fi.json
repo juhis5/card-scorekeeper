@@ -80,7 +80,10 @@
       "sectionHeading": "Kierroksen {round} pisteet",
       "inputLabel": "{name}: kierroksen {round} pisteet",
       "scoredLabel": "Syötetty",
-      "invalidError": "Anna kokonaisluku, joka on 0 tai suurempi."
+      "invalidError": "Anna viiden kerrannainen (0, 5, 10, 15…).",
+      "cardLabel": "Syötä pisteet: {name}",
+      "cardLabelScored": "Muokkaa pisteitä: {name} (syötetty)",
+      "cancel": "Peruuta"
     },
     "photoCount": {
       "trigger": "Kuvaa kortit",

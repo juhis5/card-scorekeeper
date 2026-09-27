@@ -3,9 +3,13 @@ import {
   ACE_VALUE,
   FACE_CARD_VALUE,
   JOKER_VALUE,
+  LOW_NUMBER_CARD_VALUE,
+  ROUND_SCORE_STEP,
+  TEN_VALUE,
   TOTAL_ROUNDS,
   cardValue,
   contractForRound,
+  isValidRoundScore,
   placements,
   roundTotal,
   runningTotal,
@@ -19,12 +23,61 @@ function makePlayer(id: string, totalScore: number): Player {
   return { id, name: id, totalScore }
 }
 
-describe('cardValue', () => {
-  it('values number cards at their face value from 2 through 10', () => {
-    const numberRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7', '8', '9', '10']
+describe('isValidRoundScore', () => {
+  it('accepts a non-negative integer divisible by 5', () => {
+    expect(isValidRoundScore(0)).toBe(true)
+    expect(isValidRoundScore(5)).toBe(true)
+    expect(isValidRoundScore(55)).toBe(true)
+  })
 
-    numberRanks.forEach((rank) => {
-      expect(cardValue({ rank, suit: 'clubs' } as Card)).toBe(Number(rank))
+  it('rejects a non-integer', () => {
+    expect(isValidRoundScore(5.5)).toBe(false)
+  })
+
+  it('rejects a negative number', () => {
+    expect(isValidRoundScore(-5)).toBe(false)
+  })
+
+  it('rejects a number not divisible by 5', () => {
+    expect(isValidRoundScore(3)).toBe(false)
+    expect(isValidRoundScore(12)).toBe(false)
+    expect(isValidRoundScore(101)).toBe(false)
+  })
+})
+
+describe('cardValue', () => {
+  it('values number cards 2–9 at 5 points, and 10 at 10 points', () => {
+    const lowRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7', '8', '9']
+
+    lowRanks.forEach((rank) => {
+      expect(cardValue({ rank, suit: 'clubs' } as Card)).toBe(LOW_NUMBER_CARD_VALUE)
+    })
+    expect(cardValue({ rank: '10', suit: 'clubs' })).toBe(TEN_VALUE)
+  })
+
+  it('makes every card value a multiple of ROUND_SCORE_STEP, so every hand total is valid', () => {
+    const allRanks: Exclude<Card['rank'], 'Joker'>[] = [
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+      'J',
+      'Q',
+      'K',
+      'A',
+    ]
+    const allCards: Card[] = [
+      ...allRanks.map((rank): Card => ({ rank, suit: 'hearts' })),
+      { rank: 'Joker', suit: null },
+    ]
+
+    allCards.forEach((card) => {
+      expect(cardValue(card) % ROUND_SCORE_STEP).toBe(0)
     })
   })
 
@@ -44,7 +97,7 @@ describe('cardValue', () => {
 })
 
 describe('roundTotal', () => {
-  it('sums the PLAN example hand (4♦, K♠, A♥, Joker) to 54 points', () => {
+  it('sums the example hand (4♦, K♠, A♥, Joker) to 55 points', () => {
     const hand: Card[] = [
       { rank: '4', suit: 'diamonds' },
       { rank: 'K', suit: 'spades' },
@@ -52,7 +105,18 @@ describe('roundTotal', () => {
       { rank: 'Joker', suit: null },
     ]
 
-    expect(roundTotal(hand)).toBe(54)
+    expect(roundTotal(hand)).toBe(55)
+  })
+
+  it('counts every copy of a repeated card — the game is played with 2–3 decks', () => {
+    const hand: Card[] = [
+      { rank: '7', suit: 'hearts' },
+      { rank: '7', suit: 'hearts' },
+      { rank: 'Joker', suit: null },
+      { rank: 'Joker', suit: null },
+    ]
+
+    expect(roundTotal(hand)).toBe(60)
   })
 })
 

@@ -14,7 +14,8 @@ export default mergeConfig(
       // `pnpm test:run` never depends on the emulator being up (see the tdd skill). 'api/**' (the
       // photo-count function) needs a real Node environment too — see vitest.api.config.ts
       // (`pnpm test:api`) — kept separate so this app suite's count/environment never shifts.
-      exclude: [...configDefaults.exclude, 'e2e/**', 'tests/**', 'api/**'],
+      // '.claude/**' holds agent worktrees: full repo copies whose tests must not be collected.
+      exclude: [...configDefaults.exclude, 'e2e/**', 'tests/**', 'api/**', '.claude/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
     },
   }),

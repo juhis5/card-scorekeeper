@@ -144,12 +144,14 @@ function renderRoom() {
 }
 
 async function enterScore(name: string, round: number, points: number): Promise<void> {
+  // ScoreCard starts collapsed — click the card header to expand it
+  const cardButton = screen.getByRole('button', { name: new RegExp(`${name}`, 'i') })
+  if (!screen.queryByLabelText(`${name}'s round ${round} score`)) {
+    await fireEvent.click(cardButton)
+  }
   const input = screen.getByLabelText(`${name}'s round ${round} score`)
   await fireEvent.update(input, String(points))
   await fireEvent.blur(input)
-  // The commit handler awaits an async store call before marking the player "scored" — let
-  // that microtask settle before the next interaction reads button-disabled state (see the
-  // tdd skill's "racing async/DOM" flakiness guidance).
   await flushPromises()
 }
 
@@ -176,11 +178,11 @@ describe('RoomView score entry', () => {
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
     await renderRoom()
-    await enterScore('Alice', 1, 12)
+    await enterScore('Alice', 1, 10)
 
     const rows = screen.getAllByRole('row').slice(1) // drop the header row
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
-    expect(aliceRow?.textContent).toContain('12')
+    expect(aliceRow?.textContent).toContain('10')
   })
 })
 
@@ -193,7 +195,7 @@ describe('RoomView invalid score entry', () => {
     await renderRoom()
     await enterScore('Alice', 1, -5)
 
-    expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('0')
@@ -206,9 +208,9 @@ describe('RoomView invalid score entry', () => {
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
     await renderRoom()
-    await enterScore('Alice', 1, 12.5)
+    await enterScore('Alice', 1, 5.5)
 
-    expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('0')
@@ -222,14 +224,14 @@ describe('RoomView invalid score entry', () => {
 
     await renderRoom()
     await enterScore('Alice', 1, -5)
-    expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
 
-    await enterScore('Alice', 1, 12)
+    await enterScore('Alice', 1, 10)
 
-    expect(screen.queryByText('Enter a whole number of 0 or more.')).toBeNull()
+    expect(screen.queryByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeNull()
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
-    expect(aliceRow?.textContent).toContain('12')
+    expect(aliceRow?.textContent).toContain('10')
   })
 })
 
@@ -276,11 +278,11 @@ describe('RoomView resume after reload (slice 5 offline robustness)', () => {
 
     await renderRoom()
     await flushPromises()
-    await enterScore('Alice', 1, 9)
+    await enterScore('Alice', 1, 10)
 
     const rows = screen.getAllByRole('row').slice(1)
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
-    expect(aliceRow?.textContent).toContain('9')
+    expect(aliceRow?.textContent).toContain('10')
   })
 
   it('still shows the empty state when nothing is persisted', async () => {
@@ -310,24 +312,27 @@ describe('RoomView resume after reload (slice 5 offline robustness)', () => {
 })
 
 describe('RoomView score entry order', () => {
-  it('keeps entry rows in a stable seat order even as the scoreboard reorders', async () => {
+  it('keeps entry cards in a stable seat order even as the scoreboard reorders', async () => {
     const game = useGameStore()
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
     await renderRoom()
-    const seatOrder = screen
-      .getAllByLabelText(/'s round 1 score$/)
-      .map((input) => input.getAttribute('id'))
+    const getCardNames = () =>
+      screen.getAllByRole('button', { name: /^(enter|edit) .+'s score/i }).map((button) => {
+        const label = button.getAttribute('aria-label') ?? ''
+        // Extract player name from "Enter <name>'s score" or "Edit <name>'s score (scored)"
+        const match = label.match(/(?:Enter|Edit) (.+?)'s score/)
+        return match?.[1] ?? label
+      })
+    const seatOrder = getCardNames()
 
     // Host scores badly and drops below Alice in the (ascending-sorted) scoreboard...
     await enterScore('Host', 1, 90)
 
-    const orderAfterCommit = screen
-      .getAllByLabelText(/'s round 1 score$/)
-      .map((input) => input.getAttribute('id'))
+    const orderAfterCommit = getCardNames()
 
-    // ...but the entry rows themselves don't reshuffle under the host's thumb mid-entry.
+    // ...but the entry cards themselves don't reshuffle under the host's thumb mid-entry.
     expect(orderAfterCommit).toEqual(seatOrder)
   })
 
@@ -336,15 +341,12 @@ describe('RoomView score entry order', () => {
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
 
     await renderRoom()
-    expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
+    expect(screen.queryByRole('button', { name: /alice/i })).toBeNull()
 
-    // Simulates a player showing up after mount — e.g. an async first-snapshot delay online, or
-    // (as reproduced here with the offline repository, which isn't filtered to a single seat) a
-    // late joiner — the seatOrder ref must grow to pick them up, not stay frozen at mount time.
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
     await flushPromises()
 
-    expect(screen.getByLabelText("Alice's round 1 score")).toBeTruthy()
+    expect(screen.getByRole('button', { name: /alice/i })).toBeTruthy()
   })
 })
 
@@ -440,14 +442,15 @@ describe('RoomView online mode', () => {
     expect(screen.queryByText("You're offline — playing a local game on this device.")).toBeNull()
   })
 
-  it("shows only this device's own player as an editable score row for a joiner", async () => {
+  it("shows only this device's own player as an editable score card for a joiner", async () => {
     const { joinerPinia } = await setUpOnlineRoom()
     setActivePinia(joinerPinia)
 
     await renderAs(joinerPinia)
 
-    expect(screen.getByLabelText("Alice's round 1 score")).toBeTruthy()
-    expect(screen.queryByLabelText("Host's round 1 score")).toBeNull()
+    expect(screen.getByRole('button', { name: /alice/i })).toBeTruthy()
+    // Host's card should not appear for the joiner
+    expect(screen.queryByRole('button', { name: /host/i })).toBeNull()
   })
 
   it('shows Next round for the host but not for a joiner, who sees a waiting message instead', async () => {

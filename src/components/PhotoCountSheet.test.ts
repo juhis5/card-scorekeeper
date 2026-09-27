@@ -102,13 +102,13 @@ describe('PhotoCountSheet, reading in progress', () => {
 
 describe('PhotoCountSheet, a successful read', () => {
   const CARDS = [
-    { rank: '4', suit: 'diamonds', value: 4 },
+    { rank: '4', suit: 'diamonds', value: 5 },
     { rank: 'K', suit: 'spades', value: 10 },
     { rank: 'Joker', suit: null, value: 25 },
   ]
 
   it('shows the detected cards and the total', async () => {
-    countCardsMock.mockResolvedValue({ ok: true, cards: CARDS, total: 39 })
+    countCardsMock.mockResolvedValue({ ok: true, cards: CARDS, total: 40 })
     renderSheet()
 
     await selectAPhoto()
@@ -117,43 +117,43 @@ describe('PhotoCountSheet, a successful read', () => {
     expect(screen.getByText('4♦')).toBeTruthy()
     expect(screen.getByText('K♠')).toBeTruthy()
     expect(screen.getByText('Joker')).toBeTruthy()
-    expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('39')
+    expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('40')
   })
 
   it('politely announces the result for a screen-reader user not watching the screen', async () => {
-    countCardsMock.mockResolvedValue({ ok: true, cards: CARDS, total: 39 })
+    countCardsMock.mockResolvedValue({ ok: true, cards: CARDS, total: 40 })
     renderSheet()
 
     await selectAPhoto()
     await flushPromises()
 
-    expect(screen.getByText('Found 3 cards, total 39 points. Review and confirm.')).toBeTruthy()
+    expect(screen.getByText('Found 3 cards, total 40 points. Review and confirm.')).toBeTruthy()
   })
 
   it('recomputes the total when a card value is edited', async () => {
     countCardsMock.mockResolvedValue({
       ok: true,
       cards: [
-        { rank: '4', suit: 'diamonds', value: 4 },
+        { rank: '4', suit: 'diamonds', value: 5 },
         { rank: 'K', suit: 'spades', value: 10 },
       ],
-      total: 14,
+      total: 15,
     })
     renderSheet()
     await selectAPhoto()
     await flushPromises()
 
     const cardValueInput = screen.getByLabelText('4♦ value')
-    await fireEvent.update(cardValueInput, '9')
+    await fireEvent.update(cardValueInput, '10')
 
-    expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('19')
+    expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('20')
   })
 
   it('lets the player override the total directly, independent of the card breakdown', async () => {
     countCardsMock.mockResolvedValue({
       ok: true,
-      cards: [{ rank: '4', suit: 'diamonds', value: 4 }],
-      total: 4,
+      cards: [{ rank: '4', suit: 'diamonds', value: 5 }],
+      total: 5,
     })
     renderSheet()
     await selectAPhoto()
@@ -168,8 +168,8 @@ describe('PhotoCountSheet, a successful read', () => {
   it('confirms the current total and closes the sheet', async () => {
     countCardsMock.mockResolvedValue({
       ok: true,
-      cards: [{ rank: '4', suit: 'diamonds', value: 4 }],
-      total: 4,
+      cards: [{ rank: '4', suit: 'diamonds', value: 5 }],
+      total: 5,
     })
     const { emitted } = renderSheet()
     await selectAPhoto()
@@ -178,7 +178,7 @@ describe('PhotoCountSheet, a successful read', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
     await flushPromises()
 
-    expect(emitted().confirm).toEqual([[4]])
+    expect(emitted().confirm).toEqual([[5]])
     expect(screen.queryByRole('button', { name: 'Use this total' })).toBeNull()
   })
 })

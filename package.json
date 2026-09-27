@@ -12,7 +12,9 @@
     "build": "vue-tsc --build && vite build",
     "preview": "vite preview",
     "lint": "eslint . --fix",
+    "lint:check": "eslint .",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest",
     "test:run": "vitest run",
     "test:api": "vitest run --config vitest.api.config.ts",
@@ -76,11 +78,12 @@
     "workbox-window": "^7.4.1"
   },
   "lint-staged": {
-    "*.{ts,vue,js,json,css,md}": [
+    "*.{ts,vue}": [
+      "eslint --fix",
       "prettier --write"
     ],
-    "*.{ts,vue}": [
-      "eslint --fix"
+    "*.{js,json,css,md}": [
+      "prettier --write"
     ]
   }
 }

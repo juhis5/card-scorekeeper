@@ -17,7 +17,7 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { WifiOff } from '@lucide/vue'
 import ContractBanner from '@/components/ContractBanner.vue'
-import PlayerScoreRow from '@/components/PlayerScoreRow.vue'
+import ScoreCard from '@/components/ScoreCard.vue'
 import ScoreBoard from '@/components/ScoreBoard.vue'
 import WinnerBanner from '@/components/WinnerBanner.vue'
 import { Button } from '@/components/ui/button'
@@ -209,8 +209,9 @@ onMounted(() => {
         <h2 id="score-entry-heading" class="text-lg font-semibold">
           {{ t('room.score.sectionHeading', { round: n(currentRound) }) }}
         </h2>
-        <ul class="divide-border divide-y">
-          <PlayerScoreRow
+        <!-- role="list": Tailwind's list reset makes Safari/VoiceOver drop <ul> semantics. -->
+        <ul role="list" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <ScoreCard
             v-for="standing in entryStandings"
             :key="`${standing.player.id}-${currentRound}`"
             :player="standing.player"

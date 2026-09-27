@@ -19,8 +19,8 @@ The card game is joined by strangers via a room code, and any player can snap a 
 - **Request** (JSON): `{ roomCode: string, sessionToken: string, image: string /* base64 */, mimeType: string }`.
 - **Response** (JSON): the extraction shape from docs/PLAN.md:
   ```json
-  { "cards": [ {"rank":"4","suit":"diamonds","value":4}, {"rank":"Joker","suit":null,"value":25} ],
-    "total": 54 }
+  { "cards": [ {"rank":"4","suit":"diamonds","value":5}, {"rank":"Joker","suit":null,"value":25} ],
+    "total": 55 }
   ```
 - The result is a **suggestion**. The UI shows the card list + total and the player confirms or edits before it commits to `round_score`. Never auto-commit a photo total.
 
@@ -46,8 +46,9 @@ Ship a `.env.example` with names only. `.env*` is gitignored.
 
 Current Gemini Flash model (e.g. `gemini-2.5-flash` — verify current name/pricing). Constrain output with a response schema matching the extraction shape, `temperature: 0`. Encode the Rommi card values in the prompt:
 
-- number cards = face value (2–10), J/Q/K = 10, **Ace = 15**, **Joker = 25**.
+- number cards 2–9 = 5, 10 = 10, J/Q/K = 10, **Ace = 15**, **Joker = 25**.
 - Return one entry per detected card with `rank`, `suit` (null for Joker), `value`, plus the summed `total`.
+- The game uses **2 (sometimes 3) decks**, so identical cards (same rank + suit) and several Jokers are normal. Tell the model to list every physical card and never merge look-alikes; never dedupe or cap copies server-side.
 - Cards laid flat and non-overlapping read far better than a fan — the UI should tell players this.
 
 ## Response handling & accuracy

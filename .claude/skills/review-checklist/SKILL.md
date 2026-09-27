@@ -12,8 +12,8 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 1. Get the **diff** and the **intent** (what the change is + why). A fresh-context reviewer (no implementation bias) is best.
 2. **Verify empirically — don't eyeball.** Run:
    - `pnpm build` (vue-tsc → zero type errors)
-   - `pnpm test:run` (unit), `pnpm test:rules` (Firestore rules on the emulator) if rules changed, `pnpm e2e` if the critical flow changed
-   - `pnpm lint`
+   - `pnpm test:run` (unit); `pnpm test:api` if `api/` changed; `pnpm test:rules` (Firestore rules on the emulator) if rules changed; `pnpm test:integration` if a repository changed; `pnpm test:e2e` (starts the emulators) if the critical flow changed. Plain `pnpm e2e` has no emulator and can't run the live-sync spec.
+   - `pnpm lint:check` and `pnpm format:check`. Never `pnpm lint` or `pnpm format` during a review: they rewrite the files under review.
    - the app itself if UI changed (real phone viewport), including the **offline cold-start** path if touched
 3. Read every changed file against the rubric below.
 4. **Report findings ranked most-severe first**: `file:line` — what's wrong — a concrete failure scenario or why it matters — a suggested fix. Use the `ReportFindings` tool if reviewing via the bundled `/code-review` flow; otherwise a ranked list. If it's clean, say what you verified — don't rubber-stamp.
@@ -32,7 +32,7 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 - **Firestore security rules** changes have emulator tests (own-vs-other score edits, host override, expired room, room-scoped reads).
 - Critical flow has/updates an e2e (two clients: a score syncs live between them).
 - Tests are deterministic (no real network/clock/Firebase — mock the boundary / use the emulator), meaningful, one behavior each.
-- **No flaky tests.** No `retry`, `.skip`/`.only`, arbitrary sleeps, or loosened assertions to mask an intermittent failure — a flaky or order-dependent test is a **Block** (see `tdd`). Verify suspect tests with `vitest run --repeat=20 --sequence.shuffle`.
+- **No flaky tests.** No `retry`, `.skip`/`.only`, arbitrary sleeps, or loosened assertions to mask an intermittent failure — a flaky or order-dependent test is a **Block** (see `tdd`). Verify suspect tests with a shuffled seed loop (Vitest 4 has no repeat flag): `for s in $(seq 1 20); do pnpm exec vitest run <file> --sequence.shuffle --sequence.seed=$s || break; done`. For an emulator suite, loop the `pnpm test:*` script and judge each run by its exit code, not the "Tests passed" line.
 
 ### 3. Skills adherence — check the diff against each relevant skill
 - **`vue-pinia`**: `<script setup lang="ts">`, setup stores + `storeToRefs`, typed emits / `defineModel`, small single-job components, dependencies point inward (`lib/` pure — no Vue/Firebase/IO in it), store depends on the `GameRepository` **interface** not Firestore directly.
@@ -46,7 +46,7 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 - **backend (`firestore-realtime`, `vercel-gemini`, `vercel-deploy`)**: Firestore rules are the security boundary (not the UI); public web config (`VITE_FIREBASE_*`) vs server-only secrets (`GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`) kept separate; photo-count room+token gate + per-room/global rate limits present; total recomputed server-side; listeners unsubscribed.
 - **`routing`**: routes lazy-loaded + named; guards thin (delegate to stores, no logic/mutation/network in a guard — offline nav must not block); focus moved + announced on navigation.
 - **`i18n`**: no hardcoded user-facing strings (all via `t()` keys); numbers/dates via Intl; `<html lang>` = the active locale.
-- **domain (`rules.ts`)**: card values (number=face, J/Q/K=10, Ace=15, Joker=25), the 5 contracts, low-total-wins, tie handling — all correct and unit-tested.
+- **domain (`rules.ts`)**: card values (2–9=5, 10=10, J/Q/K=10, Ace=15, Joker=25; round score = multiple of 5; duplicates from 2–3 decks count per card), the 5 contracts, low-total-wins, tie handling — all correct and unit-tested.
 
 ### 4. Maintainability & aesthetics — no shortcut hacks
 The bar: code should read like the surrounding code and be pleasant to maintain.

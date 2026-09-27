@@ -43,18 +43,18 @@ describe('usePhotoCount().countCards, the happy path', () => {
 
   it('returns the parsed cards and total', async () => {
     const cards = [
-      { rank: '4', suit: 'diamonds', value: 4 },
+      { rank: '4', suit: 'diamonds', value: 5 },
       { rank: 'Joker', suit: null, value: 25 },
     ]
     const { countCards } = usePhotoCount({
       getIdToken: async () => 'id-token-abc',
       downscale: async () => DOWNSCALED,
-      fetchImpl: async () => jsonResponse(200, { cards, total: 29 }),
+      fetchImpl: async () => jsonResponse(200, { cards, total: 30 }),
     })
 
     const result = await countCards('ABCDE', makeFile())
 
-    expect(result).toEqual({ ok: true, cards, total: 29 })
+    expect(result).toEqual({ ok: true, cards, total: 30 })
   })
 
   it('tracks isPending across the call', async () => {

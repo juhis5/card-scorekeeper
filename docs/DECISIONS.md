@@ -284,9 +284,9 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   Still open: **4b-ii's e2e** needs BOTH firestore + auth emulators + `connectAuthEmulator`
   (`VITE_USE_EMULATOR`) — not started this session.
 - CI: `.github/workflows/ci.yml` has a commented `test:rules` job — wire it now that rules exist
-  (needs Java + firebase-tools on the runner). Do in 4b or polish. Do NOT add `test:integration`
-  to CI (see flake below).
-- KNOWN FLAKE (accepted, fenced off): `pnpm test:integration` (emulator-backed FirestoreGameRepository
+  (needs Java + firebase-tools on the runner). Do in 4b or polish. ~~Do NOT add `test:integration`
+  to CI (see flake below).~~ Added 2026-09-27 once the flake was fixed.
+- ~~KNOWN FLAKE~~ FIXED 2026-09-27 (see the dated entry at the end). Original note: `pnpm test:integration` (emulator-backed FirestoreGameRepository
   test) intermittently fails on a cold-booted emulator via Vitest — a Node24 + grpc-js + emulator
   HTTP/2 cold-boot transport race (browser uses WebChannel, so NOT a product bug). Isolated into its
   own `vitest.integration.config.ts`, OUT of `test:run`/CI/hooks. The join-order correctness it
@@ -315,3 +315,35 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   `<meta name="theme-color">` stays dark-tinted in light mode (a clean fix needs reading
   `--background` at runtime, not a second hardcoded hex); shadcn `SheetContent`'s built-in "Close"
   label is hardcoded English but unreachable today (`PhotoCountSheet` sets `:show-close-button="false"`).
+- 2026-09-27 — Card values changed to the house rule: **2–9 = 5, 10 = 10**, J/Q/K = 10, Ace = 15,
+  Joker = 25 (was number = face value). Every value is now a multiple of 5, so a round score must be
+  too — `isValidRoundScore` in `rules.ts` rejects anything else, and `firestore.rules` mirrors it
+  with `points % 5 == 0` on `roundScores` only. `gamePlayers` bounds are deliberately NOT tightened:
+  an offline host's pending result recorded under the old values would otherwise be rejected on
+  reconnect forever.
+- 2026-09-27 — The game is played with **2 decks (sometimes 3)**. Scoring is per physical card, so
+  deck count changes nothing in `rules.ts`; the one single-deck assumption was the Gemini prompt
+  ("count each card once" invites merging two identical 7♥), now told to list every copy. No
+  deck-count game setting: its only use would be capping copies per card when validating a photo
+  read, which isn't worth a new field through types, both repositories, rules and UI.
+- 2026-09-27 — `test:integration` flake FIXED and the suite is back in CI (the `rules` job). Root
+  cause was not a warm-up race: the Node SDK's gRPC `Listen` stream loses its framing against the
+  emulator (reads protobuf bytes as a length prefix — `Received message larger than max
+  (1919182194 vs 4194304)` = ASCII "rder"), backs off ~60s, and the 30s test times out. Open
+  upstream: firebase/firebase-tools#8654. Failed ~1 in 3 cold runs, on `main` too. Fix: the suite
+  runs the SDK's browser build (WebChannel — what the app ships) via happy-dom + inlined `firebase`
+  + an alias to the browser entry (see vitest.integration.config.ts); the `warmUpListenChannel`
+  workaround is gone. 20/20 cold runs green, ~2s each (was ~15–30s).
+- 2026-09-27 — Correction to the entry above: "20/20 cold runs green" was partly judged on the
+  "Tests passed" line, not the exit code. A second, exit-code-only flake remained (3 in 35 runs
+  during the full review): on `deleteApp` the SDK sends WebChannel's `TYPE=terminate` request via
+  `navigator.sendBeacon` without awaiting it, happy-dom implements the beacon as a `fetch()` whose
+  promise nobody handles, and when Vitest aborts the window at teardown that rejection is unhandled,
+  so the run exits 1 with every assertion passing. Re-calling `terminate()` wouldn't help:
+  `deleteApp` already runs it. Fix: `tests/integration/beacon.setup.ts` makes the beacon send and
+  drop its outcome, as a browser does. Verified all 8 terminate beacons per run go through it, then
+  40/40 cold runs exited 0. Flake checks on emulator suites now count exit codes (tdd skill).
+- 2026-09-27 — CI made real (review round 1): node24 Actions pinned by commit SHA, a read-only
+  `GITHUB_TOKEN`, `workflow_dispatch`, and non-fixing `lint:check` / `format:check` gates. The v4
+  pins declared node20, which GitHub removed from runners on 2026-09-23; CI had not run since
+  2026-07-24.

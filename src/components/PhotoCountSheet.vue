@@ -8,11 +8,11 @@
  * cards…" state, then either the detected card list + total (editable) or a friendly error.
  *
  * Nothing here ever calls `game.setRoundScore` — `confirm` just emits the final number, and the
- * parent (`PlayerScoreRow`) feeds it through the SAME manual-entry commit path (including its
+ * parent (`ScoreCard`) feeds it through the SAME manual-entry commit path (including its
  * existing validation/error UI), so the photo can never silently set a score (see CLAUDE.md's
  * "photo card-count is a suggestion — always confirm/edit before it commits").
  *
- * Only ever mounted for an online room's own editable row (see `PlayerScoreRow`/`RoomView`) —
+ * Only ever mounted for an online room's own editable card (see `ScoreCard`/`RoomView`) —
  * photo-count is online-only (needs the room-gated `/api/count` function).
  */
 import { computed, ref, useTemplateRef, watch } from 'vue'
@@ -32,8 +32,8 @@ import {
 import { usePhotoCount, type PhotoCountCard } from '@/composables/usePhotoCount'
 
 const { id, roomCode } = defineProps<{
-  /** Base id for this instance's form controls — the caller (`PlayerScoreRow`) derives it from
-   * the player's own id, so multiple rows on screen never collide. */
+  /** Base id for this instance's form controls — the caller (`ScoreCard`) derives it from
+   * the player's own id, so multiple cards on screen never collide. */
   id: string
   roomCode: string
 }>()

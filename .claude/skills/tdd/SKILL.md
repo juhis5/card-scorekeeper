@@ -29,7 +29,7 @@ Don't chase a coverage number. Coverage is a signal (untested logic branch = wri
 
 ## What to test where
 
-- **`lib/rules.ts`** — the highest-value TDD target here. Test the fixed rules exactly: card values (number = face, J/Q/K = 10, Ace = 15, Joker = 25); a round total sums correctly; the 5 contracts map round → required melds; winner = lowest total after round 5; ties handled. Pure functions with exact expected values — ideal for test-first.
+- **`lib/rules.ts`** — the highest-value TDD target here. Test the fixed rules exactly: card values (2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25; repeated cards from 2–3 decks each count); a round total sums correctly; the 5 contracts map round → required melds; winner = lowest total after round 5; ties handled. Pure functions with exact expected values — ideal for test-first.
 - **Stats logic** — win rate, best/worst round, head-to-head derivation from `game_player` rows. Pure functions over fixtures; TDD them (the identity caveats don't change the math).
 - **Stores (Pinia)** — fresh Pinia per test (`setActivePinia(createPinia())`). Mock Firestore (`onSnapshot`/writes) at the boundary — never hit real Firebase in unit tests. Test that a snapshot payload maps to sorted standings, that the current round advances, that permissions are respected in the action.
 - **Serverless photo-count** — unit-test the pure parts: room+token gate logic, rate-limit windows, server-side recompute of the card total, response validation. Mock the Gemini SDK and the Admin SDK. Assert: no valid room/token → 403, over cap → 429, bad model output rejected.
@@ -57,12 +57,12 @@ Common FE causes → the real fix:
 - **Leaked subscriptions/timers/listeners** across tests: unmount components, unsubscribe `onSnapshot` (`onScopeDispose`), clear timers.
 - **Animations/transitions** racing assertions: disable in tests or await completion.
 
-Reproduce before declaring it fixed: run it many times, shuffled — `vitest run <file> --repeat=20 --sequence.shuffle`. Green 20/20 shuffled = fixed. If you genuinely can't fix it now it's a **blocker**, not a merge-through: quarantine only with a tracked issue + owner + deadline, never a silent `.skip`. Default: fix it now.
+Reproduce before declaring it fixed: run it many times, shuffled — `for s in $(seq 1 20); do pnpm exec vitest run <file> --sequence.shuffle --sequence.seed=$s || break; done` (Vitest 4 has no repeat flag). Green 20/20 shuffled = fixed. For an emulator suite, loop the `pnpm test:*` script and count exit codes: a run can print "Tests passed" and still exit 1 on an unhandled error. If you genuinely can't fix it now it's a **blocker**, not a merge-through: quarantine only with a tracked issue + owner + deadline, never a silent `.skip`. Default: fix it now.
 
 ## Wiring
 
 - `vitest.config.ts`: `environment: 'happy-dom'`, `globals: true`.
-- Scripts: `"test": "vitest"`, `"test:run": "vitest run"`, `"test:rules": "firebase emulators:exec 'vitest run rules'"`, `"e2e": "playwright test"`. Build runs `vue-tsc`.
+- Scripts: `"test": "vitest"`, `"test:run": "vitest run"`, `"test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'"`, `"test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'"`, `"lint:check": "eslint ."`. Build runs `vue-tsc`.
 - Co-locate unit tests: `foo.ts` + `foo.test.ts`. Rules tests and E2E in their own folders.
 
 ## This project (card-scorekeeper)
