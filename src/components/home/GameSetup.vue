@@ -2,16 +2,19 @@
 /**
  * Home's "Uusi peli": start a game under your name. On submit, probes backend reachability and
  * picks the repository — an online room others join with its code when reachable, a local
- * single-device game otherwise (see `useGameConnectivity`/`lib/game-mode.ts`). Everyone else is
+ * single-device game otherwise (see `useGameConnectivity`/`lib/data/game-mode.ts`). "This phone
+ * only" skips the probe for a table where nobody else has a phone (fourth round). Everyone else is
  * added in the room with "Lisää pelaaja", so the form is just the name, which Home shares with
  * "Liity" (`v-model:name`). A bare form: Home provides the card around it.
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useLocalStorage } from '@vueuse/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
@@ -29,6 +32,8 @@ const identity = useIdentityStore()
 const game = useGameStore()
 const { hostRepository, localRepository } = useGameConnectivity()
 
+/** Remembered on this device: a table without phones tends to stay that way. */
+const isThisPhoneOnly = useLocalStorage('this-phone-only', false)
 const attemptedSubmit = ref(false)
 const isSubmitting = ref(false)
 const isCheckingConnection = ref(false)
@@ -96,10 +101,10 @@ async function handleSubmit(): Promise<void> {
   if (isNameInvalid.value || isSubmitting.value) return
 
   isSubmitting.value = true
-  isCheckingConnection.value = true
+  isCheckingConnection.value = !isThisPhoneOnly.value
   submitError.value = ''
   try {
-    const mode = await hostRepository()
+    const mode = isThisPhoneOnly.value ? localRepository() : await hostRepository()
     isCheckingConnection.value = false
     await startOrFallBack(mode)
   } catch {
@@ -130,7 +135,16 @@ async function handleSubmit(): Promise<void> {
         {{ t('home.errors.hostNameRequired') }}
       </p>
     </div>
-    <p class="text-muted-foreground text-sm">{{ t('home.form.hint') }}</p>
+    <label
+      for="this-phone-only"
+      class="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm font-medium"
+    >
+      {{ t('home.form.thisPhoneOnly') }}
+      <Switch id="this-phone-only" v-model="isThisPhoneOnly" />
+    </label>
+    <p class="text-muted-foreground text-sm">
+      {{ isThisPhoneOnly ? t('home.form.thisPhoneOnlyHint') : t('home.form.hint') }}
+    </p>
 
     <p v-if="isCheckingConnection" role="status" class="text-muted-foreground text-sm">
       {{ t('home.form.checkingConnection') }}

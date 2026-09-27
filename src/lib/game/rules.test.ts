@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  roundsWithSeveralZeros,
   ACE_VALUE,
   FACE_CARD_VALUE,
   JOKER_VALUE,
@@ -278,6 +279,41 @@ describe('isEveryRoundScored', () => {
 
   it('is true for no players', () => {
     expect(isEveryRoundScored([], scores, 2)).toBe(true)
+  })
+})
+
+describe('roundsWithSeveralZeros', () => {
+  it('finds a round where more than one player has 0: only the one who went out scores nothing', () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 0 },
+      { playerId: 'bob', round: 1, points: 0 },
+      { playerId: 'alice', round: 2, points: 0 },
+      { playerId: 'bob', round: 2, points: 15 },
+    ]
+
+    expect(roundsWithSeveralZeros(['alice', 'bob'], scores, 2)).toEqual([1])
+  })
+
+  it('accepts a round with one 0, or none', () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 0 },
+      { playerId: 'bob', round: 1, points: 20 },
+      { playerId: 'alice', round: 2, points: 10 },
+      { playerId: 'bob', round: 2, points: 5 },
+    ]
+
+    expect(roundsWithSeveralZeros(['alice', 'bob'], scores, 2)).toEqual([])
+  })
+
+  it('ignores removed players and rounds that have not started', () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 0 },
+      { playerId: 'gone', round: 1, points: 0 },
+      { playerId: 'alice', round: 3, points: 0 },
+      { playerId: 'bob', round: 3, points: 0 },
+    ]
+
+    expect(roundsWithSeveralZeros(['alice', 'bob'], scores, 2)).toEqual([])
   })
 })
 

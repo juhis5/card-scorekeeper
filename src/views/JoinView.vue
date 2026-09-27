@@ -71,7 +71,7 @@ onMounted(async () => {
 
 <template>
   <main
-    class="bg-background text-foreground mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4"
+    class="bg-background text-foreground mx-auto flex w-full max-w-md flex-1 flex-col gap-4 p-4"
   >
     <h1
       id="main-heading"

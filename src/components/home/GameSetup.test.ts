@@ -109,6 +109,7 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 beforeEach(() => {
   setActivePinia(createPinia())
   hostRepository.mockReset()
+  localRepository.mockReset()
   localStorage.clear()
 })
 
@@ -127,6 +128,22 @@ describe('GameSetup name field', () => {
 
     expect(screen.getByText('Enter your name to continue.')).toBeTruthy()
     expect(hostRepository).not.toHaveBeenCalled()
+  })
+})
+
+describe('GameSetup, this phone only', () => {
+  it('starts a game on this device without checking the connection, and remembers the choice', async () => {
+    localRepository.mockReturnValue(offlineMode())
+    const router = renderGameSetup()
+
+    await fireEvent.click(screen.getByRole('switch', { name: 'This phone only' }))
+    expect(screen.getByText(/nobody joins/)).toBeTruthy()
+    await startAs('Juho')
+
+    expect(hostRepository).not.toHaveBeenCalled()
+    expect(localRepository).toHaveBeenCalled()
+    expect(router.currentRoute.value.params.code).toBe('local')
+    expect(localStorage.getItem('this-phone-only')).toBe('true')
   })
 })
 

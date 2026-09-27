@@ -41,7 +41,7 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
 <template>
   <!-- `env(safe-area-inset-*)` on the app frame, once, per the mobile-first golden rule. -->
   <div
-    class="min-h-dvh pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+    class="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
   >
     <div aria-live="polite" role="status" class="sr-only">{{ routeAnnouncement }}</div>
     <div aria-live="polite" role="status" class="sr-only">{{ updateAnnouncement }}</div>
@@ -57,6 +57,10 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
     >
       <BackButton v-if="!isHome" class="-ml-2" />
       <RoomCodeBar v-if="headerRoomCode" :code="headerRoomCode" />
+      <!-- Home's own heading says the same to screen readers. -->
+      <span v-else-if="isHome" aria-hidden="true" class="min-w-0 flex-1 text-lg font-semibold">
+        {{ t('app.title') }}
+      </span>
       <div v-else class="min-w-0 flex-1" />
       <AppMenu class="-mr-2" />
     </header>

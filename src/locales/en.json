@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "Rommi Scorekeeper",
+    "title": "Rommi",
     "theme": {
       "label": "Dark mode"
     },
@@ -47,8 +47,7 @@
     "round5": "Two flushes and one set of three"
   },
   "home": {
-    "heading": "Rommi Scorekeeper",
-    "statsLink": "View your stats",
+    "heading": "Rommi",
     "play": {
       "label": "Play",
       "join": "Join",
@@ -61,7 +60,9 @@
       "replaceConfirm": "Start a new game? The game in progress on this device will be lost.",
       "replaceStart": "Start new game",
       "replaceKeep": "Keep playing",
-      "hint": "Add the others in the game, or they join with the room code."
+      "hint": "Add the others in the game, or they join with the room code.",
+      "thisPhoneOnly": "This phone only",
+      "thisPhoneOnlyHint": "Everyone's points go in on this phone and nobody joins. Works without a connection."
     },
     "join": {
       "roomCodeLabel": "Room code",
@@ -177,7 +178,8 @@
     },
     "next": {
       "button": "Next round",
-      "waiting": "Still waiting for scores from {names}."
+      "waiting": "Still waiting for scores from {names}.",
+      "severalZeros": "Only one player can score 0 in a round. Check round {rounds}."
     },
     "finish": {
       "button": "Finish game"
