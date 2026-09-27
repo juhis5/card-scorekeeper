@@ -101,6 +101,9 @@ export function useImageDownscale(deps: UseImageDownscaleDeps = {}) {
       const canvas = createCanvas(width, height)
       const context = canvas.getContext('2d')
       if (!context) throw new Error('2d canvas context unavailable')
+      // A 4000px photo shrinks ~2.5x; the default "low" filter blurs the small rank/suit corners
+      // the model has to read.
+      context.imageSmoothingQuality = 'high'
       context.drawImage(bitmap, 0, 0, width, height)
 
       const blob = await encodeToJpeg(canvas)

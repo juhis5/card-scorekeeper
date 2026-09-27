@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
@@ -143,7 +143,7 @@ describe('PhotoCountSheet, a successful read', () => {
     await selectAPhoto()
     await flushPromises()
 
-    const cardValueInput = screen.getByLabelText('4♦ value')
+    const cardValueInput = screen.getByLabelText('Card 1 of 2: 4 of diamonds')
     await fireEvent.update(cardValueInput, '10')
 
     expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('20')
@@ -185,7 +185,7 @@ describe('PhotoCountSheet, a successful read', () => {
 
 describe('PhotoCountSheet, a failed read', () => {
   it('shows a friendly error and a retry action instead of a raw error', async () => {
-    countCardsMock.mockResolvedValue({ ok: false, reason: 'network' })
+    countCardsMock.mockResolvedValue({ ok: false, reason: 'invalid-response' })
     renderSheet()
 
     await selectAPhoto()
@@ -203,5 +203,139 @@ describe('PhotoCountSheet, a failed read', () => {
     await flushPromises()
 
     expect(emitted().confirm).toBeUndefined()
+  })
+})
+
+describe('PhotoCountSheet, telling failures apart', () => {
+  it.each([
+    [
+      'unauthenticated',
+      "Couldn't confirm your session. Reload the page, or type your total.",
+      false,
+    ],
+    ['forbidden', "Photo counting isn't available in this room anymore. Type your total.", false],
+    ['rate-limited', 'Too many photos right now. Wait a moment, or type your total.', true],
+    ['timeout', 'Reading the photo took too long. Try again, or type your total.', true],
+    ['network', "Couldn't reach photo counting. Check your connection, or type your total.", true],
+    [
+      'unavailable',
+      "Photo counting isn't responding right now. Try again later, or type your total.",
+      true,
+    ],
+    ['image-processing', "Couldn't use that photo. Try another one, or type your total.", true],
+    ['invalid-response', "Couldn't read the cards — type the total instead.", true],
+    ['server-error', "Photo counting isn't working right now. Type your total.", false],
+  ] as const)('on %s says "%s" (retry offered: %s)', async (reason, message, canRetry) => {
+    countCardsMock.mockResolvedValue({ ok: false, reason })
+    renderSheet()
+
+    await selectAPhoto()
+    await flushPromises()
+
+    expect(screen.getByRole('alert').textContent).toContain(message)
+    expect(screen.queryByRole('button', { name: 'Try again' }) !== null).toBe(canRetry)
+  })
+})
+
+describe('PhotoCountSheet, editing the total', () => {
+  const CARDS = [
+    { rank: '7', suit: 'hearts', value: 5 },
+    { rank: 'K', suit: 'spades', value: 10 },
+  ]
+
+  it('keeps a cleared total empty and disables confirming until a valid total is typed', async () => {
+    countCardsMock.mockResolvedValue({ ok: true, cards: CARDS, total: 15 })
+    renderSheet()
+    await selectAPhoto()
+    await flushPromises()
+
+    await fireEvent.update(screen.getByLabelText('Total'), '')
+
+    expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('')
+    expect(
+      (screen.getByRole('button', { name: 'Use this total' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+  })
+
+  it('refuses a total that is not a valid round score', async () => {
+    countCardsMock.mockResolvedValue({ ok: true, cards: CARDS, total: 15 })
+    renderSheet()
+    await selectAPhoto()
+    await flushPromises()
+
+    await fireEvent.update(screen.getByLabelText('Total'), '17')
+
+    expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
+    expect(
+      (screen.getByRole('button', { name: 'Use this total' }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+  })
+})
+
+describe('PhotoCountSheet, repeated cards from 2-3 decks', () => {
+  it('gives each copy its own spoken label and counts every one', async () => {
+    countCardsMock.mockResolvedValue({
+      ok: true,
+      cards: [
+        { rank: '7', suit: 'hearts', value: 5 },
+        { rank: '7', suit: 'hearts', value: 5 },
+        { rank: 'Joker', suit: null, value: 25 },
+        { rank: 'Joker', suit: null, value: 25 },
+      ],
+      total: 60,
+    })
+    renderSheet()
+    await selectAPhoto()
+    await flushPromises()
+
+    expect(screen.getByLabelText('Card 1 of 4: 7 of hearts')).toBeTruthy()
+    expect(screen.getByLabelText('Card 2 of 4: 7 of hearts')).toBeTruthy()
+    expect(screen.getByLabelText('Card 4 of 4: joker')).toBeTruthy()
+    expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('60')
+  })
+
+  it('announces a single card in the singular', async () => {
+    countCardsMock.mockResolvedValue({
+      ok: true,
+      cards: [{ rank: 'A', suit: 'spades', value: 15 }],
+      total: 15,
+    })
+    renderSheet()
+    await selectAPhoto()
+    await flushPromises()
+
+    expect(screen.getByText('Found 1 card, total 15 points. Review and confirm.')).toBeTruthy()
+  })
+})
+
+describe('PhotoCountSheet, in Finnish', () => {
+  afterEach(() => {
+    i18n.global.locale.value = 'en'
+  })
+
+  it('names each card in Finnish and uses the Finnish plural', async () => {
+    i18n.global.locale.value = 'fi'
+    countCardsMock.mockResolvedValue({
+      ok: true,
+      cards: [
+        { rank: 'Q', suit: 'hearts', value: 10 },
+        { rank: 'Joker', suit: null, value: 25 },
+      ],
+      total: 35,
+    })
+    renderSheet()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Kuvaa kortit' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Ota tai valitse kuva' }))
+    await fireEvent.change(screen.getByTestId('photo-count-file'), {
+      target: { files: [makeFile()] },
+    })
+    await flushPromises()
+
+    expect(screen.getByLabelText('Kortti 1/2: hertta rouva')).toBeTruthy()
+    expect(screen.getByLabelText('Kortti 2/2: jokeri')).toBeTruthy()
+    expect(
+      screen.getByText('Löytyi 2 korttia, summa 35 pistettä. Tarkista ja vahvista.'),
+    ).toBeTruthy()
   })
 })

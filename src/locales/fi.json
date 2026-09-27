@@ -102,12 +102,37 @@
       "hint": "Levitä kortit tasaisesti ja päällekkäin menemättä parhaan tuloksen saamiseksi.",
       "takePhoto": "Ota tai valitse kuva",
       "reading": "Luetaan kortteja…",
-      "error": "Kortteja ei voitu lukea — kirjoita summa itse.",
+      "errors": {
+        "unauthenticated": "Istuntoa ei voitu vahvistaa. Lataa sivu uudelleen tai kirjoita summa itse.",
+        "forbidden": "Kuvalaskenta ei ole enää käytössä tässä huoneessa. Kirjoita summa itse.",
+        "rateLimited": "Liian monta kuvaa juuri nyt. Odota hetki tai kirjoita summa itse.",
+        "timeout": "Kuvan lukeminen kesti liian kauan. Yritä uudelleen tai kirjoita summa itse.",
+        "network": "Kuvalaskentaan ei saatu yhteyttä. Tarkista verkkoyhteys tai kirjoita summa itse.",
+        "unavailable": "Kuvalaskenta ei vastaa juuri nyt. Yritä myöhemmin uudelleen tai kirjoita summa itse.",
+        "imageProcessing": "Kuvaa ei voitu käyttää. Kokeile toista kuvaa tai kirjoita summa itse.",
+        "invalidResponse": "Kortteja ei voitu lukea — kirjoita summa itse.",
+        "serverError": "Kuvalaskenta ei toimi juuri nyt. Kirjoita summa itse."
+      },
       "retry": "Yritä uudelleen",
       "retake": "Ota kuva uudelleen",
-      "cardValueLabel": "{card}: arvo",
+      "cardInputLabel": "Kortti {index}/{count}: {card}",
+      "cardName": "{suit} {rank}",
+      "joker": "jokeri",
+      "jokerShort": "Jokeri",
+      "ranks": {
+        "J": "jätkä",
+        "Q": "rouva",
+        "K": "kuningas",
+        "A": "ässä"
+      },
+      "suits": {
+        "clubs": "risti",
+        "diamonds": "ruutu",
+        "hearts": "hertta",
+        "spades": "pata"
+      },
       "totalLabel": "Yhteensä",
-      "resultAnnouncement": "Löytyi {count} korttia, summa {total} pistettä. Tarkista ja vahvista.",
+      "resultAnnouncement": "Löytyi {count} kortti, summa {total} pistettä. Tarkista ja vahvista. | Löytyi {count} korttia, summa {total} pistettä. Tarkista ja vahvista.",
       "confirm": "Käytä tätä summaa",
       "cancel": "Peruuta"
     },

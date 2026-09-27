@@ -368,7 +368,7 @@ describe('ScoreCard, confirming a photo-count result', () => {
   })
 
   it('never commits when the photo read fails', async () => {
-    countCardsMock.mockResolvedValue({ ok: false, reason: 'network' })
+    countCardsMock.mockResolvedValue({ ok: false, reason: 'invalid-response' })
     const { emitted } = renderCard({ canUsePhotoCount: true, roomCode: 'ABCDE' })
 
     await expandCard()

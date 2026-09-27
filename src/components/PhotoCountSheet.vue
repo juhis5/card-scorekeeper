@@ -3,9 +3,9 @@
  * The photo-count "snap your cards" affordance + confirm/edit sheet (see docs/PLAN.md "Entering
  * a round's score — two ways" and the vercel-gemini skill). Tapping "Snap cards" opens a bottom
  * sheet with the "lay cards flat, non-overlapping" hint and a "take/choose a photo" action
- * (`<input type="file" accept="image/*" capture="environment">` — camera on mobile, a plain file
- * picker on desktop, no extra code for that fallback). Picking a photo shows a "Reading your
- * cards…" state, then either the detected card list + total (editable) or a friendly error.
+ * (`<input type="file" accept="image/*">` with no `capture`, so phones offer camera or gallery and
+ * desktop gets a plain file picker). Picking a photo shows a "Reading your cards…" state, then
+ * either the detected card list + total (editable) or an error that says what went wrong.
  *
  * Nothing here ever calls `game.setRoundScore` — `confirm` just emits the final number, and the
  * parent (`ScoreCard`) feeds it through the SAME manual-entry commit path (including its
@@ -15,7 +15,7 @@
  * Only ever mounted for an online room's own editable card (see `ScoreCard`/`RoomView`) —
  * photo-count is online-only (needs the room-gated `/api/count` function).
  */
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Camera, Loader2 } from '@lucide/vue'
 import RoundScoreInput from '@/components/RoundScoreInput.vue'
@@ -29,7 +29,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { usePhotoCount, type PhotoCountCard } from '@/composables/usePhotoCount'
+import {
+  usePhotoCount,
+  type PhotoCountCard,
+  type PhotoCountFailureReason,
+} from '@/composables/usePhotoCount'
+import { isValidRoundScore, MAX_ROUND_SCORE } from '@/lib/rules'
 
 const { id, roomCode } = defineProps<{
   /** Base id for this instance's form controls — the caller (`ScoreCard`) derives it from
@@ -40,7 +45,7 @@ const { id, roomCode } = defineProps<{
 
 const emit = defineEmits<{ confirm: [total: number] }>()
 
-const { t } = useI18n()
+const { t, n } = useI18n()
 const { isPending, countCards } = usePhotoCount()
 
 /** The in-flight/loading state is owned entirely by `isPending` (from `usePhotoCount`) — this
@@ -53,10 +58,10 @@ const isOpen = ref(false)
 const status = ref<Status>('idle')
 const cards = ref<PhotoCountCard[]>([])
 const cardValues = ref<Array<number | null>>([])
-/** Set only while the player is directly editing the Total field; cleared back to `null`
- * (falling back to the sum of `cardValues`) whenever any card value changes — editing a card
- * recomputes the total, editing the total directly overrides it until the next card edit. */
-const totalOverride = ref<number | null>(null)
+/** Its own draft, not derived from `cardValues`: editing a card recomputes it, but the player can
+ * also clear and retype it directly. */
+const total = ref<number | null>(null)
+const failureReason = ref<PhotoCountFailureReason | null>(null)
 
 const fileInputRef = useTemplateRef<HTMLInputElement>('fileInput')
 
@@ -66,23 +71,39 @@ const fileInputRef = useTemplateRef<HTMLInputElement>('fileInput')
  * "live regions" — announce meaningful live changes, not just the in-between states). */
 const resultAnnouncement = ref('')
 
-const computedTotal = computed(() =>
-  cardValues.value.reduce((sum: number, value) => sum + (value ?? 0), 0),
-)
-const total = computed<number | null>({
-  get: () => totalOverride.value ?? computedTotal.value,
-  set: (value) => {
-    totalOverride.value = value
-  },
-})
+const FAILURE_MESSAGE_KEYS = {
+  unauthenticated: 'room.photoCount.errors.unauthenticated',
+  forbidden: 'room.photoCount.errors.forbidden',
+  'rate-limited': 'room.photoCount.errors.rateLimited',
+  timeout: 'room.photoCount.errors.timeout',
+  network: 'room.photoCount.errors.network',
+  unavailable: 'room.photoCount.errors.unavailable',
+  'image-processing': 'room.photoCount.errors.imageProcessing',
+  'invalid-response': 'room.photoCount.errors.invalidResponse',
+  'server-error': 'room.photoCount.errors.serverError',
+} as const satisfies Record<PhotoCountFailureReason, string>
 
-watch(
-  cardValues,
-  () => {
-    totalOverride.value = null
-  },
-  { deep: true },
+/** Failures where another photo, or the same one a bit later, can succeed. A closed room, a lost
+ * session or a server fault won't fix itself, so those only point at typing the total. */
+const RETRYABLE_REASONS: ReadonlySet<PhotoCountFailureReason> = new Set([
+  'rate-limited',
+  'timeout',
+  'network',
+  'unavailable',
+  'image-processing',
+  'invalid-response',
+])
+
+const errorMessage = computed(() =>
+  failureReason.value ? t(FAILURE_MESSAGE_KEYS[failureReason.value]) : '',
 )
+const canRetry = computed(
+  () => failureReason.value !== null && RETRYABLE_REASONS.has(failureReason.value),
+)
+const isTotalValid = computed(() => total.value !== null && isValidRoundScore(total.value))
+/** An empty total just keeps confirm disabled; a typed but impossible one also says why. */
+const isTotalInvalid = computed(() => total.value !== null && !isValidRoundScore(total.value))
+const totalErrorId = computed(() => `${id}-total-error`)
 
 const SUIT_SYMBOLS: Record<string, string> = {
   clubs: '♣',
@@ -91,12 +112,62 @@ const SUIT_SYMBOLS: Record<string, string> = {
   spades: '♠',
 }
 
-function cardLabel(card: PhotoCountCard): string {
-  return card.suit === null ? card.rank : `${card.rank}${SUIT_SYMBOLS[card.suit] ?? card.suit}`
+function cardSymbol(card: PhotoCountCard): string {
+  if (card.suit === null) return t('room.photoCount.jokerShort')
+  return `${card.rank}${SUIT_SYMBOLS[card.suit] ?? card.suit}`
 }
 
-function cardValueLabel(card: PhotoCountCard): string {
-  return t('room.photoCount.cardValueLabel', { card: cardLabel(card) })
+function rankName(rank: string): string {
+  switch (rank) {
+    case 'J':
+      return t('room.photoCount.ranks.J')
+    case 'Q':
+      return t('room.photoCount.ranks.Q')
+    case 'K':
+      return t('room.photoCount.ranks.K')
+    case 'A':
+      return t('room.photoCount.ranks.A')
+    default:
+      return rank
+  }
+}
+
+function suitName(suit: string): string {
+  switch (suit) {
+    case 'clubs':
+      return t('room.photoCount.suits.clubs')
+    case 'diamonds':
+      return t('room.photoCount.suits.diamonds')
+    case 'hearts':
+      return t('room.photoCount.suits.hearts')
+    case 'spades':
+      return t('room.photoCount.suits.spades')
+    default:
+      return suit
+  }
+}
+
+/** Screen readers read "7♥" inconsistently, and copies from a second deck would share a label,
+ * so each input is named by position plus the card in words: "Card 2 of 4: 7 of hearts". */
+function cardInputLabel(card: PhotoCountCard, index: number): string {
+  const cardName =
+    card.suit === null
+      ? t('room.photoCount.joker')
+      : t('room.photoCount.cardName', { rank: rankName(card.rank), suit: suitName(card.suit) })
+  return t('room.photoCount.cardInputLabel', {
+    index: index + 1,
+    count: cards.value.length,
+    card: cardName,
+  })
+}
+
+function sumCardValues(): number {
+  return cardValues.value.reduce((sum: number, value) => sum + (value ?? 0), 0)
+}
+
+function updateCardValue(index: number, value: number | null): void {
+  cardValues.value[index] = value
+  total.value = sumCardValues()
 }
 
 function openSheet(): void {
@@ -119,22 +190,26 @@ async function handleFileChange(event: Event): Promise<void> {
 
   const result = await countCards(roomCode, file) // flips `isPending` for the duration
   if (!result.ok) {
+    failureReason.value = result.reason
     status.value = 'error'
     return
   }
 
   cards.value = result.cards
   cardValues.value = result.cards.map((card) => card.value)
-  totalOverride.value = null
+  total.value = result.total
+  failureReason.value = null
   status.value = 'ready'
-  resultAnnouncement.value = t('room.photoCount.resultAnnouncement', {
-    count: result.cards.length,
-    total: result.total,
-  })
+  resultAnnouncement.value = t(
+    'room.photoCount.resultAnnouncement',
+    { count: result.cards.length, total: n(result.total) },
+    result.cards.length,
+  )
 }
 
 function handleConfirm(): void {
-  emit('confirm', total.value ?? 0)
+  if (total.value === null || !isTotalValid.value) return
+  emit('confirm', total.value)
   isOpen.value = false
 }
 
@@ -152,7 +227,6 @@ function handleOpenChange(open: boolean): void {
       data-testid="photo-count-file"
       type="file"
       accept="image/*"
-      capture="environment"
       class="sr-only"
       aria-hidden="true"
       tabindex="-1"
@@ -188,9 +262,15 @@ function handleOpenChange(open: boolean): void {
 
           <template v-else-if="status === 'error'">
             <p role="alert" class="text-destructive text-sm">
-              {{ t('room.photoCount.error') }}
+              {{ errorMessage }}
             </p>
-            <Button type="button" variant="secondary" class="h-11" @click="openFilePicker">
+            <Button
+              v-if="canRetry"
+              type="button"
+              variant="secondary"
+              class="h-11"
+              @click="openFilePicker"
+            >
               {{ t('room.photoCount.retry') }}
             </Button>
           </template>
@@ -202,12 +282,14 @@ function handleOpenChange(open: boolean): void {
                 :key="`${card.rank}-${card.suit}-${index}`"
                 class="flex items-center justify-between gap-3"
               >
-                <span class="text-foreground">{{ cardLabel(card) }}</span>
+                <span aria-hidden="true" class="text-foreground">{{ cardSymbol(card) }}</span>
                 <RoundScoreInput
                   :id="`${id}-card-${index}`"
-                  v-model="cardValues[index]"
-                  :label="cardValueLabel(card)"
+                  :model-value="cardValues[index]"
+                  :label="cardInputLabel(card, index)"
+                  is-label-hidden
                   class="w-24"
+                  @update:model-value="updateCardValue(index, $event)"
                 />
               </li>
             </ul>
@@ -216,7 +298,12 @@ function handleOpenChange(open: boolean): void {
               :id="`${id}-total`"
               v-model="total"
               :label="t('room.photoCount.totalLabel')"
+              :is-invalid="isTotalInvalid"
+              :described-by="isTotalInvalid ? totalErrorId : undefined"
             />
+            <p v-if="isTotalInvalid" :id="totalErrorId" class="text-destructive text-sm">
+              {{ t('room.score.invalidError', { max: n(MAX_ROUND_SCORE) }) }}
+            </p>
 
             <Button type="button" variant="ghost" class="h-11" @click="openFilePicker">
               {{ t('room.photoCount.retake') }}
@@ -227,7 +314,13 @@ function handleOpenChange(open: boolean): void {
         <div aria-live="polite" class="sr-only">{{ resultAnnouncement }}</div>
 
         <SheetFooter>
-          <Button v-if="status === 'ready'" type="button" class="h-11" @click="handleConfirm">
+          <Button
+            v-if="status === 'ready'"
+            type="button"
+            class="h-11"
+            :disabled="!isTotalValid"
+            @click="handleConfirm"
+          >
             {{ t('room.photoCount.confirm') }}
           </Button>
           <SheetClose as-child>

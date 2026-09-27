@@ -102,12 +102,37 @@
       "hint": "Lay your cards flat and non-overlapping for the best read.",
       "takePhoto": "Take or choose a photo",
       "reading": "Reading your cards…",
-      "error": "Couldn't read the cards — type the total instead.",
+      "errors": {
+        "unauthenticated": "Couldn't confirm your session. Reload the page, or type your total.",
+        "forbidden": "Photo counting isn't available in this room anymore. Type your total.",
+        "rateLimited": "Too many photos right now. Wait a moment, or type your total.",
+        "timeout": "Reading the photo took too long. Try again, or type your total.",
+        "network": "Couldn't reach photo counting. Check your connection, or type your total.",
+        "unavailable": "Photo counting isn't responding right now. Try again later, or type your total.",
+        "imageProcessing": "Couldn't use that photo. Try another one, or type your total.",
+        "invalidResponse": "Couldn't read the cards — type the total instead.",
+        "serverError": "Photo counting isn't working right now. Type your total."
+      },
       "retry": "Try again",
       "retake": "Retake photo",
-      "cardValueLabel": "{card} value",
+      "cardInputLabel": "Card {index} of {count}: {card}",
+      "cardName": "{rank} of {suit}",
+      "joker": "joker",
+      "jokerShort": "Joker",
+      "ranks": {
+        "J": "jack",
+        "Q": "queen",
+        "K": "king",
+        "A": "ace"
+      },
+      "suits": {
+        "clubs": "clubs",
+        "diamonds": "diamonds",
+        "hearts": "hearts",
+        "spades": "spades"
+      },
       "totalLabel": "Total",
-      "resultAnnouncement": "Found {count} cards, total {total} points. Review and confirm.",
+      "resultAnnouncement": "Found {count} card, total {total} points. Review and confirm. | Found {count} cards, total {total} points. Review and confirm.",
       "confirm": "Use this total",
       "cancel": "Cancel"
     },
