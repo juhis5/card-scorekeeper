@@ -225,7 +225,7 @@
     "addPlayer": {
       "button": "Lisää pelaaja",
       "nameLabel": "Pelaajan nimi",
-      "hint": "Pelaajalle ilman omaa puhelinta: syötät hänen pisteensä.",
+      "hint": "pelaaja ilman omaa puhelinta",
       "add": "Lisää",
       "nameRequired": "Syötä pelaajan nimi.",
       "failed": "Pelaajaa {name} ei voitu lisätä. Yritä uudelleen."
