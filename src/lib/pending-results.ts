@@ -32,8 +32,7 @@ function isGameResult(value: unknown): value is GameResult {
     isRecord(value) &&
     typeof value.gameId === 'string' &&
     typeof value.finishedAt === 'string' &&
-    typeof value.totalRounds === 'number' &&
-    typeof value.winnerUuid === 'string'
+    typeof value.totalRounds === 'number'
   )
 }
 

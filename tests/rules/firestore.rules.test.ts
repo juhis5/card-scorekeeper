@@ -24,8 +24,10 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore'
 import {
   MAX_PLAYER_NAME_LENGTH,
@@ -80,14 +82,15 @@ function roundScoreFixture(ownerUid: string, overrides: Partial<Record<string, u
   }
 }
 
-const GAME_ID = 'local-game-1'
+/** A local game's id: UUID-shaped, so it can never collide with a room code. */
+const GAME_ID = 'b3f0c2a4-5d6e-4f70-8a91-2b3c4d5e6f70'
 
 function gameResultFixture(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     gameId: GAME_ID,
     finishedAt: '2026-01-01T00:00:00.000Z',
     totalRounds: 5,
-    winnerUuid: 'device-a',
+    participantUids: [ALICE_UID],
     ...overrides,
   }
 }
@@ -100,6 +103,7 @@ function gamePlayerFixture(
   return {
     gameId,
     deviceUuid,
+    participantUids: [deviceUuid],
     displayName: 'Alice',
     finalScore: 42,
     placement: 1,
@@ -607,7 +611,7 @@ describe('game_result append-only stats records (no matching room)', () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
     await assertFails(
-      updateDoc(doc(alice, `game_result/${GAME_ID}`), { winnerUuid: 'someone-else' }),
+      updateDoc(doc(alice, `game_result/${GAME_ID}`), { finishedAt: '2030-01-01T00:00:00.000Z' }),
     )
   })
 
@@ -661,8 +665,8 @@ describe('game_player append-only stats records (no matching room)', () => {
 
     await assertFails(
       setDoc(
-        doc(alice, `game_player/missing-game_${ALICE_UID}`),
-        gamePlayerFixture('missing-game', ALICE_UID),
+        doc(alice, `game_player/00000000-0000-4000-8000-000000000000_${ALICE_UID}`),
+        gamePlayerFixture('00000000-0000-4000-8000-000000000000', ALICE_UID),
       ),
     )
   })
@@ -710,6 +714,249 @@ describe('game_player append-only stats records (no matching room)', () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
     await assertFails(deleteDoc(doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`)))
+  })
+})
+
+// Stats integrity (review round 4). Room codes and local game ids live in separate namespaces,
+// every stats doc names its participants, and only participants can list or add to it.
+describe('stats namespaces and participants', () => {
+  it("denies a local result whose id isn't UUID-shaped, so nobody can pre-squat a room code", async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(doc(alice, `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
+    )
+  })
+
+  it('denies a local result that lists anyone but its writer as a participant', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `game_result/${GAME_ID}`),
+        gameResultFixture({ participantUids: [ALICE_UID, 'mallory-uid'] }),
+      ),
+    )
+  })
+
+  it("denies a stranger adding a row to someone else's local result", async () => {
+    await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
+    const mallory = testEnv.authenticatedContext('mallory-uid').firestore()
+
+    await assertFails(
+      setDoc(
+        doc(mallory, `game_player/${GAME_ID}_mallory-uid`),
+        gamePlayerFixture(GAME_ID, 'mallory-uid'),
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(mallory, `game_player/${GAME_ID}_mallory-uid`),
+        gamePlayerFixture(GAME_ID, 'mallory-uid', { participantUids: [ALICE_UID] }),
+      ),
+    )
+  })
+
+  it('denies creating a room whose code is not a room code', async () => {
+    const mallory = testEnv.authenticatedContext('mallory-uid').firestore()
+
+    await assertFails(
+      setDoc(
+        doc(mallory, `room/${GAME_ID}`),
+        roomFixture({ code: GAME_ID, hostUid: 'mallory-uid' }),
+      ),
+    )
+  })
+
+  it('denies a row whose participants differ from its result', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`), playerFixture(ALICE_UID))
+      await setDoc(
+        doc(db(), `game_result/${ROOM_CODE}`),
+        gameResultFixture({ gameId: ROOM_CODE, participantUids: [HOST_UID, ALICE_UID] }),
+      )
+    })
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(host, `game_player/${ROOM_CODE}_${ALICE_UID}`),
+        gamePlayerFixture(ROOM_CODE, ALICE_UID, { participantUids: [HOST_UID, ALICE_UID, 'x'] }),
+      ),
+    )
+  })
+
+  describe('reads', () => {
+    beforeEach(async () => {
+      await seed(async (db) => {
+        await setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture())
+        await setDoc(
+          doc(db(), `game_player/${GAME_ID}_${ALICE_UID}`),
+          gamePlayerFixture(GAME_ID, ALICE_UID),
+        )
+      })
+    })
+
+    it('lets a participant list the rows of games they played', async () => {
+      const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+      await assertSucceeds(
+        getDocs(
+          query(
+            collection(alice, 'game_player'),
+            where('gameId', 'in', [GAME_ID]),
+            where('participantUids', 'array-contains', ALICE_UID),
+          ),
+        ),
+      )
+      await assertSucceeds(
+        getDocs(
+          query(
+            collection(alice, 'game_result'),
+            where('participantUids', 'array-contains', ALICE_UID),
+          ),
+        ),
+      )
+    })
+
+    it('denies listing stats without the participant filter', async () => {
+      const mallory = testEnv.authenticatedContext('mallory-uid').firestore()
+
+      await assertFails(getDocs(collection(mallory, 'game_player')))
+      await assertFails(getDocs(collection(mallory, 'game_result')))
+    })
+
+    it("denies a stranger reading someone else's stats doc", async () => {
+      const mallory = testEnv.authenticatedContext('mallory-uid').firestore()
+
+      await assertFails(getDoc(doc(mallory, `game_player/${GAME_ID}_${ALICE_UID}`)))
+      await assertFails(getDoc(doc(mallory, `game_result/${GAME_ID}`)))
+    })
+
+    it('lets a writer check that a result does not exist yet before writing it', async () => {
+      const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+      await assertSucceeds(getDoc(doc(alice, 'game_result/00000000-0000-4000-8000-000000000000')))
+    })
+  })
+})
+
+describe('room create and update values', () => {
+  it('denies extra fields on a new room', async () => {
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(setDoc(doc(host, `room/${ROOM_CODE}`), roomFixture({ junk: 'x' })))
+  })
+
+  it('denies a room that expires beyond the normal lifetime', async () => {
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+    const inAYear = Timestamp.fromMillis(Date.now() + 365 * 24 * ONE_HOUR_MS)
+
+    await assertFails(setDoc(doc(host, `room/${ROOM_CODE}`), roomFixture({ expiresAt: inAYear })))
+  })
+
+  describe('host updates', () => {
+    beforeEach(async () => {
+      await seed(async (db) => setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture()))
+    })
+
+    function hostUpdate(fields: Record<string, unknown>) {
+      const host = testEnv.authenticatedContext(HOST_UID).firestore()
+      return updateDoc(doc(host, `room/${ROOM_CODE}`), fields)
+    }
+
+    it('lets the host move to the next round', async () => {
+      await assertSucceeds(hostUpdate({ status: 'playing', currentRound: 2 }))
+    })
+
+    it('denies skipping rounds, going back, or leaving the 1-5 range', async () => {
+      await assertFails(hostUpdate({ currentRound: 3 }))
+      await assertFails(hostUpdate({ currentRound: 0 }))
+      await assertFails(hostUpdate({ currentRound: 'two' }))
+    })
+
+    it('denies finishing before round 5 and an unknown status', async () => {
+      await assertFails(hostUpdate({ status: 'finished' }))
+      await assertFails(hostUpdate({ status: 'whatever' }))
+    })
+
+    it('lets the host finish in round 5 and never reopen', async () => {
+      await seed(async (db) =>
+        setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ currentRound: 5, status: 'playing' })),
+      )
+      await assertSucceeds(hostUpdate({ status: 'finished' }))
+      await assertFails(hostUpdate({ status: 'playing' }))
+    })
+  })
+})
+
+describe('roundScores tied to the room', () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ currentRound: 3 }))
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`), playerFixture(ALICE_UID))
+    })
+  })
+
+  function aliceScore(round: number, points = 10) {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+    return setDoc(
+      doc(alice, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_${round}`),
+      roundScoreFixture(ALICE_UID, { round, points }),
+    )
+  }
+
+  it('lets a player fill in a round they missed', async () => {
+    await assertSucceeds(aliceScore(1))
+  })
+
+  it('denies a player changing an earlier round they already scored', async () => {
+    await seed(async (db) =>
+      setDoc(
+        doc(db(), `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
+        roundScoreFixture(ALICE_UID, { round: 1, points: 30 }),
+      ),
+    )
+
+    await assertFails(aliceScore(1, 0))
+  })
+
+  it('lets the host correct an earlier round', async () => {
+    await seed(async (db) =>
+      setDoc(
+        doc(db(), `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
+        roundScoreFixture(ALICE_UID, { round: 1, points: 30 }),
+      ),
+    )
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertSucceeds(
+      updateDoc(doc(host, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`), { points: 25 }),
+    )
+  })
+
+  it('denies scoring a round that has not started', async () => {
+    await assertFails(aliceScore(4))
+  })
+
+  it('denies a stranger who never joined writing a score into the room', async () => {
+    const stranger = testEnv.authenticatedContext('stranger-uid').firestore()
+
+    await assertFails(
+      setDoc(
+        doc(stranger, `room/${ROOM_CODE}/roundScores/stranger-uid_3`),
+        roundScoreFixture('stranger-uid', { round: 3 }),
+      ),
+    )
+  })
+
+  it('denies any score change once the game is finished', async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ currentRound: 5, status: 'finished' })),
+    )
+
+    await assertFails(aliceScore(5))
   })
 })
 
@@ -813,47 +1060,39 @@ describe('game_result/game_player create authorization for a room-backed game', 
     })
   })
 
+  const ROOM_PARTICIPANTS = [HOST_UID, ALICE_UID]
+  const roomResult = () =>
+    gameResultFixture({ gameId: ROOM_CODE, participantUids: ROOM_PARTICIPANTS })
+  const roomRow = (uid: string) =>
+    gamePlayerFixture(ROOM_CODE, uid, { participantUids: ROOM_PARTICIPANTS })
+
   it('lets the room host write the game_result for that room-backed game', async () => {
     const host = testEnv.authenticatedContext(HOST_UID).firestore()
 
-    await assertSucceeds(
-      setDoc(doc(host, `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
-    )
+    await assertSucceeds(setDoc(doc(host, `game_result/${ROOM_CODE}`), roomResult()))
   })
 
   it('denies a non-host authenticated user writing the game_result for a room-backed game', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
-    await assertFails(
-      setDoc(doc(alice, `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
-    )
+    await assertFails(setDoc(doc(alice, `game_result/${ROOM_CODE}`), roomResult()))
   })
 
   it("lets the host write a real participant's game_player row for a room-backed game", async () => {
-    await seed(async (db) =>
-      setDoc(doc(db(), `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
-    )
+    await seed(async (db) => setDoc(doc(db(), `game_result/${ROOM_CODE}`), roomResult()))
     const host = testEnv.authenticatedContext(HOST_UID).firestore()
 
     await assertSucceeds(
-      setDoc(
-        doc(host, `game_player/${ROOM_CODE}_${ALICE_UID}`),
-        gamePlayerFixture(ROOM_CODE, ALICE_UID),
-      ),
+      setDoc(doc(host, `game_player/${ROOM_CODE}_${ALICE_UID}`), roomRow(ALICE_UID)),
     )
   })
 
   it('denies a non-host authenticated user (even a real participant) writing a game_player row for a room-backed game', async () => {
-    await seed(async (db) =>
-      setDoc(doc(db(), `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
-    )
+    await seed(async (db) => setDoc(doc(db(), `game_result/${ROOM_CODE}`), roomResult()))
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
     await assertFails(
-      setDoc(
-        doc(alice, `game_player/${ROOM_CODE}_${ALICE_UID}`),
-        gamePlayerFixture(ROOM_CODE, ALICE_UID),
-      ),
+      setDoc(doc(alice, `game_player/${ROOM_CODE}_${ALICE_UID}`), roomRow(ALICE_UID)),
     )
   })
 
@@ -862,16 +1101,11 @@ describe('game_result/game_player create authorization for a room-backed game', 
   // joined this room at all (a fabricated "opponent" who never played). The mutation check (see
   // the report) confirms this exact test fails against the pre-fix rule.
   it('denies the host writing a game_player row for a uid that was never a participant in this room', async () => {
-    await seed(async (db) =>
-      setDoc(doc(db(), `game_result/${ROOM_CODE}`), gameResultFixture({ gameId: ROOM_CODE })),
-    )
+    await seed(async (db) => setDoc(doc(db(), `game_result/${ROOM_CODE}`), roomResult()))
     const host = testEnv.authenticatedContext(HOST_UID).firestore()
 
     await assertFails(
-      setDoc(
-        doc(host, `game_player/${ROOM_CODE}_never-played-uid`),
-        gamePlayerFixture(ROOM_CODE, 'never-played-uid'),
-      ),
+      setDoc(doc(host, `game_player/${ROOM_CODE}_never-played-uid`), roomRow('never-played-uid')),
     )
   })
 })

@@ -318,10 +318,5 @@ describe('FirestoreGameRepository.finishGame — stats-building', () => {
       bestRound: 50,
       worstRound: 50,
     })
-
-    // winnerUuid is unaffected by this fix — still the winning player's localStorage device_uuid
-    // (see docs/DECISIONS.md: out of scope for the forgery fix, GameResult.winnerUuid is display
-    // convenience, not used by lib/stats.ts's derivation).
-    expect(result.winnerUuid).toBe('device-alice-local')
   })
 })

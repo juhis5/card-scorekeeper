@@ -19,7 +19,6 @@ const RESULT: GameResult = {
   gameId: 'g1',
   finishedAt: '2026-01-01T00:00:00.000Z',
   totalRounds: 5,
-  winnerUuid: 'device-a',
 }
 
 const PLAYERS: GamePlayer[] = [
@@ -55,7 +54,7 @@ beforeEach(() => {
 })
 
 describe('writeGameResult', () => {
-  it('writes the game_result doc keyed by gameId, with the full GameResult shape', async () => {
+  it('writes the game_result doc keyed by gameId, naming every player as a participant', async () => {
     await writeGameResult(DB, RESULT, PLAYERS)
 
     expect(docMock).toHaveBeenCalledWith(DB, 'game_result/g1')
@@ -65,7 +64,7 @@ describe('writeGameResult', () => {
         gameId: 'g1',
         finishedAt: '2026-01-01T00:00:00.000Z',
         totalRounds: 5,
-        winnerUuid: 'device-a',
+        participantUids: ['device-a', 'device-b'],
       },
     )
   })
@@ -79,6 +78,7 @@ describe('writeGameResult', () => {
       { db: DB, path: 'game_player/g1_device-a' },
       {
         gameId: 'g1',
+        participantUids: ['device-a', 'device-b'],
         deviceUuid: 'device-a',
         displayName: 'Alice',
         finalScore: 10,

@@ -29,13 +29,7 @@ import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
 import { writeGameResult } from './firestore-stats'
 import { generateRoomCode as defaultGenerateRoomCode } from './room-code'
-import {
-  CONTRACTS,
-  TOTAL_ROUNDS,
-  placements as placementsFor,
-  runningTotal,
-  winners as leadingPlayers,
-} from './rules'
+import { CONTRACTS, TOTAL_ROUNDS, placements as placementsFor, runningTotal } from './rules'
 import { bestAndWorstRound } from './stats'
 import { withTimeout } from './timeout'
 import { isPermissionDenied } from './write-errors'
@@ -348,12 +342,6 @@ export class FirestoreGameRepository implements ResumableGameRepository {
 
     await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
 
-    const deviceUuidByPlayerId = new Map(
-      playersSnapshot.docs.map((snapshot) => [
-        snapshot.id,
-        (snapshot.data() as PlayerDocData).deviceUuid,
-      ]),
-    )
     // Recomputed from roundScores, not the players' own writable totalScore field — same reason
     // the game store's rankedPlayers does (see docs/DECISIONS.md's trust-model entry): a
     // permanent stats row is worth getting exactly right regardless of any denormalized field.
@@ -362,14 +350,10 @@ export class FirestoreGameRepository implements ResumableGameRepository {
       totalScore: runningTotal(player.id, roundScores),
     }))
 
-    const [leader] = leadingPlayers(rankedPlayers)
-    const winnerUuid = leader ? (deviceUuidByPlayerId.get(leader.player.id) ?? '') : ''
-
     const result: GameResult = {
       gameId: roomCode,
       finishedAt: new Date(this.now()).toISOString(),
       totalRounds: TOTAL_ROUNDS,
-      winnerUuid,
     }
 
     const gamePlayers: GamePlayer[] = placementsFor(rankedPlayers).map(({ player, placement }) => {

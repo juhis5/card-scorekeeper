@@ -258,12 +258,11 @@ describe('LocalGameRepository.finishGame', () => {
     return { repository, host, alice, bob, gameId: created.gameId, storage }
   }
 
-  it('marks the game finished and reports the lowest-total player as the winner', async () => {
+  it("returns the finished game's result under its own game id", async () => {
     const { repository, gameId } = await playFullGame()
 
     const result = await repository.finishGame()
 
-    expect(result.winnerUuid).toBe('device-a')
     expect(result.gameId).toBe(gameId)
   })
 
@@ -283,26 +282,6 @@ describe('LocalGameRepository.finishGame', () => {
 
     const emissions = recordEmissions(repository)
     expect(emissions[0]?.status).toBe('finished')
-  })
-
-  it('reports one of the tied players as the winner when totals tie for lowest', async () => {
-    const repository = makeRepository()
-    await repository.createGame(HOST_CONFIG)
-    const host = recordEmissions(repository)[0]?.players[0]
-    if (!host) throw new Error('expected the host to be seated after createGame')
-    const alice = await repository.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
-    const bob = await repository.addPlayer({ name: 'Bob', deviceUuid: 'device-b' })
-
-    for (const round of ALL_ROUNDS) {
-      await repository.setRoundScore({ playerId: host.id, round, points: 50 })
-      await repository.setRoundScore({ playerId: alice, round, points: 10 })
-      await repository.setRoundScore({ playerId: bob, round, points: 10 })
-      if (round < 5) await repository.advanceRound()
-    }
-
-    const result = await repository.finishGame()
-
-    expect(['device-a', 'device-b']).toContain(result.winnerUuid)
   })
 
   it('throws when called before the final round is reached', async () => {
@@ -327,7 +306,7 @@ describe('LocalGameRepository.finishGame', () => {
 
     const pending = readPendingResults(storage)
     expect(pending).toHaveLength(1)
-    expect(pending[0]?.result).toMatchObject({ gameId, totalRounds: 5, winnerUuid: 'device-a' })
+    expect(pending[0]?.result).toMatchObject({ gameId, totalRounds: 5 })
     expect(pending[0]?.players).toHaveLength(1)
     expect(pending[0]?.players[0]?.deviceUuid).toBe('device-host')
   })
@@ -370,7 +349,7 @@ describe('LocalGameRepository.finishGame', () => {
     const throwingStorage = makeThrowingStorage()
     const { repository } = await playFullGame(throwingStorage)
 
-    await expect(repository.finishGame()).resolves.toMatchObject({ winnerUuid: 'device-a' })
+    await expect(repository.finishGame()).resolves.toMatchObject({ totalRounds: 5 })
   })
 })
 
