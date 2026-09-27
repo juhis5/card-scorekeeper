@@ -86,3 +86,14 @@ export interface ResumableGameRepository extends GameRepository {
 export function isResumable(repository: GameRepository): repository is ResumableGameRepository {
   return 'findSeat' in repository
 }
+
+/** An online room whose host can point it at the next game once it has finished (Play again). */
+export interface ReplayableGameRepository extends GameRepository {
+  /** Host only, finished room only: records the next room's code, which every device in this
+   * room then sees as `GameState.nextRoomCode`. Set once; firestore.rules refuses a change. */
+  linkNextRoom(nextRoomCode: string): Promise<void>
+}
+
+export function isReplayable(repository: GameRepository): repository is ReplayableGameRepository {
+  return 'linkNextRoom' in repository
+}

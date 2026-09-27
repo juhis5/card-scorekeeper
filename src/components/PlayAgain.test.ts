@@ -1,0 +1,225 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { fireEvent, render, screen } from '@testing-library/vue'
+import { flushPromises } from '@vue/test-utils'
+import PlayAgain from './PlayAgain.vue'
+import { i18n } from '@/i18n'
+import { NameTakenError } from '@/lib/player-names'
+import { useGameStore } from '@/stores/game'
+import type {
+  AddPlayerInput,
+  CreatedGame,
+  GameConfig,
+  ReplayableGameRepository,
+  Unsubscribe,
+} from '@/lib/repository'
+import type { GameResult, GameState } from '@/lib/types'
+
+const { joinRepository, nextRoomRepository } = vi.hoisted(() => ({
+  joinRepository: vi.fn(),
+  nextRoomRepository: vi.fn(),
+}))
+
+vi.mock('@/composables/useGameConnectivity', () => ({
+  useGameConnectivity: () => ({ joinRepository, nextRoomRepository }),
+}))
+
+const FINISHED_CODE = 'ABCDE'
+const NEXT_CODE = 'FGHJK'
+
+/** An in-memory room: `roomCode` is what createGame hands out (null for a local game). */
+class FakeRoom implements ReplayableGameRepository {
+  private readonly listeners = new Set<(state: GameState) => void>()
+  state: GameState = { status: 'waiting', currentRound: 1, players: [], roundScores: [] }
+  linkedRoomCodes: string[] = []
+  seatedNames: string[] = []
+  addPlayerError: Error | null = null
+
+  constructor(private readonly roomCode: string | null) {}
+
+  async createGame(config: GameConfig): Promise<CreatedGame> {
+    this.seatedNames.push(config.hostDisplayName)
+    return { gameId: this.roomCode ?? 'local-game', roomCode: this.roomCode, hostPlayerId: 'host' }
+  }
+
+  async addPlayer(input: AddPlayerInput): Promise<string> {
+    if (this.addPlayerError) throw this.addPlayerError
+    this.seatedNames.push(input.name)
+    return 'jani'
+  }
+
+  subscribe(onChange: (state: GameState) => void): Unsubscribe {
+    this.listeners.add(onChange)
+    onChange(this.state)
+    return () => this.listeners.delete(onChange)
+  }
+
+  async linkNextRoom(nextRoomCode: string): Promise<void> {
+    this.linkedRoomCodes.push(nextRoomCode)
+  }
+
+  async setRoundScore(): Promise<void> {}
+  async removePlayer(): Promise<void> {}
+  async advanceRound(): Promise<void> {}
+  async finishGame(): Promise<GameResult> {
+    return { gameId: 'game', finishedAt: 'now', totalRounds: 5 }
+  }
+  leave(): void {
+    this.listeners.clear()
+  }
+
+  finish(overrides: Partial<GameState> = {}): void {
+    this.state = { ...this.state, status: 'finished', currentRound: 5, ...overrides }
+    this.listeners.forEach((listener) => listener(this.state))
+  }
+}
+
+function makeRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'home', component: { template: '<div />' } },
+      { path: '/room/:code', name: 'room', component: { template: '<div />' } },
+    ],
+  })
+}
+
+async function renderPlayAgain(props: { myName: string; otherNames: string[] }) {
+  const router = makeRouter()
+  await router.push({ name: 'room', params: { code: FINISHED_CODE } })
+  render(PlayAgain, { props, global: { plugins: [i18n, router] } })
+  return router
+}
+
+async function finishedHostedGame(roomCode: string | null) {
+  const finished = new FakeRoom(roomCode)
+  await useGameStore().start(finished, { hostDeviceUuid: 'device-host', hostDisplayName: 'Juho' })
+  finished.finish()
+  return finished
+}
+
+async function finishedJoinedGame() {
+  const finished = new FakeRoom(FINISHED_CODE)
+  await useGameStore().join(finished, FINISHED_CODE, { name: 'Jani', deviceUuid: 'device-jani' })
+  finished.finish()
+  return finished
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  localStorage.clear()
+  joinRepository.mockReset()
+  nextRoomRepository.mockReset()
+})
+
+describe('PlayAgain after a local game', () => {
+  it("opens the setup form with this game's names, host first", async () => {
+    await finishedHostedGame(null)
+    const router = await renderPlayAgain({ myName: 'Juho', otherNames: ['Jani', 'Ripa'] })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('home')
+    expect(router.options.history.state.playAgainNames).toEqual(['Juho', 'Jani', 'Ripa'])
+    expect(nextRoomRepository).not.toHaveBeenCalled()
+  })
+})
+
+describe('PlayAgain, online host', () => {
+  it('creates the next room under the same name, points this room at it and moves there', async () => {
+    const finished = await finishedHostedGame(FINISHED_CODE)
+    const next = new FakeRoom(NEXT_CODE)
+    nextRoomRepository.mockResolvedValue({ kind: 'online', repository: next })
+    const router = await renderPlayAgain({ myName: 'Juho', otherNames: ['Jani'] })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    await flushPromises()
+
+    expect(next.seatedNames).toEqual(['Juho'])
+    expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
+    expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
+  })
+
+  it("says so when the server can't be reached, and a second tap tries again", async () => {
+    await finishedHostedGame(FINISHED_CODE)
+    nextRoomRepository.mockResolvedValueOnce({ kind: 'unreachable' })
+    const router = await renderPlayAgain({ myName: 'Juho', otherNames: ['Jani'] })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    await flushPromises()
+
+    expect(screen.getByRole('alert').textContent).toContain("Couldn't start the next game")
+    expect(router.currentRoute.value.params.code).toBe(FINISHED_CODE)
+
+    nextRoomRepository.mockResolvedValueOnce({
+      kind: 'online',
+      repository: new FakeRoom(NEXT_CODE),
+    })
+    await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    await flushPromises()
+
+    expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
+  })
+})
+
+describe('PlayAgain, the other players', () => {
+  it('offers nothing until the host starts the next game', async () => {
+    await finishedJoinedGame()
+    await renderPlayAgain({ myName: 'Jani', otherNames: ['Juho'] })
+
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('asks to join the next game once the host starts it, and seats them under the same name', async () => {
+    const finished = await finishedJoinedGame()
+    const next = new FakeRoom(NEXT_CODE)
+    joinRepository.mockResolvedValue({ kind: 'online', repository: next })
+    const router = await renderPlayAgain({ myName: 'Jani', otherNames: ['Juho'] })
+
+    finished.finish({ nextRoomCode: NEXT_CODE })
+    await flushPromises()
+    expect(screen.getByRole('status').textContent).toBe('The host started a new game.')
+    await fireEvent.click(screen.getByRole('button', { name: 'Join the next game' }))
+    await flushPromises()
+
+    expect(joinRepository).toHaveBeenCalledWith(NEXT_CODE)
+    expect(next.seatedNames).toEqual(['Jani'])
+    expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
+  })
+
+  it('keeps the finished game and offers another name when theirs is taken in the next game', async () => {
+    const finished = await finishedJoinedGame()
+    const next = new FakeRoom(NEXT_CODE)
+    next.addPlayerError = new NameTakenError('Jani')
+    joinRepository.mockResolvedValue({ kind: 'online', repository: next })
+    await renderPlayAgain({ myName: 'Jani', otherNames: ['Juho'] })
+
+    finished.finish({ nextRoomCode: NEXT_CODE })
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('button', { name: 'Join the next game' }))
+    await flushPromises()
+
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Someone in the next game already uses your name.',
+    )
+    expect(screen.getByRole('link', { name: 'Join with another name' }).getAttribute('href')).toBe(
+      `/?code=${NEXT_CODE}`,
+    )
+    expect(useGameStore().roomCode).toBe(FINISHED_CODE)
+  })
+
+  it("says so when the next game can't be reached", async () => {
+    const finished = await finishedJoinedGame()
+    joinRepository.mockResolvedValue({ kind: 'unreachable' })
+    await renderPlayAgain({ myName: 'Jani', otherNames: ['Juho'] })
+
+    finished.finish({ nextRoomCode: NEXT_CODE })
+    await flushPromises()
+    await fireEvent.click(screen.getByRole('button', { name: 'Join the next game' }))
+    await flushPromises()
+
+    expect(screen.getByRole('alert').textContent).toContain("Couldn't reach the next game")
+  })
+})

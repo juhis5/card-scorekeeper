@@ -103,6 +103,21 @@ describe('GameSetup name fields', () => {
   })
 })
 
+describe('GameSetup after Play again', () => {
+  it("fills in the finished local game's names, host first", async () => {
+    const router = makeTestRouter()
+    await router.push({ name: 'home', state: { playAgainNames: ['Juho', 'Jani', 'Ripa'] } })
+    render(GameSetup, { global: { plugins: [i18n, router] } })
+
+    expect((screen.getByLabelText('Your name') as HTMLInputElement).value).toBe('Juho')
+    expect(
+      screen
+        .getAllByLabelText(/^Player \d+ name$/)
+        .map((input) => (input as HTMLInputElement).value),
+    ).toEqual(['Jani', 'Ripa'])
+  })
+})
+
 describe('GameSetup validation', () => {
   it('shows a host-name error and never probes connectivity when the host name is missing', async () => {
     renderGameSetup()

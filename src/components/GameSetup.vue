@@ -3,8 +3,8 @@
  * The home-screen "host" form: name your game and start it. On submit, probes backend
  * reachability (see `useGameConnectivity`/`lib/game-mode.ts`) and picks the repository — online
  * (Firestore, a real room code others join with) when reachable, local single-device otherwise.
- * This is the only place that constructs a repository; everything downstream (RoomView and its
- * children) only ever talks to the store.
+ * Repositories are chosen here, in JoinGame and in PlayAgain (the next room after a finished
+ * game); everything else talks only to the store.
  *
  * The "other players" fields only matter for the offline fallback — online, other players join
  * later via the room code, not by the host typing their names upfront (see docs/PLAN.md's "Reachable
@@ -27,6 +27,7 @@ import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { hasUnfinishedPersistedGame } from '@/lib/local-repository'
+import { playAgainNamesFrom } from '@/lib/navigation'
 import { duplicateNameIndexes } from '@/lib/player-names'
 import type { HostGameMode } from '@/lib/game-mode'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
@@ -42,8 +43,16 @@ const identity = useIdentityStore()
 const game = useGameStore()
 const { hostRepository, localRepository } = useGameConnectivity()
 
-const hostName = ref(identity.displayName)
-const otherPlayers = ref<OtherPlayerField[]>([{ id: crypto.randomUUID(), name: '' }])
+// Play again after a local game opens this form with that game's names, host first.
+const playAgainNames = playAgainNamesFrom(router.options.history.state)
+const playAgainOthers = playAgainNames?.slice(1) ?? []
+const hostName = ref(playAgainNames?.[0] ?? identity.displayName)
+const otherPlayers = ref<OtherPlayerField[]>(
+  (playAgainOthers.length > 0 ? playAgainOthers : ['']).map((name) => ({
+    id: crypto.randomUUID(),
+    name,
+  })),
+)
 const attemptedSubmit = ref(false)
 const areOtherPlayersInvalid = ref(false)
 const isSubmitting = ref(false)

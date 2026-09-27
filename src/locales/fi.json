@@ -197,6 +197,20 @@
     "connection": {
       "removed": "Et ole enää tässä huoneessa. Isäntä on ehkä poistanut sinut, tai huone on suljettu.",
       "lost": "Yhteys huoneeseen katkesi. Lataa sivu uudelleen yhdistääksesi."
+    },
+    "playAgain": {
+      "button": "Pelaa uudestaan",
+      "hostStarted": "Isäntä aloitti uuden pelin.",
+      "youStarted": "Aloitit jo seuraavan pelin.",
+      "join": "Liity seuraavaan peliin",
+      "goToNext": "Siirry seuraavaan peliin",
+      "errors": {
+        "startFailed": "Seuraavaa peliä ei voitu aloittaa. Tarkista yhteys ja yritä uudelleen.",
+        "unreachable": "Seuraavaa peliä ei tavoitettu. Tarkista yhteys ja yritä uudelleen.",
+        "joinFailed": "Seuraavaan peliin ei voitu liittyä. Se on ehkä suljettu.",
+        "nameTaken": "Joku seuraavassa pelissä käyttää jo nimeäsi."
+      },
+      "joinWithAnotherName": "Liity toisella nimellä"
     }
   },
   "notFound": {

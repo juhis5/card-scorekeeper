@@ -251,6 +251,52 @@ describe('FirestoreGameRepository.subscribe errors', () => {
   })
 })
 
+describe('FirestoreGameRepository play again', () => {
+  const NEXT_CODE = 'FGHJK'
+
+  function repository() {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      roomCode: ROOM_CODE,
+    })
+  }
+
+  function emitRoom(data: Record<string, unknown>): void {
+    const onRoom = (onSnapshotMock.mock.calls[0] as unknown[])[1] as (snapshot: unknown) => void
+    onRoom({ data: () => data })
+  }
+
+  it("passes the room's link to the next room on to every device", () => {
+    const onChange = vi.fn()
+    repository().subscribe(onChange)
+
+    emitRoom({ status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE })
+
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ nextRoomCode: NEXT_CODE }))
+  })
+
+  it('ignores a link that is not a room code', () => {
+    const onChange = vi.fn()
+    repository().subscribe(onChange)
+
+    emitRoom({ status: 'finished', currentRound: 5, nextRoomCode: 'not a code' })
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ nextRoomCode: 'not a code' }),
+    )
+  })
+
+  it('points the finished room at the next room', async () => {
+    await repository().linkNextRoom(NEXT_CODE)
+
+    expect(updateDocMock).toHaveBeenCalledWith(
+      { path: `room/${ROOM_CODE}` },
+      { nextRoomCode: NEXT_CODE },
+    )
+  })
+})
+
 describe('FirestoreGameRepository write timeouts', () => {
   const TIMEOUT_MS = 1000
 
@@ -277,6 +323,16 @@ describe('FirestoreGameRepository write timeouts', () => {
   it('gives up creating a room when the write never reaches the server', async () => {
     const outcome = repository()
       .createGame({ hostDeviceUuid: 'd', hostDisplayName: 'Host' })
+      .catch((error: unknown) => error)
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
+    expect(await outcome).toMatchObject({ code: 'deadline-exceeded' })
+  })
+
+  it('gives up pointing at the next room when the write never reaches the server', async () => {
+    updateDocMock.mockReturnValue(new Promise(() => undefined))
+    const outcome = repository(ROOM_CODE)
+      .linkNextRoom('FGHJK')
       .catch((error: unknown) => error)
 
     await vi.advanceTimersByTimeAsync(TIMEOUT_MS)

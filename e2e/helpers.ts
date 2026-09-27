@@ -1,8 +1,11 @@
 /**
  * Shared two-device helpers for the online e2e specs: host and join through the real UI, read the
- * room code, enter a score, and find a scoreboard row. Queries by role/label/text only.
+ * room code, enter a score, play a round, and find a scoreboard row. Queries by role/label/text
+ * only.
  */
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
+
+const TOTAL_ROUNDS = 5
 
 /** Mirrors src/lib/room-code.ts's alphabet (no 0/O/1/I) — used only to locate/parse the code
  * rendered in the UI, not to generate one. */
@@ -78,4 +81,31 @@ export async function enterOwnRoundScore(page: Page, round: number, points: numb
  * and "did their total update" assertions. */
 export function scoreboardRow(page: Page, playerName: string) {
   return page.getByRole('row', { name: new RegExp(playerName) })
+}
+
+export function roundHeading(page: Page, round: number) {
+  return page.getByRole('heading', { name: `Round ${round} scores` })
+}
+
+export interface OnlinePlayers {
+  hostName: string
+  joinerName: string
+}
+
+/** Both players score (the host scores 20, the joiner 10), the host moves on once both are in,
+ * the board reveals the round's totals and the joiner follows. */
+export async function playOnlineRound(
+  hostPage: Page,
+  joinerPage: Page,
+  round: number,
+  { hostName, joinerName }: OnlinePlayers,
+): Promise<void> {
+  await enterRoundScore(hostPage, hostName, round, 20)
+  await enterOwnRoundScore(joinerPage, round, 10)
+  const isLastRound = round === TOTAL_ROUNDS
+  const button = hostPage.getByRole('button', { name: isLastRound ? 'Finish game' : 'Next round' })
+  await expect(button).toBeEnabled()
+  await button.click()
+  await expect(scoreboardRow(hostPage, joinerName)).toContainText(String(round * 10))
+  if (!isLastRound) await expect(roundHeading(joinerPage, round + 1)).toBeVisible()
 }

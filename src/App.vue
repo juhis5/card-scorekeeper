@@ -82,6 +82,10 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
       </Button>
     </div>
 
-    <RouterView />
+    <!-- Keyed by path: a room's view state (seat order, which scores this device entered) belongs
+         to that room, so moving on to the next room after Play again starts the view afresh. -->
+    <RouterView v-slot="{ Component, route: current }">
+      <component :is="Component" :key="current.path" />
+    </RouterView>
   </div>
 </template>

@@ -17,6 +17,7 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { WifiOff } from '@lucide/vue'
 import ContractBanner from '@/components/ContractBanner.vue'
+import PlayAgain from '@/components/PlayAgain.vue'
 import RemovePlayerControl from '@/components/RemovePlayerControl.vue'
 import ScoreCard from '@/components/ScoreCard.vue'
 import ScoreBoard from '@/components/ScoreBoard.vue'
@@ -80,16 +81,28 @@ watch(
   },
   { immediate: true },
 )
+const seatedStandings = computed(() =>
+  seatOrder.value
+    .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
+    .filter((standing): standing is Standing => standing !== undefined),
+)
 // The host (offline or online) enters and fixes anyone's score; an online joiner edits only their
 // own seat. firestore.rules enforces the same split.
-const entryStandings = computed(() => {
-  const ordered = seatOrder.value
-    .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
-    .filter((standing): standing is Standing => standing !== undefined)
-  return isHost.value
-    ? ordered
-    : ordered.filter((standing) => standing.player.id === myPlayerId.value)
-})
+const entryStandings = computed(() =>
+  isHost.value
+    ? seatedStandings.value
+    : seatedStandings.value.filter((standing) => standing.player.id === myPlayerId.value),
+)
+/** Play again carries this game's names on: this device's own, and everyone else's in seat order. */
+const myName = computed(
+  () =>
+    seatedStandings.value.find(({ player }) => player.id === myPlayerId.value)?.player.name ?? '',
+)
+const otherNames = computed(() =>
+  seatedStandings.value
+    .filter(({ player }) => player.id !== myPlayerId.value)
+    .map(({ player }) => player.name),
+)
 
 /** Earlier rounds an editable player has no score for: a late joiner fills these in, so nobody is
  * ranked on fewer rounds than the others. */
@@ -513,9 +526,12 @@ onMounted(async () => {
         {{ t('room.next.waiting', { names: waitingForNames }) }}
       </p>
 
+      <div v-if="isFinished" class="bg-background sticky bottom-0 mt-auto pt-2 pb-2">
+        <PlayAgain :my-name="myName" :other-names="otherNames" />
+      </div>
       <!-- aria-disabled rather than disabled: the tap must still reach the handler, which waits
            for a score saved by that same tap before deciding. -->
-      <div v-if="isHost" class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
+      <div v-else-if="isHost" class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
         <Button
           v-if="!isFinalRound"
           class="h-11 flex-1 aria-disabled:opacity-50"
@@ -526,7 +542,7 @@ onMounted(async () => {
           {{ t('room.next.button') }}
         </Button>
         <Button
-          v-else-if="!isFinished"
+          v-else
           class="h-11 flex-1 aria-disabled:opacity-50"
           :aria-disabled="!allPlayersScored"
           :disabled="isFinishing"
@@ -535,11 +551,7 @@ onMounted(async () => {
           {{ t('room.finish.button') }}
         </Button>
       </div>
-      <p
-        v-else-if="!isFinished"
-        role="status"
-        class="text-muted-foreground py-2 text-center text-sm"
-      >
+      <p v-else role="status" class="text-muted-foreground py-2 text-center text-sm">
         {{ t('room.online.waitingForHost') }}
       </p>
     </template>

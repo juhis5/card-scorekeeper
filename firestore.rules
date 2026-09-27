@@ -114,23 +114,40 @@ service cloud.firestore {
       // Only the host advances rounds / finishes the game, and only while the room is live.
       // `resource` (not a get()) is enough here — we're already inside this exact document's
       // own rule, no need to fetch it a second time. Field-restricted to exactly what the app
-      // ever writes here (advanceRound/finishGame): status + currentRound. hostUid/code/
-      // createdAt/expiresAt are immutable after create — an unbounded expiry extension would
-      // undermine "rooms auto-expire" (docs/PLAN.md's Gemini free-tier protection).
+      // ever writes here: status + currentRound (advanceRound/finishGame), or the one-time
+      // nextRoomCode (Play again) below. hostUid/code/createdAt/expiresAt are immutable after
+      // create — an unbounded expiry extension would undermine "rooms auto-expire"
+      // (docs/PLAN.md's Gemini free-tier protection).
       // Values too, not just keys: a round outside 1..5 would crash every client's contract
       // banner, and a finished room must never reopen (the /api photo gate trusts 'finished').
       // Rounds only move forward one at a time, and the game finishes only in round 5.
+      function isRoundUpdate() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentRound'])
+          && resource.data.status != 'finished'
+          && request.resource.data.status in ['waiting', 'playing', 'finished']
+          && request.resource.data.currentRound is int
+          && request.resource.data.currentRound >= resource.data.currentRound
+          && request.resource.data.currentRound <= resource.data.currentRound + 1
+          && request.resource.data.currentRound <= 5
+          && (request.resource.data.status != 'finished' || request.resource.data.currentRound == 5);
+      }
+
+      // Play again: a finished room takes one more write, `nextRoomCode`, pointing every device
+      // still in it at the room the same host just created. Set once, never changed, and the
+      // status stays 'finished', so the room still never reopens.
+      function isNextRoomLink() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nextRoomCode'])
+          && resource.data.status == 'finished'
+          && !('nextRoomCode' in resource.data)
+          && isRoomCode(request.resource.data.nextRoomCode)
+          && request.resource.data.nextRoomCode != code
+          && get(/databases/$(database)/documents/room/$(request.resource.data.nextRoomCode)).data.hostUid == request.auth.uid;
+      }
+
       allow update: if isSignedIn()
         && resource.data.hostUid == request.auth.uid
         && resource.data.expiresAt > request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentRound'])
-        && resource.data.status != 'finished'
-        && request.resource.data.status in ['waiting', 'playing', 'finished']
-        && request.resource.data.currentRound is int
-        && request.resource.data.currentRound >= resource.data.currentRound
-        && request.resource.data.currentRound <= resource.data.currentRound + 1
-        && request.resource.data.currentRound <= 5
-        && (request.resource.data.status != 'finished' || request.resource.data.currentRound == 5);
+        && (isRoundUpdate() || isNextRoomLink());
 
       allow delete: if false;
 

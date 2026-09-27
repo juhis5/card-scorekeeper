@@ -188,7 +188,10 @@ const RouterLinkStub = { template: '<a><slot /></a>' }
 function makeTestRouter(): Router {
   return createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/room/:code', name: 'room', component: { template: '<div />' } }],
+    routes: [
+      { path: '/', name: 'home', component: { template: '<div />' } },
+      { path: '/room/:code', name: 'room', component: { template: '<div />' } },
+    ],
   })
 }
 
@@ -559,6 +562,30 @@ describe('RoomView finishing the game', () => {
     }
 
     expect(screen.getByText('Alice and Bob tie for the win!')).toBeTruthy()
+  })
+
+  it("offers Play again with this game's names, host first and in seat order", async () => {
+    const game = useGameStore()
+    await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await game.addPlayer({ name: 'Bob', deviceUuid: 'device-b' })
+    const router = makeTestRouter()
+    await router.push(`/room/${LOCAL_GAME_ROUTE_CODE}`)
+    render(RoomView, {
+      global: { plugins: [router, i18n], stubs: { RouterLink: RouterLinkStub } },
+    })
+
+    for (let round = 1; round <= 5; round++) {
+      await enterScore('Host', round, 50)
+      await enterScore('Alice', round, 5)
+      await enterScore('Bob', round, 10)
+      await advanceOrFinish(round)
+    }
+    await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('home')
+    expect(router.options.history.state.playAgainNames).toEqual(['Host', 'Alice', 'Bob'])
   })
 })
 

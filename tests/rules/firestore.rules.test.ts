@@ -1044,6 +1044,100 @@ describe('room create and update values', () => {
   })
 })
 
+describe('play again: a finished room points at the next room', () => {
+  const NEXT_CODE = 'FGHJK'
+
+  async function seedRooms({
+    finished = roomFixture({ status: 'finished', currentRound: 5 }),
+    next = roomFixture({ code: NEXT_CODE }),
+  }: { finished?: Record<string, unknown>; next?: Record<string, unknown> | null } = {}) {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), finished)
+      if (next) await setDoc(doc(db(), `room/${NEXT_CODE}`), next)
+    })
+  }
+
+  function linkAs(uid: string, fields: Record<string, unknown> = { nextRoomCode: NEXT_CODE }) {
+    const db = testEnv.authenticatedContext(uid).firestore()
+    return updateDoc(doc(db, `room/${ROOM_CODE}`), fields)
+  }
+
+  it("lets the host point a finished room at the host's next room, and keeps it finished", async () => {
+    await seedRooms()
+
+    await assertSucceeds(linkAs(HOST_UID))
+  })
+
+  it('lets anyone signed in read the link', async () => {
+    await seedRooms({
+      finished: roomFixture({ status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE }),
+    })
+    const stranger = testEnv.authenticatedContext('stranger-uid').firestore()
+
+    await assertSucceeds(getDoc(doc(stranger, `room/${ROOM_CODE}`)))
+  })
+
+  it('denies anyone but the host', async () => {
+    await seedRooms({ next: roomFixture({ code: NEXT_CODE, hostUid: ALICE_UID }) })
+
+    await assertFails(linkAs(ALICE_UID))
+  })
+
+  it('denies a room that has not finished', async () => {
+    await seedRooms({ finished: roomFixture({ status: 'playing', currentRound: 5 }) })
+
+    await assertFails(linkAs(HOST_UID))
+  })
+
+  it('denies changing the link once it is set', async () => {
+    await seedRooms({
+      finished: roomFixture({ status: 'finished', currentRound: 5, nextRoomCode: 'LMNPQ' }),
+    })
+
+    await assertFails(linkAs(HOST_UID))
+  })
+
+  it('denies other fields with the link, so the room never reopens', async () => {
+    await seedRooms()
+
+    await assertFails(linkAs(HOST_UID, { nextRoomCode: NEXT_CODE, status: 'playing' }))
+    await assertFails(linkAs(HOST_UID, { nextRoomCode: NEXT_CODE, currentRound: 1 }))
+  })
+
+  it('denies a next room someone else hosts, or one that does not exist', async () => {
+    await seedRooms({ next: roomFixture({ code: NEXT_CODE, hostUid: ALICE_UID }) })
+    await assertFails(linkAs(HOST_UID))
+
+    await testEnv.clearFirestore()
+    await seedRooms({ next: null })
+    await assertFails(linkAs(HOST_UID))
+  })
+
+  it('denies pointing at itself or at something that is not a room code', async () => {
+    await seedRooms()
+
+    await assertFails(linkAs(HOST_UID, { nextRoomCode: ROOM_CODE }))
+    await assertFails(linkAs(HOST_UID, { nextRoomCode: 'fghjk' }))
+    await assertFails(linkAs(HOST_UID, { nextRoomCode: 12345 }))
+  })
+
+  it('denies linking an expired room', async () => {
+    await seedRooms({
+      finished: roomFixture({ status: 'finished', currentRound: 5, expiresAt: pastExpiry() }),
+    })
+
+    await assertFails(linkAs(HOST_UID))
+  })
+
+  it('denies a new room that already carries a link', async () => {
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(
+      setDoc(doc(host, `room/${ROOM_CODE}`), roomFixture({ nextRoomCode: NEXT_CODE })),
+    )
+  })
+})
+
 describe('roundScores tied to the room', () => {
   beforeEach(async () => {
     await seed(async (db) => {

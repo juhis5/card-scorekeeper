@@ -103,6 +103,7 @@ export default defineConfig({
         '**/host-powers.spec.ts',
         '**/online-game.spec.ts',
         '**/unique-names.spec.ts',
+        '**/play-again.spec.ts',
       ],
     },
 
