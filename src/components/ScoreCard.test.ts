@@ -280,6 +280,21 @@ describe('ScoreCard, the Save button', () => {
   })
 })
 
+describe('ScoreCard with the keyboard up', () => {
+  it("never scrolls the page when the visible area resizes, so it can't fight the player's own scrolling", async () => {
+    renderCard()
+    await expandCard()
+    const scrollBy = vi.spyOn(window, 'scrollBy').mockImplementation(() => undefined)
+
+    window.dispatchEvent(new Event('resize'))
+    window.visualViewport?.dispatchEvent(new Event('resize'))
+    window.visualViewport?.dispatchEvent(new Event('scroll'))
+
+    expect(scrollBy).not.toHaveBeenCalled()
+    scrollBy.mockRestore()
+  })
+})
+
 describe('ScoreCard, leaving the field by tapping elsewhere', () => {
   it('saves at once but closes only after that tap has landed, so the list does not shift under it', async () => {
     const { emitted } = renderCard()

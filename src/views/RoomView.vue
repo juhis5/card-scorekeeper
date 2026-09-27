@@ -388,7 +388,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
+  <main class="group/room mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
     <!-- One heading for every state: navigation focuses it before the room's first snapshot
          arrives, and a new element per state would drop that focus when the room opens. While a
          game is on screen it's for screen readers only; the board needs the space more. -->
@@ -527,10 +527,13 @@ onMounted(async () => {
         {{ t('room.next.waiting', { names: waitingForNames }) }}
       </p>
 
+      <!-- The bottom bars stick to the bottom of the screen, except while a field has focus: with
+           the keyboard up the phone shows them right above it, on top of the field being typed
+           into (third playtest, iPhone). -->
       <div
         v-if="isFinished"
         data-bottom-bar
-        class="bg-background sticky bottom-0 mt-auto pt-2 pb-2"
+        class="bg-background sticky bottom-0 mt-auto pt-2 pb-2 group-has-[input:focus]/room:static"
       >
         <PlayAgain :my-name="myName" :other-names="otherNames" :guest-names="guestNames" />
       </div>
@@ -539,7 +542,7 @@ onMounted(async () => {
       <div
         v-else-if="isHost"
         data-bottom-bar
-        class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2"
+        class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2 group-has-[input:focus]/room:static"
       >
         <Button
           v-if="!isFinalRound"

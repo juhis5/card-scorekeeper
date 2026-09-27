@@ -70,7 +70,7 @@ const isExpanded = ref(false)
 let isPressInsidePanel = false
 const cardElement = useTemplateRef<HTMLLIElement>('card')
 const headerButton = useTemplateRef<HTMLButtonElement>('header')
-const { reveal } = useKeepInView(cardElement, isExpanded)
+const { reveal } = useKeepInView(cardElement)
 
 const inputId = computed(() => `score-card-${player.id}`)
 const errorId = computed(() => `${inputId.value}-error`)
@@ -117,11 +117,10 @@ async function expand(): Promise<void> {
   points.value = savedPoints.value
   isExpanded.value = true
   await nextTick()
-  // A plain focus, so the phone brings the field above its keyboard as it would anywhere; then
-  // the whole card, ✓ and ✕ included, is moved clear of the header and the Next bar, and again
-  // once the keyboard is up (useKeepInView).
-  document.getElementById(inputId.value)?.focus()
+  // First the whole card, ✓ and ✕ included, clear of the header and the Next bar; then a plain
+  // focus, so the phone's own keyboard scrolling runs last and brings the field above it.
   reveal()
+  document.getElementById(inputId.value)?.focus()
 }
 
 /** Collapsing unmounts the focused control, so hand focus back to the header — otherwise it

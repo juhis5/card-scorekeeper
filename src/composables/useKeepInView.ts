@@ -1,12 +1,13 @@
 /**
- * Keeps an open card showing above the phone keyboard. While `isActive`, it re-checks whenever the
- * visible part of the page changes size (the keyboard opening, or the phone turning) and scrolls
- * the page just enough; `reveal()` does it once on demand. On an iPhone the keyboard shrinks only
- * window.visualViewport, not the page, so that's what counts as visible. The sticky header
- * (`data-app-header`) and a room's bottom bar (`data-bottom-bar`) cover part of it when they're in
- * view; on an iPhone with the keyboard up the bar sits behind the keyboard and covers nothing.
+ * Moves an open card clear of the sticky header (`data-app-header`) and a room's bottom bar
+ * (`data-bottom-bar`), once, when it opens. Call `reveal()` before focusing the card's field, so
+ * the phone's own keyboard scrolling runs last and has the final say.
+ *
+ * Deliberately not a resize listener. Following window.visualViewport while the keyboard was up
+ * fought the player's own scrolling on an iPhone, whose visual viewport also resizes while
+ * scrolling (the toolbars sliding in and out): the page jumped back mid-scroll (third playtest).
  */
-import { watch, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import { scrollToReveal, type VerticalBox } from '@/lib/keep-in-view'
 
 function visibleArea(): VerticalBox {
@@ -24,7 +25,7 @@ function coveredEdges(visible: VerticalBox): { top: number; bottom: number } {
   }
 }
 
-export function useKeepInView(element: Ref<HTMLElement | null>, isActive: Ref<boolean>) {
+export function useKeepInView(element: Ref<HTMLElement | null>) {
   function reveal(): void {
     const target = element.value
     if (!target) return
@@ -32,17 +33,6 @@ export function useKeepInView(element: Ref<HTMLElement | null>, isActive: Ref<bo
     const distance = scrollToReveal(target.getBoundingClientRect(), visible, coveredEdges(visible))
     if (distance !== 0) window.scrollBy({ top: distance })
   }
-
-  watch(
-    isActive,
-    (active, _previous, onCleanup) => {
-      if (!active) return
-      const source = window.visualViewport ?? window
-      source.addEventListener('resize', reveal)
-      onCleanup(() => source.removeEventListener('resize', reveal))
-    },
-    { immediate: true },
-  )
 
   return { reveal }
 }
