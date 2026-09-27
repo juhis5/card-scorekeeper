@@ -33,10 +33,22 @@ export async function startHostedGame(page: Page, hostName: string): Promise<voi
 
 /** Reads the room code the host's RoomView is displaying. Throws (failing the test with a clear
  * message) if the text doesn't contain a well-formed code — never silently returns garbage. */
+function roomCodeCopyButton(page: Page) {
+  return page.getByRole('button', { name: /^Copy room code / })
+}
+
+/** An online room shows its code in the header, a local game doesn't: waits for it. */
+export async function expectOnlineRoom(page: Page): Promise<void> {
+  await expect(roomCodeCopyButton(page)).toBeVisible()
+}
+
+/** The room code, from the header's copy button ("Copy room code 7K4RQ"). */
 export async function readRoomCode(page: Page): Promise<string> {
-  const codeText = await page.getByText(ROOM_CODE_PATTERN).innerText()
-  const match = codeText.match(ROOM_CODE_PATTERN)
-  if (!match) throw new Error(`expected a room code in "${codeText}"`)
+  const copyButton = roomCodeCopyButton(page)
+  await copyButton.waitFor()
+  const label = (await copyButton.getAttribute('aria-label')) ?? ''
+  const match = label.match(ROOM_CODE_PATTERN)
+  if (!match) throw new Error(`expected a room code in "${label}"`)
   return match[0]
 }
 

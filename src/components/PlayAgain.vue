@@ -146,7 +146,7 @@ function handleJoinNext(code: string): Promise<void> {
     <p v-if="error" role="alert" class="text-destructive text-sm">{{ errorMessages[error] }}</p>
     <RouterLink
       v-if="error === 'nameTaken' && nextRoomCode"
-      :to="{ name: 'home', query: { code: nextRoomCode } }"
+      :to="{ name: 'join', params: { code: nextRoomCode } }"
       class="text-primary flex h-11 items-center underline underline-offset-4"
     >
       {{ t('room.playAgain.joinWithAnotherName') }}

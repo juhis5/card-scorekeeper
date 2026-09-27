@@ -81,8 +81,6 @@
     "heading": "Rommi scoreboard",
     "roundBanner": "Round {round} of {total} — {contract}",
     "online": {
-      "codeLabel": "Room code: {code}",
-      "codeHint": "Share this code so others can join.",
       "waitingForHost": "Waiting for the host to move to the next round.",
       "reconnecting": "Reconnecting… your scores are safe and will sync automatically."
     },
@@ -270,5 +268,31 @@
       "recordCompact": "{wins} W – {losses} L – {ties} T",
       "empty": "No shared games yet with other players."
     }
+  },
+  "invite": {
+    "room": "Room",
+    "copyCodeLabel": "Copy room code {code}",
+    "button": "Invite",
+    "title": "Invite players",
+    "description": "Others join by scanning the code or typing the room code.",
+    "qrLabel": "QR code for the link to join this room",
+    "scan": "Scan to join",
+    "copyCode": "Copy code",
+    "shareLink": "Share link",
+    "codeCopied": "Room code copied",
+    "linkCopied": "Link copied",
+    "shareText": "Join our Rommi game in room {code}",
+    "close": "Close"
+  },
+  "join": {
+    "announce": "Join a game",
+    "heading": "Join room {code}",
+    "headingNoCode": "Join a game",
+    "checking": "Checking the room…",
+    "finished": "This game has already ended.",
+    "expired": "This room has expired.",
+    "missing": "There is no room {code}. Check the code.",
+    "invalid": "That link doesn't have a room code in it.",
+    "toHome": "Back to home"
   }
 }

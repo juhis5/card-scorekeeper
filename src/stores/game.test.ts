@@ -12,6 +12,7 @@ import type {
   GameRepository,
   ReplayableGameRepository,
   ResumableGameRepository,
+  RoomAvailability,
   Seat,
   SetRoundScoreInput,
   Unsubscribe,
@@ -651,6 +652,10 @@ class FakeResumableRepository extends FakeGameRepository implements ResumableGam
 
   async findSeat(): Promise<Seat | null> {
     return this.seat
+  }
+
+  async roomAvailability(): Promise<RoomAvailability> {
+    return 'open'
   }
 }
 

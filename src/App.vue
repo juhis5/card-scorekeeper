@@ -6,11 +6,18 @@ import { X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import AppMenu from '@/components/AppMenu.vue'
 import BackButton from '@/components/BackButton.vue'
+import RoomCodeBar from '@/components/RoomCodeBar.vue'
 import { useServiceWorker } from '@/composables/useServiceWorker'
+import { useGameStore } from '@/stores/game'
 
 const route = useRoute()
 const { t } = useI18n()
 const isHome = computed(() => route.name === 'home')
+const game = useGameStore()
+/** The online room this device is in, while its page is open. */
+const headerRoomCode = computed(() =>
+  route.name === 'room' && game.roomCode === String(route.params.code) ? game.roomCode : null,
+)
 
 // Announces the active view's heading on every navigation — SPA route changes are otherwise
 // silent to screen readers (see a11y-mobile + routing skills). Focus itself moves to the
@@ -40,13 +47,14 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
     <div aria-live="polite" role="status" class="sr-only">{{ updateAnnouncement }}</div>
 
     <!-- Persistent chrome (see the routing skill), reachable from every route incl. mid-game:
-         Back, and the menu with the pages (Stats is a device-wide record, not tied to any one
-         room) and the settings. No title link: Back already leads home, and the app's name sits
-         in the menu. -->
+         Back, the room code while in an online room, and the menu with the pages (Stats is a
+         device-wide record, not tied to any one room) and the settings. No title link: Back
+         already leads home, and the app's name sits in the menu. -->
     <header class="mx-auto flex w-full max-w-md items-center gap-1 px-4 pt-2">
       <BackButton v-if="!isHome" class="-ml-2" />
-      <div class="min-w-0 flex-1" />
-      <AppMenu />
+      <RoomCodeBar v-if="headerRoomCode" :code="headerRoomCode" />
+      <div v-else class="min-w-0 flex-1" />
+      <AppMenu class="-mr-2" />
     </header>
 
     <div

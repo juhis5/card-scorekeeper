@@ -81,8 +81,6 @@
     "heading": "Rommi-pistetaulukko",
     "roundBanner": "Kierros {round}/{total} — {contract}",
     "online": {
-      "codeLabel": "Huonekoodi: {code}",
-      "codeHint": "Jaa tämä koodi, jotta muut voivat liittyä.",
       "waitingForHost": "Odotetaan, että isäntä siirtyy seuraavalle kierrokselle.",
       "reconnecting": "Yhteyttä muodostetaan uudelleen… pisteesi ovat tallessa ja synkronoituvat automaattisesti."
     },
@@ -270,5 +268,31 @@
       "recordCompact": "{wins} V – {losses} H – {ties} T",
       "empty": "Ei vielä yhteisiä pelejä muiden pelaajien kanssa."
     }
+  },
+  "invite": {
+    "room": "Huone",
+    "copyCodeLabel": "Kopioi huonekoodi {code}",
+    "button": "Kutsu",
+    "title": "Kutsu pelaajia",
+    "description": "Muut liittyvät skannaamalla koodin tai kirjoittamalla huonekoodin.",
+    "qrLabel": "QR-koodi linkkiin, jolla liitytään tähän huoneeseen",
+    "scan": "Skannaa liittyäksesi",
+    "copyCode": "Kopioi koodi",
+    "shareLink": "Jaa linkki",
+    "codeCopied": "Huonekoodi kopioitu",
+    "linkCopied": "Linkki kopioitu",
+    "shareText": "Liity Rommi-peliimme huoneessa {code}",
+    "close": "Sulje"
+  },
+  "join": {
+    "announce": "Liity peliin",
+    "heading": "Liity huoneeseen {code}",
+    "headingNoCode": "Liity peliin",
+    "checking": "Tarkistetaan huonetta…",
+    "finished": "Tämä peli on jo päättynyt.",
+    "expired": "Tämä huone on vanhentunut.",
+    "missing": "Huonetta {code} ei ole. Tarkista koodi.",
+    "invalid": "Linkissä ei ole huonekoodia.",
+    "toHome": "Takaisin etusivulle"
   }
 }

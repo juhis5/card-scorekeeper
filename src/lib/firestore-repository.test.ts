@@ -163,6 +163,39 @@ describe('FirestoreGameRepository.addPlayer when already seated', () => {
   })
 })
 
+describe('FirestoreGameRepository.roomAvailability', () => {
+  const NOW = 1_000_000
+
+  function repository() {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: ALICE_UID } } as never,
+      roomCode: ROOM_CODE,
+      now: () => NOW,
+    })
+  }
+
+  function roomSnapshot(status: string, expiresAtMs: number) {
+    return snapshot({ status, hostUid: HOST_UID, expiresAt: { toMillis: () => expiresAtMs } })
+  }
+
+  it('is open for a live room that has not finished', async () => {
+    getDocMock.mockResolvedValue(roomSnapshot('playing', NOW + 1))
+    await expect(repository().roomAvailability()).resolves.toBe('open')
+  })
+
+  it('says finished, expired or missing, so the join page can say so before a join fails', async () => {
+    getDocMock.mockResolvedValueOnce(roomSnapshot('finished', NOW + 1))
+    await expect(repository().roomAvailability()).resolves.toBe('finished')
+
+    getDocMock.mockResolvedValueOnce(roomSnapshot('playing', NOW))
+    await expect(repository().roomAvailability()).resolves.toBe('expired')
+
+    getDocMock.mockResolvedValueOnce(snapshot(undefined))
+    await expect(repository().roomAvailability()).resolves.toBe('missing')
+  })
+})
+
 describe('FirestoreGameRepository unique names', () => {
   function aliceRepository() {
     return new FirestoreGameRepository({

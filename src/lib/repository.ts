@@ -85,11 +85,16 @@ export interface Seat {
   isHost: boolean
 }
 
+/** Whether a room can still be joined: 'expired' wins over 'finished'. */
+export type RoomAvailability = 'open' | 'finished' | 'expired' | 'missing'
+
 /** An online repository that can find this device's existing seat, so a reload resumes the game
  * instead of losing it. */
 export interface ResumableGameRepository extends GameRepository {
   /** `null` when this device has no seat in the room, or the room doesn't exist. */
   findSeat(): Promise<Seat | null>
+  /** Reads the room, so a join link can say "this game has ended" instead of a failed join. */
+  roomAvailability(): Promise<RoomAvailability>
 }
 
 export function isResumable(repository: GameRepository): repository is ResumableGameRepository {
