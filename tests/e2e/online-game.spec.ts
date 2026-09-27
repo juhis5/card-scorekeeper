@@ -1,8 +1,6 @@
 /**
- * A whole online game across two browser contexts and the emulators: five rounds, a reload on
- * each device mid-game (both must land back in their seat, the host with host controls), the
- * finish on both devices, and the host's stats afterwards. The e2e suite otherwise stops after
- * round 1. Every assertion auto-waits for the live Firestore update, never a fixed sleep.
+ * A whole online game on two devices: five rounds, a reload on each mid-game (both land back in
+ * their seat, the host with host controls), the finish on both and the host's stats.
  */
 import { expect, test } from '@playwright/test'
 import {
@@ -18,7 +16,6 @@ import {
 
 const PLAYERS = { hostName: 'Host', joinerName: 'Alice' }
 
-// Not run under the `webkit` project, like live-sync.spec.ts: see playwright.config.ts.
 test.describe('a full online game', () => {
   test('plays five rounds with reloads, finishes on both devices and records stats', async ({
     browser,
@@ -41,7 +38,6 @@ test.describe('a full online game', () => {
       await playOnlineRound(hostPage, joinerPage, 1, PLAYERS)
       await playOnlineRound(hostPage, joinerPage, 2, PLAYERS)
 
-      // A reload mid-game puts each device back in its seat; the host keeps host controls.
       await joinerPage.reload()
       await expect(roundHeading(joinerPage, 3)).toBeVisible()
       await playOnlineRound(hostPage, joinerPage, 3, PLAYERS)
@@ -59,7 +55,7 @@ test.describe('a full online game', () => {
         .getByText('Games played', { exact: true })
         .locator('xpath=following-sibling::dd[1]')
       await expect(gamesPlayed).toHaveText('1')
-      // Head-to-head: the highscores below list players from every game.
+      // Scoped to Head-to-head: the highscores below list players from every game.
       await expect(
         hostPage.getByRole('region', { name: 'Head-to-head' }).getByRole('row', { name: /Alice/ }),
       ).toBeVisible()

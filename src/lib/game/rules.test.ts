@@ -24,7 +24,6 @@ import {
 } from './rules'
 import type { Card, Player, RoundScore } from './types'
 
-/** Builds a minimal Player fixture with the given running total. */
 function makePlayer(id: string, totalScore: number): Player {
   return { id, name: id, totalScore }
 }

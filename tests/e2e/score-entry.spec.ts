@@ -1,10 +1,7 @@
 /**
- * Score entry on a ScoreCard, in real browsers. happy-dom can't reproduce the event orders that
- * matter here: a click on Cancel blurs the input before the click lands, and Chromium blurs a
- * focused input when collapsing the card removes it from the DOM.
- *
- * The Firestore and Auth emulators are blocked so Start falls back to a local game on this one
- * device. Score entry is the same component online, and a local game needs no second browser.
+ * Score entry in real browsers, whose event orders happy-dom can't reproduce: a click on Cancel
+ * blurs the input first, and Chromium blurs a focused input when its card collapses. A local game
+ * on one device, since score entry is the same component online.
  */
 import { expect, test, type Page } from '@playwright/test'
 import { startLocalGame } from './helpers'

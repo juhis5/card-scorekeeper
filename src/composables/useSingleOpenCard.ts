@@ -1,5 +1,5 @@
 /**
- * One card open at a time in a room, and a tap outside the open card closes it (fourth round).
+ * One card open at a time in a room, and a tap outside the open card closes it.
  * A tap is a `pointerup`: a scroll ends in `pointercancel` instead, so scrolling never closes a
  * card. Taps in a dialog or on its overlay (the photo count, the remove confirm) don't count.
  */

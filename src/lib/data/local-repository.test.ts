@@ -14,13 +14,12 @@ const ALL_ROUNDS: readonly ContractRoundNumber[] = [1, 2, 3, 4, 5]
 
 const HOST_CONFIG = { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' }
 
-/** Deterministic id source for tests: returns 'id-1', 'id-2', ... in call order. */
+/** 'id-1', 'id-2', ... in call order. */
 function sequentialIds(prefix: string) {
   let count = 0
   return () => `${prefix}-${++count}`
 }
 
-/** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
 function makeMemoryStorage(): KeyValueStorage {
   const values = new Map<string, string>()
   return {
@@ -51,7 +50,6 @@ function makeRepository(
   })
 }
 
-/** Captures every state emitted by subscribe(), in order. */
 function recordEmissions(repository: LocalGameRepository): GameState[] {
   const emissions: GameState[] = []
   repository.subscribe((state) => emissions.push(state))
@@ -289,9 +287,7 @@ describe('LocalGameRepository.advanceRound', () => {
 })
 
 describe('LocalGameRepository.finishGame', () => {
-  /** Plays a full game where the host is deliberately kept out of the running for lowest total,
-   * so tests can assert a specific, unambiguous winner among Alice/Bob. Accepts the storage so
-   * pending-queue tests can inspect it after the fact. */
+  /** A full game the host finishes last in, so Alice wins outright. */
   async function playFullGame(storage: KeyValueStorage = makeMemoryStorage()) {
     const repository = makeRepository({ storage })
     const created = await repository.createGame(HOST_CONFIG)
@@ -346,11 +342,7 @@ describe('LocalGameRepository.finishGame', () => {
     expect(readPendingResults(storage)).toEqual([])
   })
 
-  // Only the host's own row is queued — never the local ad-hoc co-players'. Two independent
-  // reasons (see buildHostGamePlayer's doc comment): (1) locked decision — synthetic per-game
-  // co-player ids never aggregate across games anyway; (2) security — firestore.rules' local-path
-  // game_player create rule is self-write-only (deviceUuid == auth.uid), so a co-player's row
-  // could never legitimately be written under anyone's auth session.
+  // A co-player's row could never pass the self-write-only rule (see buildHostGamePlayer).
   it("queues a pending stats result with only the host's own GamePlayer row on finish", async () => {
     const { repository, gameId, storage } = await playFullGame()
 

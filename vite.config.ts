@@ -6,20 +6,14 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
     tailwindcss(),
-    // Precaches the app SHELL (this build's JS/CSS/HTML/icons) so the offline host can open the
-    // app cold, with no network, and start a local game — the missing half of offline host mode
-    // (`LocalGameRepository` + `lib/rules.ts` are the other half). See the `pwa` skill.
-    //
-    // `registerType: 'prompt'` (not `autoUpdate`): an abrupt SW-driven reload mid-round would
-    // lose a game in progress at the card table, so a new deploy waits for `useServiceWorker`'s
-    // update prompt (see `src/composables/useServiceWorker.ts` + `App.vue`) instead of reloading
-    // on its own.
+    // Precaches the app shell, so the offline host can open the app with no network and start a
+    // local game. 'prompt', not 'autoUpdate': a reload mid-round would lose the game, so a new
+    // deploy waits for the app's update prompt.
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
@@ -45,11 +39,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // The shell only — Firestore's own requests (firestore.googleapis.com et al.) and the
-        // `/api` photo-count call are never matched by this glob, so they're untouched by the SW
-        // and pass straight through to the network. Firestore manages its own offline behavior
-        // via `persistentLocalCache` (see `src/lib/firebase.ts`); the SW must not shadow it with
-        // a second, conflicting cache.
+        // The shell only. Firestore and /api requests go straight to the network: Firestore keeps
+        // its own offline cache (src/lib/data/firebase.ts), and a second one here would conflict.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
     }),

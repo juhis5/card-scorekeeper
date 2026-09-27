@@ -42,8 +42,8 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Dark is the default identity for this app; light is a supported alternative. See design-system skill.
-   `.theme-light` repeats the light tokens for the theme picker's swatches inside a dark page. */
+/* Dark is the default; light is supported. `.theme-light` repeats the light tokens for the theme
+   picker's swatches on a dark page. */
 :root,
 .theme-light {
   --background: #f7f9fb;
@@ -114,9 +114,10 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* Named palettes (fourth round): each is checked for AA contrast, text and primary on every surface.
-   The dark ones also get `.dark` (see lib/platform/themes.ts), so they come after it here. */
-/* Jani: charcoal and orange, after wingnet (#2D2D2D, #43413F, #BB5500, #DB8B31), the orange lifted to pass AA as text. */
+/* Named palettes, each checked for AA contrast (theme-contrast.test.ts). The dark ones also get
+   `.dark`, so they come after it. */
+/* Jani: charcoal and orange after wingnet (#2D2D2D, #43413F, #BB5500, #DB8B31), the orange
+   lifted to pass AA as text. */
 .theme-jani {
   --background: #2d2d2d;
   --foreground: #f5f1ec;
@@ -204,17 +205,16 @@
   --ring: #1f6aa3;
 }
 
-/* Motion tokens — shared across themes; gate non-essential motion on `motion-reduce:`. */
+/* Shared by every theme. Gate non-essential motion on `motion-reduce:`. */
 :root {
   --dur-fast: 120ms;
   --dur: 200ms;
   /* The sticky app header's height (a 44px row plus its top padding). */
   --app-header-height: 3.25rem;
-  /* Space under a room while a card is open on a touch screen, so even the last card can scroll up
-     under the header, above where the keyboard opens. */
+  /* Space under a room while a card is open on touch, so even the last card can scroll up above
+     the keyboard. */
   --open-card-room: 60vh;
-  /* How far down a floating sheet with a field sits: about the middle of what a phone keyboard,
-     covering roughly the lower half of the screen, leaves visible. */
+  /* A floating sheet with a field sits about mid-way in what a phone keyboard leaves visible. */
   --floating-sheet-top: 15dvh;
 }
 @theme {
@@ -234,15 +234,9 @@
   }
 }
 
-/* Reduced motion: suppress the Sheet's enter/exit slide+fade (the only non-trivial motion in this
- * app besides an already-gated spinner — see the a11y-mobile + design-system skills). Written as a
- * plain, unlayered rule rather than Tailwind's `motion-reduce:` variant classes: Tailwind v4 puts
- * ALL utilities — including `motion-reduce:` ones — inside the same `@layer utilities`, so within
- * that layer it's ordinary source order that decides ties, and the base `data-open:animate-in`
- * utility is emitted AFTER the media-gated override in this build, silently winning back the
- * animation (confirmed against the built dist/assets/*.css — the class-based attempt did not
- * work). An unlayered rule always beats every rule inside a layer regardless of source order or
- * specificity (CSS cascade-layer semantics), so this is the one override that actually applies. */
+/* Reduced motion: no slide or fade on sheets and dialogs. Unlayered on purpose: Tailwind v4 puts
+ * `motion-reduce:` utilities in the same layer as `data-open:animate-in`, which is emitted later
+ * and wins. An unlayered rule beats any layered one. */
 @media (prefers-reduced-motion: reduce) {
   [data-slot='sheet-overlay'],
   [data-slot='sheet-content'],
@@ -253,9 +247,8 @@
   }
 }
 
-/* Scoreboard motion (ScoreBoard.vue). When a round is revealed, rows slide to their new places
- * (TransitionGroup's FLIP move class) and a changed total fades in. Long enough to follow the
- * reorder; off entirely for reduced motion. Unlayered for the same reason as the rule above. */
+/* Scoreboard motion (ScoreBoard.vue): on a reveal, rows slide to their new places and a changed
+ * total fades in. Unlayered for the same reason as the rule above. */
 .board-row-move {
   transition: transform 450ms var(--ease-standard);
 }

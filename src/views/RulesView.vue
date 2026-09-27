@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * The rules, opened from the menu: the five contracts, the melds with example cards, and what each
- * card left in the hand costs. Contracts come from CONTRACTS and the values from cardValue, so this
- * page can't drift from the scoring. Plain content, part of the precached app, so it opens offline.
+ * The rules: contracts, example melds and card values. Contracts and values come from rules.ts,
+ * so this page can't drift from the scoring.
  */
 import { useI18n } from 'vue-i18n'
 import PlayingCard from '@/components/rules/PlayingCard.vue'

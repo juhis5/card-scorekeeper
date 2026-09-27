@@ -1,10 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: "Install the app" in the app menu (third playtest: installing didn't work on an
- * iPhone with Chrome). Where the browser has its own install prompt (Android Chrome, desktop
- * Chromium) the row opens it. Elsewhere it opens the steps for this device: on an iPhone every
- * browser installs through Share → Add to Home Screen, with Share in a different place per
- * browser. The menu leaves it out once the app runs installed, or where there's no way to install.
+ * Single job: the menu's "Install the app" row. Opens the browser's install prompt where there is
+ * one (Android Chrome, desktop Chromium). Elsewhere it shows this device's steps: every iPhone
+ * browser installs through Share → Add to Home Screen, but each puts Share somewhere else.
  */
 import { computed, ref, useId } from 'vue'
 import { storeToRefs } from 'pinia'

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createHostRepository, createJoinRepository } from './game-mode'
 import type { GameRepository } from './repository'
 
-/** Stands in for a real repository — these tests only care which constructor was invoked. */
+/** These tests only check which constructor ran. */
 function makeFakeRepository(): GameRepository {
   return {} as GameRepository
 }

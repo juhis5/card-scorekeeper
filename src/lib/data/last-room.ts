@@ -1,10 +1,6 @@
 /**
- * The online room this device was last in, so Home can offer "Continue game" after a reload or a
- * trip back to Home. Remembered when a room is created or joined, forgotten when that game
- * finishes or this device loses its seat, and ignored once the room would have expired.
- *
- * Best-effort like every other local persistence here: storage can be unavailable (some private
- * windows), and then there is simply nothing to continue.
+ * The online room this device was last in, for Home's "Continue game". Ignored once the room would
+ * have expired. Best-effort: without storage (some private windows) there's nothing to continue.
  */
 import { browserLocalStorage, type KeyValueStorage } from './key-value-storage'
 import { ROOM_TTL_MS } from '../game/room-code'
@@ -61,7 +57,7 @@ export function lastRoom(deps: LastRoomDeps = {}): string | null {
   return remembered.code
 }
 
-/** Forgets `code` only if it is still the remembered room, so an old game can't clear a newer one. */
+/** Only if `code` is still the remembered room, so an old game can't clear a newer one. */
 export function forgetRoom(code: string, deps: LastRoomDeps = {}): void {
   const storage = deps.storage ?? browserLocalStorage()
   if (readRemembered(storage)?.code === code) write(storage, '')

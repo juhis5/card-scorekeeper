@@ -53,9 +53,6 @@ describe('flushPendingResultsOnLaunch', () => {
     expect(writeGameResultMock).toHaveBeenCalledWith('db-instance', { gameId: 'g1' }, [])
   })
 
-  // The forgery fix (docs/DECISIONS.md): firestore.rules' local-path game_player create rule
-  // requires deviceUuid == request.auth.uid, so whatever LocalGameRepository queued offline must
-  // be overwritten with the uid this device is ACTUALLY signed in as, right now.
   it("overwrites each queued row's deviceUuid with the freshly-signed-in uid, not whatever was queued", async () => {
     ensureSignedInMock.mockResolvedValue('current-uid')
     writeGameResultMock.mockResolvedValue(undefined)

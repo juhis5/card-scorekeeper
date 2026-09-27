@@ -1,9 +1,5 @@
 <script setup lang="ts">
-/**
- * Single job: the room code in the header, where everyone in an online room sees it. "Huone"
- * says what the code is; the copy button copies it in one tap, and Kutsu opens the invite sheet
- * with the QR code and the share link.
- */
+/** Single job: an online room's code in the header, with one-tap copy and the Kutsu sheet. */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Copy } from '@lucide/vue'

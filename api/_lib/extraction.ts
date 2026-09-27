@@ -1,12 +1,6 @@
 /**
- * Validates the Gemini model's raw output against the extraction shape and recomputes every
- * value server-side — a bad or adversarial model sum must not slip through (see docs/PLAN.md
- * "Response handling & accuracy" and the vercel-gemini skill).
- *
- * Imports `cardValue`/`roundTotal` directly from `src/lib/rules.ts` rather than mirroring them:
- * `rules.ts` has zero Vue/browser dependencies (pure functions over `src/lib/types.ts`), so it
- * resolves cleanly here — the recompute is *the same code* the manual-entry path and the rest of
- * the app use, not a copy that could drift out of parity.
+ * Validates the model's output and recomputes every value with the app's own rules.ts (the same
+ * code manual entry uses, not a copy), so a bad or adversarial model sum can't slip through.
  */
 import { cardValue, roundTotal } from '../../src/lib/game/rules.js'
 import type { Card, Rank, Suit } from '../../src/lib/game/types.js'
@@ -41,8 +35,7 @@ function toCard(raw: unknown): Card | null {
   if (typeof rank !== 'string' || !VALID_RANKS.has(rank)) return null
 
   if (rank === 'Joker') {
-    // The model is prompted to send suit: null for a Joker (see gemini.ts) — undefined is
-    // tolerated too (a lenient model omitting a null field), anything else is malformed.
+    // The prompt asks for suit: null on a Joker. An omitted suit is tolerated too.
     if (suit !== null && suit !== undefined) return null
     return { rank: 'Joker', suit: null }
   }
@@ -51,12 +44,8 @@ function toCard(raw: unknown): Card | null {
   return { rank: rank as Exclude<Rank, 'Joker'>, suit: suit as Suit }
 }
 
-/**
- * Validates the model's already-parsed JSON against the extraction shape (a `{ cards: [...] }`
- * object with a non-empty array of recognizable cards) and returns the parsed domain `Card[]`, or
- * null if anything is missing/wrong-typed/unrecognized. Deliberately ignores the model's own
- * `value`/`total` fields — those are never trusted, only recomputed (see `buildExtractionResult`).
- */
+/** `{ cards: [...] }` with a non-empty list of recognized cards, as `Card[]`, or null. The model's
+ * own `value` and `total` are ignored: they're only ever recomputed. */
 export function parseModelCards(raw: unknown): Card[] | null {
   if (typeof raw !== 'object' || raw === null) return null
   const { cards } = raw as Record<string, unknown>
@@ -71,12 +60,8 @@ export function parseModelCards(raw: unknown): Card[] | null {
   return parsed
 }
 
-/**
- * Parses the model's raw response text end-to-end: JSON parse + shape validation, collapsed into
- * one null-on-any-failure result. Bad JSON and a well-formed-but-wrong shape are the same failure
- * from the handler's point of view ("malformed model output → clean error, UI falls back to
- * manual") — they get the same status code, so they're validated in the same place.
- */
+/** JSON parse plus shape check. Bad JSON and a wrong shape are the same failure to the handler,
+ * so both return null. */
 export function parseModelOutput(rawText: string): Card[] | null {
   let json: unknown
   try {
@@ -87,8 +72,7 @@ export function parseModelOutput(rawText: string): Card[] | null {
   return parseModelCards(json)
 }
 
-/** Builds the final response from validated cards, recomputing every value server-side from the
- * SAME rules manual entry uses — never the model's stated per-card value or total. */
+/** The response, with every value recomputed from the rules, never taken from the model. */
 export function buildExtractionResult(cards: Card[]): CountResponseBody {
   return {
     cards: cards.map((card) => ({ rank: card.rank, suit: card.suit, value: cardValue(card) })),

@@ -1,12 +1,10 @@
 /**
- * Inviting (second playtest: "the code should be copyable … copy a direct link to the room"). The
- * host's header shows the room code with Invite; the invite sheet has the QR code; the link opens
- * a page that asks only for a name and seats the player in that room.
+ * Inviting: the invite sheet shows the room code and a QR code, and the link opens a page that
+ * asks only for a name and seats the player in that room.
  */
 import { expect, test } from '@playwright/test'
 import { readRoomCode, scoreboardRow, startHostedGame } from './helpers'
 
-// Not run under the `webkit` project, like the other two-client specs: see playwright.config.ts.
 test.describe('inviting players', () => {
   test('the invite link asks only for a name and seats the player in that room', async ({
     browser,

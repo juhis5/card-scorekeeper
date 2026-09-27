@@ -127,8 +127,7 @@ describe('buildExtractionResult', () => {
   })
 
   it('ignores a per-card value the caller might have attached and recomputes from rank alone', () => {
-    // parseModelCards never keeps a model-supplied `value` in the first place, but this pins the
-    // recompute contract directly: buildExtractionResult only ever trusts rank/suit.
+    // parseModelCards already drops `value`; this pins that the recompute uses rank and suit only.
     const cards = [{ rank: '2' as const, suit: 'clubs' as const }]
     expect(buildExtractionResult(cards).cards[0]).toEqual({ rank: '2', suit: 'clubs', value: 5 })
   })

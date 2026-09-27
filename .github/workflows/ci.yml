@@ -1,6 +1,6 @@
-# CI — mirrors the local git hooks (see the git-workflow skill), but never auto-fixes.
-# Actions are pinned by commit SHA (tag in the trailing comment). Bump them on purpose and check
-# each major still runs on a Node version GitHub's runners support — see docs/TOOLCHAIN.md.
+# Mirrors the local git hooks (see the git-workflow skill), but never auto-fixes.
+# Actions are pinned by commit SHA, tag in the trailing comment. Bump them on purpose and check
+# each major still runs on a Node version GitHub's runners support (docs/TOOLCHAIN.md).
 name: CI
 
 on:
@@ -8,7 +8,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
-  workflow_dispatch: # run on any branch by hand, so long-lived branches aren't unverified
+  workflow_dispatch: # run by hand on any branch
 
 permissions:
   contents: read
@@ -21,19 +21,18 @@ jobs:
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0, reads "packageManager"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version-file: .nvmrc # single source of truth (Node 24 LTS)
+          node-version-file: .nvmrc # Node 24 LTS
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint:check # eslint without --fix, so fixable violations fail too
       - run: pnpm format:check
       - run: pnpm test:run
-      - run: pnpm test:api # /api/count — fully mocked (Admin SDK + Gemini), no emulator/creds
+      - run: pnpm test:api # fully mocked, no emulator or credentials
       - run: pnpm test:api-load # compiles /api like Vercel and imports it in Node's ESM loader
-      - run: pnpm build # runs vue-tsc (typecheck) + build
+      - run: pnpm build # typecheck + build
 
-  # Firestore rules are the security boundary — run the emulator rules suite in CI so a rules
-  # regression can't merge (see firestore-realtime / tdd). Separate job: it needs Java for the
-  # emulator (firebase-tools is a devDep, pulled by the install below).
+  # The rules suite, so a rules regression can't merge, and the integration suite. Both run
+  # against the emulator, which needs Java.
   rules:
     runs-on: ubuntu-latest
     steps:
@@ -46,15 +45,13 @@ jobs:
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: temurin
-          java-version: '21' # the Firestore emulator JAR needs a JDK
+          java-version: '21'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:rules # the `rules` project in vitest.config.ts, under emulators:exec
-      # Real client SDK (browser build) vs the emulator — the `integration` project.
+      - run: pnpm test:rules
       - run: pnpm test:integration
 
-  # Two real browsers against the emulators and a production build: a score entered on one
-  # client appears live on the other. Chromium + Firefox only: Playwright-WebKit's live-sync run
-  # is a documented flake (see tests/e2e/playwright.config.ts). No retries, so a flake fails the job.
+  # Chromium and Firefox against the emulators and a production build. Playwright's WebKit is
+  # quarantined for two-client sync (see tests/e2e/playwright.config.ts). No retries.
   e2e:
     runs-on: ubuntu-latest
     steps:
@@ -78,9 +75,8 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
-  # Screenshots of the key screens (tests/e2e/visual.spec.ts), compared in Playwright's own Linux
-  # image, where the baselines are made (`pnpm test:visual:update`): only there do fonts render
-  # the same. Keep the image tag equal to the @playwright/test version.
+  # Screenshots, compared in Playwright's Linux image, where the baselines are made
+  # (`pnpm test:visual:update`) and fonts render the same. Keep the tag equal to @playwright/test.
   visual:
     runs-on: ubuntu-latest
     container:

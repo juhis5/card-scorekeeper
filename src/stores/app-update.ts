@@ -1,8 +1,7 @@
 /**
- * A new version of the app, waiting (see vite.config.ts's `registerType: 'prompt'`). A card table
- * shouldn't lose a round to an automatic reload mid-game, so the app only says so, in a banner
- * and in the menu, and reloading is the player's own choice. It looks for one regularly, not only
- * on a cold start (lib/platform/update-checks.ts).
+ * A waiting new version (vite.config.ts: `registerType: 'prompt'`). Never an automatic reload
+ * mid-game: a banner and the menu offer it, and the player chooses. Checked regularly, not only
+ * on launch.
  */
 import { defineStore } from 'pinia'
 import { useRegisterSW } from 'virtual:pwa-register/vue'

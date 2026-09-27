@@ -1,19 +1,8 @@
 <script setup lang="ts">
 /**
- * The photo-count "snap your cards" affordance + confirm/edit sheet (see docs/PLAN.md "Entering
- * a round's score — two ways" and the vercel-gemini skill). Tapping "Snap cards" opens a bottom
- * sheet with the "lay cards flat, non-overlapping" hint and a "take/choose a photo" action
- * (`<input type="file" accept="image/*">` with no `capture`, so phones offer camera or gallery and
- * desktop gets a plain file picker). Picking a photo shows a "Reading your cards…" state, then
- * either the detected card list + total (editable) or an error that says what went wrong.
- *
- * Nothing here ever calls `game.setRoundScore` — `confirm` just emits the final number, and the
- * parent (`ScoreCard`) feeds it through the SAME manual-entry commit path (including its
- * existing validation/error UI), so the photo can never silently set a score (see CLAUDE.md's
- * "photo card-count is a suggestion — always confirm/edit before it commits").
- *
- * Only ever mounted for an online room's own editable card (see `ScoreCard`/`RoomView`) —
- * photo-count is online-only (needs the room-gated `/api/count` function).
+ * Single job: the "Snap cards" button and its sheet: pick a photo (no `capture`, so phones offer
+ * camera or gallery), then edit the detected cards and total. `confirm` only emits the number;
+ * ScoreCard commits it like typed entry, so the photo stays a suggestion.
  */
 import { computed, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -37,8 +26,7 @@ import {
 import { isValidRoundScore, MAX_ROUND_SCORE } from '@/lib/game/rules'
 
 const { id, roomCode } = defineProps<{
-  /** Base id for this instance's form controls — the caller (`ScoreCard`) derives it from
-   * the player's own id, so multiple cards on screen never collide. */
+  /** Base id for the form controls, unique per card. */
   id: string
   roomCode: string
 }>()
@@ -48,27 +36,20 @@ const emit = defineEmits<{ confirm: [total: number] }>()
 const { t, n } = useI18n()
 const { isPending, countCards } = usePhotoCount()
 
-/** The in-flight/loading state is owned entirely by `isPending` (from `usePhotoCount`) — this
- * only tracks the outcome once a request settles, so there's exactly one source of truth for
- * "is a read happening right now" (see the template: `isPending` is checked first, ahead of
- * `status`). */
+/** The settled outcome only; `isPending` alone tracks a read in flight. */
 type Status = 'idle' | 'ready' | 'error'
 
 const isOpen = ref(false)
 const status = ref<Status>('idle')
 const cards = ref<PhotoCountCard[]>([])
 const cardValues = ref<Array<number | null>>([])
-/** Its own draft, not derived from `cardValues`: editing a card recomputes it, but the player can
- * also clear and retype it directly. */
+/** Its own draft: editing a card recomputes it, but the player can also retype it directly. */
 const total = ref<number | null>(null)
 const failureReason = ref<PhotoCountFailureReason | null>(null)
 
 const fileInputRef = useTemplateRef<HTMLInputElement>('fileInput')
 
-/** Polite announcement for a screen-reader user who isn't watching the screen while the photo
- * reads — the pending state (`role="status"`) and the error (`role="alert"`) already announce
- * themselves, this covers the missing third case: a successful read (see the a11y-mobile skill's
- * "live regions" — announce meaningful live changes, not just the in-between states). */
+/** Announces a successful read; the pending status and the error announce themselves. */
 const resultAnnouncement = ref('')
 
 const FAILURE_MESSAGE_KEYS = {
@@ -83,8 +64,7 @@ const FAILURE_MESSAGE_KEYS = {
   'server-error': 'room.photoCount.errors.serverError',
 } as const satisfies Record<PhotoCountFailureReason, string>
 
-/** Failures where another photo, or the same one a bit later, can succeed. A closed room, a lost
- * session or a server fault won't fix itself, so those only point at typing the total. */
+/** Failures a new photo or a later retry can fix. The rest only point at typing the total. */
 const RETRYABLE_REASONS: ReadonlySet<PhotoCountFailureReason> = new Set([
   'rate-limited',
   'timeout',
@@ -147,8 +127,8 @@ function suitName(suit: string): string {
   }
 }
 
-/** Screen readers read "7♥" inconsistently, and copies from a second deck would share a label,
- * so each input is named by position plus the card in words: "Card 2 of 4: 7 of hearts". */
+/** Screen readers read "7♥" inconsistently and second-deck copies would share a label, so it's
+ * position plus the card in words: "Card 2 of 4: 7 of hearts". */
 function cardInputLabel(card: PhotoCountCard, index: number): string {
   const cardName =
     card.suit === null
@@ -178,7 +158,7 @@ function openSheet(): void {
 
 function openFilePicker(): void {
   if (!fileInputRef.value) return
-  // Reset first so picking the exact same file twice in a row still fires `change`.
+  // Reset so picking the same file again still fires `change`.
   fileInputRef.value.value = ''
   fileInputRef.value.click()
 }
@@ -186,9 +166,9 @@ function openFilePicker(): void {
 async function handleFileChange(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
-  if (!file) return // the player cancelled the native picker — stay put, sheet already open
+  if (!file) return // picker cancelled
 
-  const result = await countCards(roomCode, file) // flips `isPending` for the duration
+  const result = await countCards(roomCode, file)
   if (!result.ok) {
     failureReason.value = result.reason
     status.value = 'error'

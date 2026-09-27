@@ -9,15 +9,12 @@ vi.mock('@/lib/data/firebase', () => ({
 }))
 
 vi.mock('@/lib/data/firestore-repository', () => ({
-  // `new`-able: `game-mode.ts`'s createOnlineRepository calls `new FirestoreGameRepository(...)`,
-  // so the mock must be a constructor function, not an arrow function.
+  // A function, not an arrow: the code under test calls it with `new`.
   FirestoreGameRepository: vi.fn(function FirestoreGameRepository(deps: unknown) {
     return { deps }
   }),
 }))
 
-// Imported after the mocks above so both pick up the mocked modules (vi.mock is hoisted, but
-// keeping the import order matching makes the wiring easy to follow).
 const { useGameConnectivity } = await import('./useGameConnectivity')
 const { FirestoreGameRepository } = await import('@/lib/data/firestore-repository')
 const { LocalGameRepository } = await import('@/lib/data/local-repository')

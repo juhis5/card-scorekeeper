@@ -1,9 +1,6 @@
 /**
- * Online rules for a real table, over two browser contexts and the emulators:
- * - a late joiner fills in the rounds played before they joined the app, and Next stays disabled
- *   until they have, so nobody is ranked on fewer rounds;
- * - the host can enter another player's score and remove a seat.
- * Every assertion auto-waits for the live Firestore update, never a fixed sleep.
+ * Online rules for a real table: Next stays disabled until a late joiner fills in the rounds they
+ * missed, so nobody is ranked on fewer rounds, and the host can score for and remove a player.
  */
 import { expect, test, type Page } from '@playwright/test'
 import {
@@ -23,7 +20,6 @@ async function fillOwnMissedRound(page: Page, round: number, points: number): Pr
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 }
 
-// Not run under the `webkit` project, like live-sync.spec.ts: see playwright.config.ts.
 test.describe('late joiners and host powers', () => {
   test('a late joiner fills in the rounds they missed before the game moves on', async ({
     browser,

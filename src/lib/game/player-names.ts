@@ -1,15 +1,7 @@
 /**
- * Player names are unique within a game, compared without regard to case or extra spaces:
- * "Juho", "juho" and " Juho " are the same name, but "Mari Anne" and "Marianne" are not.
- *
- * `cleanPlayerName` is the form every name is stored in. `playerNameKey` is what uniqueness is
- * checked on, locally and online: an online seat is created together with a
- * `room/{code}/names/{key}` doc, and firestore.rules derives the same key from the stored name
- * ('n_' + lowercase, with '/' made safe for a document id), so the two must stay in step.
- *
- * Lowercasing is limited to what the rules can do: their lower() only changes A to Z, so the rules
- * fold the capitals in FOLDED_CAPITALS one by one and the key does exactly the same. Any other
- * capital is kept as typed, so "Ωmega" and "ωmega" count as two names.
+ * Names are unique per game, ignoring case and extra spaces. Online, each seat comes with a
+ * `room/{code}/names/{key}` doc whose key firestore.rules derives from the stored name, so
+ * `playerNameKey` must stay in step with the rules.
  */
 
 /** NFC so an accent typed two ways is one name; every whitespace run becomes one space. */
@@ -17,7 +9,8 @@ export function cleanPlayerName(name: string): string {
   return name.normalize('NFC').replace(/\s+/g, ' ').trim()
 }
 
-/** A to Z plus the Nordic capitals firestore.rules folds in nameKeyOf. Change both together. */
+/** A to Z plus the capitals the rules' nameKeyOf folds one by one, as their lower() only does A to
+ * Z. Change both together. Any other capital stays as typed. */
 const FOLDED_CAPITALS = /[A-ZÄÖÅÜÉØÆ]/g
 
 export function playerNameKey(name: string): string {
@@ -30,8 +23,8 @@ export function isNameTaken(name: string, existingNames: readonly string[]): boo
   return existingNames.some((existing) => playerNameKey(existing) === key)
 }
 
-/** Someone in this game already uses the name, compared as above. `isGuestSeat` when it's a
- * player without a phone the host added, so a joiner can be told to ask the host. */
+/** `isGuestSeat` when the name belongs to a host-added guest, so a joiner can be told to ask the
+ * host. */
 export class NameTakenError extends Error {
   readonly playerName: string
   readonly isGuestSeat: boolean

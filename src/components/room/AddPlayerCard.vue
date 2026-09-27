@@ -1,11 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: the host adds a player at any round. Online that's a guest, a player without a phone
- * whose scores the host enters; in a local game every other player is one anyway. Collapsed to one
- * "Lisää pelaaja" button at the end of the card list, it opens inline like a score card: a title
- * row, then the name field with ✓ (add) and ✕ (cancel); Enter adds too. Like a score card, a tap
- * outside or another card opening closes it. A player added mid-game fills in the rounds they
- * missed, like a late joiner.
+ * Single job: the host adds a player at any round (online, a guest without a phone). It opens and
+ * closes inline like a score card. A player added mid-game fills in the rounds they missed.
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -46,15 +42,14 @@ const hasError = computed(() => errorMessage.value !== '')
 async function open(): Promise<void> {
   isOpen.value = true
   await nextTick()
-  // Like an open score card: placed first (on a phone: up under the header), then focused without
-  // the browser's own scroll.
+  // Like a score card: place it first, then focus without the browser's own scroll.
   reveal()
   document.getElementById('add-player-name')?.focus({ preventScroll: true })
 }
 
-/** The form unmounts, so hand focus back to the button that opened it: when focus was in the
- * form, or nowhere (iOS Safari doesn't focus a tapped button). Not when the host has moved on: a
- * tap elsewhere, or the new player's card appearing before a slow add is confirmed. */
+/** The form unmounts, so return focus to the open button if it was in the form or nowhere (iOS
+ * Safari doesn't focus a tapped button). Not if the host has moved on, e.g. to the new player's
+ * card during a slow add. */
 async function close({ restoreFocus = true } = {}): Promise<void> {
   const focused = document.activeElement
   const isFocusHere =
@@ -111,9 +106,7 @@ async function add(): Promise<void> {
       <Plus aria-hidden="true" class="size-4 shrink-0" />
       {{ t('room.addPlayer.button') }}
     </button>
-    <!-- Laid out like an open score card, which holds up with the phone keyboard: no <form> (a
-         form brings iOS its extra autofill bar over the page), a title row, then one row with
-         the field, ✓ and ✕. -->
+    <!-- Like an open score card. No <form>: on iOS a form adds an autofill bar over the page. -->
     <div v-else class="flex flex-col gap-2 px-4 pb-4">
       <p class="flex min-h-11 items-center gap-2 pt-4 pb-0">
         <span class="text-foreground text-base font-medium">{{ t('room.addPlayer.button') }}</span>

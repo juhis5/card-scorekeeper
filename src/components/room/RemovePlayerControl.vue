@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: the host's "remove this player" button. Removing a seat also deletes its scores and
- * can't be undone, so it asks first, in a dialog with two icon buttons (fourth round). Focus starts
- * on ✕, the safe choice, and returns to the trigger when declined. Emits `remove` only once the
- * host confirms; the parent removes.
+ * Single job: the host's remove-player button. Removing deletes the seat's scores for good, so a
+ * dialog asks first. Focus starts on ✕, the safe choice, and returns to the trigger on ✕. Emits
+ * `remove` once the host confirms.
  */
 import { useI18n } from 'vue-i18n'
 import { Trash2, X } from '@lucide/vue'

@@ -1,7 +1,6 @@
-// The /api photo-count function (see the vercel-gemini skill). Its own project because it runs in
-// Node's native ESM loader on Vercel, which needs explicit file extensions on relative imports:
-// "nodenext" makes a missing ".js" a type error instead of an ERR_MODULE_NOT_FOUND in production.
-// Test files are excluded: tsconfig.vitest.json covers them (they need vitest globals).
+// The /api function runs in Node's native ESM loader on Vercel, so "nodenext" makes a missing
+// ".js" on a relative import a type error instead of a production ERR_MODULE_NOT_FOUND.
+// Its tests are in tsconfig.vitest.json, which has the vitest globals.
 {
   "extends": "@tsconfig/node24/tsconfig.json",
   "include": ["api/**/*.ts"],

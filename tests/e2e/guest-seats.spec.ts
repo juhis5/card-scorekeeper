@@ -1,8 +1,7 @@
 /**
- * Players without a phone (second playtest: names typed at the start vanished online, and the
- * host couldn't add anyone mid-game). The host starts an online game with a guest, a phone player
- * joins, the host adds another guest in round 2 and fills in the round they missed, and the game
- * finishes with every guest's stats row accepted by the rules.
+ * Players without a phone: the host starts an online game with a guest, a phone player joins, the
+ * host adds another guest in round 2 and fills in the round they missed, and the game finishes
+ * with every guest's stats row accepted by the rules.
  */
 import { expect, test, type Page } from '@playwright/test'
 import {
@@ -43,7 +42,6 @@ async function moveOn(hostPage: Page, joinerPage: Page, round: number) {
 
 const GUEST_POINTS: Record<string, number> = { Mummo: 5, Ripa: 30 }
 
-// Not run under the `webkit` project, like the other two-client specs: see playwright.config.ts.
 test.describe('players without a phone', () => {
   test('the host scores guests added at the start and mid-game, through to the stats', async ({
     browser,
@@ -81,7 +79,7 @@ test.describe('players without a phone', () => {
       await expect(scoreboardRow(joinerPage, 'Ripa')).toContainText('150')
 
       await openFromMenu(hostPage, 'Stats')
-      // Head-to-head: the highscores below list players from every game.
+      // Scoped to Head-to-head: the highscores below list players from every game.
       await expect(
         hostPage.getByRole('region', { name: 'Head-to-head' }).getByRole('row', { name: /Mummo/ }),
       ).toBeVisible()

@@ -1,11 +1,6 @@
 /**
- * Firestore security-rules tests, run against a real Firestore emulator (see vitest.rules.config.ts
- * + `pnpm test:rules`, which wraps this in `firebase emulators:exec`). These prove the rules
- * themselves — the security boundary — not just that the app happens to behave; see the tdd +
- * firestore-realtime skills and docs/DECISIONS.md's 2026-07-24 entries, which this file verifies.
- *
- * Every fixture is seeded via `withSecurityRulesDisabled` so arranging test state never depends
- * on the rules under test — only the assertions below do.
+ * firebase/firestore.rules against the Firestore emulator (`pnpm test:rules`). Fixtures are seeded
+ * with the rules disabled, so only the assertions depend on the rules under test.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -77,9 +72,8 @@ function playerFixture(ownerUid: string, overrides: Partial<Record<string, unkno
   }
 }
 
-/** The name-record id exactly as firestore.rules derives it from a stored name: the rules' lower()
- * only lowercases ASCII, and the rules then fold a fixed set of Nordic capitals. Written out here,
- * not imported, so drift between the rules and playerNameKey (src/lib/player-names.ts) shows. */
+/** The name-record id as the rules derive it: ASCII lower(), then a fixed set of Nordic folds.
+ * Written out, not imported, so drift from playerNameKey (src/lib/game/player-names.ts) shows. */
 function rulesNameKey(name: string): string {
   const folds: Record<string, string> = { Ä: 'ä', Ö: 'ö', Å: 'å', Ü: 'ü', É: 'é', Ø: 'ø', Æ: 'æ' }
   const lowered = name
@@ -169,7 +163,7 @@ beforeEach(async () => {
   await testEnv.clearFirestore()
 })
 
-/** Seeds fixtures directly, bypassing rules — arrangement, not what's under test. */
+/** Seeds fixtures with the rules bypassed. */
 async function seed(
   fn: (
     adminDb: ReturnType<RulesTestEnvironment['unauthenticatedContext']>['firestore'],
@@ -195,10 +189,7 @@ describe('room/{code} read', () => {
     await assertSucceeds(getDoc(doc(stranger, `room/${ROOM_CODE}`)))
   })
 
-  // Firestore's `read` covers both `get` (single doc, by known code — the only thing this app
-  // ever does) and `list` (collection query). `allow read` would let any authed stranger
-  // enumerate every room via getDocs(collection(db,'room')) — defeating join-by-code privacy.
-  // Only single-doc lookups should be allowed; the collection must never be listable.
+  // Only `get` is allowed: `read` would also allow `list`, and any stranger could enumerate rooms.
   it('denies listing the room collection even for an authenticated user', async () => {
     await seed(async (db) => setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture()))
 
@@ -279,11 +270,7 @@ describe('roundScores own-write trust model', () => {
   })
 })
 
-// Low-total-wins means deflating your own score is SELF-SERVING, not self-defeating (the
-// opposite of the old "a player can only wreck their own total" assumption) — a negative or
-// falsified points value is a genuine cheating vector the own-write trust model must still
-// close. Bounding the value server-side (rules) is the only enforcement point; there's no
-// server to catch it otherwise.
+// With low total winning, a lowered score helps its writer, and only the rules can bound it.
 describe('roundScores value bounds', () => {
   beforeEach(async () => {
     await seed(async (db) => {
@@ -349,9 +336,7 @@ describe('roundScores value bounds', () => {
     )
   })
 
-  // Pins the doc id to `{ownerUid}_{round}` so there is structurally exactly one score per
-  // player per round — an arbitrary doc id would let a client double-count a round via extra
-  // sibling docs `runningTotal` would then sum together.
+  // One score per player per round: extra docs would be summed into the total.
   it('denies a roundScore write whose doc id does not match {ownerUid}_{round}', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
@@ -412,8 +397,6 @@ describe('ownerUid spoofing is rejected on create', () => {
   })
 })
 
-// Bonus coverage beyond the 8 required cases above: the room doc's own create/update rules are
-// also part of the locked design (docs/DECISIONS.md) and cheap to verify directly.
 describe('room create/update authorization (bonus coverage)', () => {
   it('lets an authenticated user create a room naming themselves as host', async () => {
     const host = testEnv.authenticatedContext(HOST_UID).firestore()
@@ -443,9 +426,8 @@ describe('room create/update authorization (bonus coverage)', () => {
     await assertSucceeds(updateDoc(doc(host, `room/${ROOM_CODE}`), { currentRound: 2 }))
   })
 
-  // Field-level restriction: the host's update rule only authorizes advancing status/round —
-  // an unbounded expiresAt extension would undermine "rooms auto-expire" (docs/PLAN.md's Gemini
-  // free-tier protection), and hostUid/code/createdAt must stay immutable identity/audit fields.
+  // The host may change only status and round: a longer expiry would defeat auto-expiry, and
+  // hostUid, code and createdAt never change.
   it("denies the host extending the room's expiresAt", async () => {
     await seed(async (db) => setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture()))
     const host = testEnv.authenticatedContext(HOST_UID).firestore()
@@ -461,9 +443,8 @@ describe('room create/update authorization (bonus coverage)', () => {
   })
 })
 
-// Field-level restriction on players/{playerUid}: only name/totalScore may change. deviceUuid is
-// the slice-6 stats trust anchor — a player rewriting it to someone else's key would let them
-// steal or corrupt another device's persistent stats; ownerUid must stay pinned to the doc.
+// Only totalScore may change: a rewritten deviceUuid could steal another device's stats, and a
+// rename would dodge the unique-name records.
 describe('players field-level write restrictions (bonus coverage)', () => {
   beforeEach(async () => {
     await seed(async (db) => {
@@ -499,9 +480,9 @@ describe('players field-level write restrictions (bonus coverage)', () => {
   })
 })
 
-// A seat is the room-membership key every other rule trusts, so its shape is validated: a doc
-// missing joinOrder would be invisible to the orderBy('joinOrder') subscription yet still count
-// as a member, and a non-string name crashes Intl.ListFormat in the winner banner.
+// A seat is the membership key other rules trust, so its shape is exact: one without joinOrder
+// would count as a member yet be missing from the orderBy('joinOrder') list, and a non-string
+// name crashes Intl.ListFormat in the winner banner.
 describe('players create validation', () => {
   beforeEach(async () => {
     await seed(async (db) => setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture()))
@@ -551,9 +532,9 @@ describe('players create validation', () => {
   })
 })
 
-// A name is unique within a room, ignoring case and extra spaces. Every seat is created together
-// with a names/{key} record owned by the same player; a second record under the same key is an
-// update, which is never allowed, so two people can't take one name even at the same moment.
+// A name is unique within a room, ignoring case and extra spaces. Every seat comes with a
+// names/{key} record; a second record under the same key would be an update, which is never
+// allowed, so two people can't take one name even at the same moment.
 describe('unique player names', () => {
   beforeEach(async () => {
     await seed(async (db) => {
@@ -922,11 +903,8 @@ describe('host removes a seat', () => {
   })
 })
 
-// Permanent stats records (docs/PLAN.md "Stats & history") are append-only: create is the only
-// write ever allowed. These games have no matching `room` doc (a purely local/offline game,
-// reaching Firestore only via the reconnect flush — see docs/PLAN.md "Reconnect = push final
-// result only"), so their create-authorization floor is bare authed + well-formed fields (see
-// docs/DECISIONS.md's create-authorization trade-off note).
+// Stats are append-only. These are local games (no room), so a signed-in writer may create a
+// well-formed result that names only themselves.
 describe('game_result append-only stats records (no matching room)', () => {
   it('lets an authenticated user create a game_result', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
@@ -957,10 +935,7 @@ describe('game_result append-only stats records (no matching room)', () => {
   })
 })
 
-// No `room` doc exists for GAME_ID in this describe block, so the identity anchor available is
-// SELF-WRITE ONLY (deviceUuid == auth.uid) — there's no room-participant list to check against
-// for a game that was never online (see the create-authorization trade-off note above the
-// hybrid describe block below).
+// No room exists for GAME_ID, so the only identity check is self-write (deviceUuid == auth.uid).
 describe('game_player append-only stats records (no matching room)', () => {
   beforeEach(async () => {
     await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
@@ -977,12 +952,7 @@ describe('game_player append-only stats records (no matching room)', () => {
     )
   })
 
-  // THE FORGERY FIX: without a room to check a participant against, self-write is the only
-  // identity anchor left. Before this rule tightened, `!roomExists(gameId)` alone authorized the
-  // write regardless of whose deviceUuid was being claimed — any authed stranger could forge a
-  // permanent, append-only win/loss row for ANY victim's deviceUuid. See the mutation-check note
-  // in the PR/report: this exact test fails (i.e. `assertFails` itself fails, because the write
-  // actually succeeds) against the pre-fix rule.
+  // The forgery fix: nobody may write a permanent row for someone else's deviceUuid.
   it("denies an authenticated user creating a game_player row for someone ELSE's deviceUuid (no room)", async () => {
     const mallory = testEnv.authenticatedContext('mallory-uid').firestore()
 
@@ -1051,8 +1021,8 @@ describe('game_player append-only stats records (no matching room)', () => {
   })
 })
 
-// Stats integrity (review round 4). Room codes and local game ids live in separate namespaces,
-// every stats doc names its participants, and only participants can list or add to it.
+// Room codes and local game ids are separate namespaces, every stats doc names its participants,
+// and only participants can list or add to it.
 describe('stats namespaces and participants', () => {
   it("denies a local result whose id isn't UUID-shaped, so nobody can pre-squat a room code", async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
@@ -1647,8 +1617,7 @@ describe('roundScores tied to the room', () => {
   })
 })
 
-// Numeric/range sanity bounds — exercised on the simpler self-write (no-room) path, but the
-// checks themselves are identity-agnostic (same conditions apply on the room-backed path too).
+// Tested on the no-room path; the room-backed path has the same bounds.
 describe('game_player value bounds (bonus coverage)', () => {
   beforeEach(async () => {
     await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
@@ -1735,10 +1704,7 @@ describe('game_result field sanity (bonus coverage)', () => {
   })
 })
 
-// The stronger constraint available when a gameId DOES correspond to a live/expired online
-// room: only that room's host may write its stats rows ("the host is the one finishing, so it
-// writes all rows"), AND (the forgery fix) only for a deviceUuid that was actually seated as a
-// real participant in that room — see docs/DECISIONS.md's create-authorization trade-off note.
+// With a room, only its host writes the stats rows, and only for uids seated in that room.
 describe('game_result/game_player create authorization for a room-backed game', () => {
   beforeEach(async () => {
     await seed(async (db) => {
@@ -1783,10 +1749,7 @@ describe('game_result/game_player create authorization for a room-backed game', 
     )
   })
 
-  // THE FORGERY FIX: before this rule tightened, `isHost(gameId)` alone authorized the write —
-  // the host could write a game_player row for ANY deviceUuid, including someone who never
-  // joined this room at all (a fabricated "opponent" who never played). The mutation check (see
-  // the report) confirms this exact test fails against the pre-fix rule.
+  // The forgery fix: the host can't invent an opponent who never joined the room.
   it('denies the host writing a game_player row for a uid that was never a participant in this room', async () => {
     await seed(async (db) => setDoc(doc(db(), `game_result/${ROOM_CODE}`), roomResult()))
     const host = testEnv.authenticatedContext(HOST_UID).firestore()

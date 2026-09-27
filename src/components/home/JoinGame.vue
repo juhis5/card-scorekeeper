@@ -1,14 +1,7 @@
 <script setup lang="ts">
 /**
- * The home-screen "join" form: a room code + this device's display name, seating this device in
- * an existing Firestore room via `useGameConnectivity().joinRepository()` +
- * `useGameStore().join()`. Online-only — unlike hosting, there is no local fallback to join (see
- * `lib/game-mode.ts`'s `createJoinRepository` doc comment), so an unreachable backend here is a
- * friendly error, not a silent local game.
- *
- * With `roomCode` set (the /join/CODE page an invite link opens) the code is fixed: the form asks
- * only for a name, and the page's own heading names the room. A bare form: the page around it
- * provides the card.
+ * Single job: the join form. Online only: there's no local game to join, so an unreachable backend
+ * is a friendly error. With `roomCode` (an invite's /join/CODE page) it asks only for a name.
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -36,7 +29,7 @@ const identity = useIdentityStore()
 const game = useGameStore()
 const { joinRepository } = useGameConnectivity()
 
-// A room page's "Join room ABCDE" link passes the code along, so the player only adds a name.
+// A room page's "Join room ABCDE" link passes the code, so the player only adds a name.
 const roomCodeInput = ref(typeof route.query.code === 'string' ? route.query.code : '')
 /** Home shares the name with "Uusi peli"; unbound (the join page), it's this form's own. */
 const joinerName = defineModel<string>('name', { default: '' })
@@ -52,8 +45,8 @@ const isCodeInvalid = computed(
   () => attemptedSubmit.value && !isValidRoomCode(normalizedCode.value),
 )
 const isNameMissing = computed(() => attemptedSubmit.value && trimmedName.value === '')
-/** The room already has a player with this name (ignoring case and extra spaces): 'guest' when
- * it's a player without a phone the host added, so the joiner knows to ask the host. */
+/** The name is taken in the room: 'guest' when a host-added player has it, so the joiner asks
+ * the host. */
 const nameTaken = ref<'player' | 'guest' | null>(null)
 const isNameInvalid = computed(() => isNameMissing.value || nameTaken.value !== null)
 const nameError = computed(() => {
@@ -69,7 +62,6 @@ watch(joinerName, () => {
 
 async function handleSubmit(): Promise<void> {
   attemptedSubmit.value = true
-  // Validate the code's shape before ever calling the backend (see the error-ux skill).
   nameTaken.value = null
   if (isCodeInvalid.value || isNameMissing.value || isSubmitting.value) return
 
@@ -96,8 +88,8 @@ async function handleSubmit(): Promise<void> {
       nameTaken.value = error.isGuestSeat ? 'guest' : 'player'
       return
     }
-    // Otherwise the rules refusing the seat means a wrong or expired code; anything else (a
-    // timeout, a dropped connection) means we couldn't reach the game. Never a raw error.
+    // A refused seat means a wrong or expired code; anything else (a timeout, a dropped
+    // connection) means the game couldn't be reached.
     submitError.value = isPermanentWriteError(error)
       ? t('home.join.errors.joinFailed')
       : t('home.join.errors.unreachable')

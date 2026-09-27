@@ -1,791 +1,367 @@
-# Decisions log — autonomous build
+# Decisions log
 
-One line per decision made without the human (asleep during the overnight build). Format:
-`YYYY-MM-DD — decision — rationale`. `docs/PLAN.md` "Decisions locked" wins over anything here.
+Why the app works the way it does. Format: `YYYY-MM-DD — decision`, with the reasons in
+sub-bullets. When a later decision replaces an earlier one, the earlier entry is removed or folded
+into the later one, so every entry here is current. `PLAN.md` describes the app as it is.
 
-- 2026-07-23 — Backlog split into 8 vertical slices (domain → repo/store → core UI offline →
-  Firestore+rules+e2e → PWA → stats → optional photo → polish). — Dependency-ordered per
-  BUILDER_PROMPT (domain lib → stores/adapters → core UI → serverless/rules → offline/pwa →
-  stats → polish); each slice independently shippable + testable.
-- 2026-07-23 — Core UI (slice 3) built offline-first against LocalGameRepository before the
-  Firestore path (slice 4). — The GameRepository seam makes online a swap, not a rewrite; a
-  playable local game is the lowest-risk way to validate the domain + UI before adding network.
-- 2026-07-24 — Tie handling: players with equal lowest total are co-winners, sharing placement 1
-  (standard competition ranking, e.g. 1,1,3). — PLAN says "lowest total wins" but is silent on
-  ties; co-winners is the least surprising rule for a friendly game and keeps placement usable
-  for head-to-head stats.
-- 2026-07-24 — Contract data split: `lib/rules.ts` holds the 5 contracts as structured meld
-  requirements + a stable i18n key per round; human-readable descriptions live in locale files.
-  — Keeps `rules.ts` free of English prose (i18n skill) while the rules themselves stay in code.
-- 2026-07-24 — `GameRepository` interface (create/addPlayer/subscribe/setRoundScore/advanceRound/
-  finishGame/leave) is mode-agnostic; game store injects a repo via `start(repo, config)` and
-  imports no concrete repo. — The offline↔online swap is the whole point (slice 4 adds
-  FirestoreGameRepository against the same interface). `setRoundScore.round` is typed
-  `ContractRoundNumber`, not `number`.
-- 2026-07-24 — Fixed `tsconfig.vitest.json`: removed the create-vue `lib: []` override so test
-  typechecking inherits the app's `es2022+dom+dom.iterable`. — With `lib: []` (and `@types/jsdom`
-  dropped for happy-dom), any DOM-touching test failed `vue-tsc` while passing at runtime;
-  confirmed with a throwaway probe. Unblocks slice 3 component tests.
-
-- 2026-07-24 — The host IS a player: `createGame` adds the host as player 1 (from
-  `GameConfig.hostDisplayName`/`hostDeviceUuid`); `addPlayer` is for the other players only.
-  Dropped speculative `AddPlayerInput.isHost` (host = `deviceUuid === hostDeviceUuid`). — Resolves
-  the slice-2 review's "unverified seam" (unused config fields): the host plays + enters their own
-  score, and "a created game contains the host as player 1" is now an invariant both repositories
-  (Local now, Firestore slice 4) must uphold, pinned by a test.
-- 2026-07-24 — `LocalGameRepository` persistence is best-effort: `setItem` failures (iOS Safari
-  private mode quota) are caught and never break the live in-memory game or block listener
-  notification. — iOS Safari is a target platform; a persistence throw must not make the offline
-  host unplayable.
-
-- 2026-07-24 — Slice 3 scoped to the playable local game flow only; the visible theme toggle and
-  locale switcher UI are deferred to the polish slice (8). — Dark theme + device locale already
-  default correctly from the scaffold (no-flash script + i18n detection), so a visible switcher is
-  polish, not core play. Keeps slice 3 focused and reviewable. Online join + connectivity probe
-  stay in slice 4 (slice 3 always starts a LOCAL game).
-
-- 2026-07-24 — Online auth: Firebase **Anonymous Auth** is the actor identity for Firestore rules
-  (`request.auth.uid`). `device_uuid` (localStorage) stays the persistent STATS key; the anon `uid`
-  is the per-session AUTH key. — A `device_uuid` carried as a doc field is spoofable, so rules
-  couldn't enforce "own score vs host" without a trustworthy identity; the firestore-realtime skill
-  sanctions anon auth for exactly this. Player/roundScore docs carry `ownerUid`; room carries `hostUid`.
-- 2026-07-24 — Firestore topology: **subcollections** under `room/{code}` —
-  `room/{code}/players/{uid}`, `room/{code}/roundScores/{uid}_{round}` — NOT PLAN's flat
-  top-level sketch (PLAN's data model is explicitly "(sketch)"/directional). — Makes room-scoping
-  STRUCTURAL: rules match `/room/{code}/**`, ownership is `docId/ownerUid == auth.uid`, expiry is one
-  `get(/room/{code})`. Firestore `playerId == auth.uid` (Local uses a random id — fine, `players[].id`
-  is opaque to domain/UI).
-- 2026-07-24 — Read gate (real, not weak): the `room` doc is readable by any authed user (needed for
-  join-by-code discovery), but `players`/`roundScores` are readable ONLY by room members
-  (`exists(/room/{code}/players/$(auth.uid))`). — PLAN says "room-scoped reads"; the subcollection
-  topology lets us enforce it for real, so the rules test tests a real property instead of just
-  `auth != null`.
-- 2026-07-24 — Trust model for core play (CORRECTED after slice-4a adversarial review): rules
-  enforce OWN-SCORE-ONLY writes (+ host may correct anyone); no server-side total recompute (no
-  server; rules can't sum N docs — that review-checklist line is the slice-7 Gemini fn). The
-  earlier "a player can only wreck their own total, self-defeating" reasoning was WRONG: low total
-  WINS, so deflating your own score is self-SERVING. Closure: (a) rules bound `roundScores.points`
-  to a non-negative integer (with a generous upper sanity cap) and `round` to 1..5; (b) the
-  `roundScores` doc id is pinned to `{ownerUid}_{round}` so there's exactly one score per player
-  per round (no double-count); (c) standings/winners are DERIVED from the bounded `roundScores`
-  (via `runningTotal`), NOT from the freely-writable denormalized `totalScore` field — so a lied
-  `totalScore` can't affect ranking. Residual (accepted, = manual scoring anywhere): a player can
-  still claim they scored 0 (went out) for their own round; the table/host notices, same as lying
-  aloud. The impossible-in-real-Rommi negative score is what's now blocked.
-- 2026-07-24 — Room doc read is `allow get` only, NOT `allow read` (which = get + list). — Firestore
-  folds `list` into `read`; granting it let any authed stranger `getDocs(collection('room'))` and
-  enumerate every room, defeating join-by-code privacy. The app only ever single-doc `get`s a room
-  by known code, so dropping `list` costs nothing. (Found by the slice-4a fresh security review.)
-
-## BUILD STALL — 2026-07-24 ~00:38 Helsinki: Sonnet delegates hit the account session limit
-
-Resets ~04:00 Helsinki. The orchestrator does not write feature code, so remaining slices wait for
-the reset. HEAD = `b30ed14` (slice 4a) is clean and builds. Slice **4b-i is PARTIAL, uncommitted**
-in the working tree — resume brief (do NOT restart from scratch; finish what's there):
-
-- DONE + green (107 tests): `src/lib/connectivity.ts` (+test, the reachability probe),
-  `src/lib/game-mode.ts` (+test, the Local-vs-Firestore repo factory), and the `CreatedGame`
-  extension with `hostPlayerId` in `src/lib/repository.ts` + both repos (`local-repository.ts`,
-  `firestore-repository.ts`) + `local-repository.test.ts`.
-- ~~BROKEN: `pnpm build` fails — `src/stores/game.test.ts:46` has a fake `CreatedGame` missing the
-  now-required `hostPlayerId`.~~ FIXED.
-- ~~NOT DONE (finish per the online-ui delegation spec, items 4–7)~~ DONE (2026-07-24, resumed
-  session): store `isHost`/`myPlayerId`/`isOnline`/`roundScores`; HomeView start-probe →
-  online/offline + a `JoinGame` join-by-code entry; RoomView online adaptations (room code,
-  self-only score entry, host-only Next/Finish, no gating on `status==='playing'`); i18n for all
-  new strings. 141 tests green (`test:run`, and shuffled), `build`/`lint` clean. See the dated
-  entries just below for the non-obvious calls made finishing this. **THEN:** slice 4b-ii
-  (two-client live-sync Playwright e2e on the emulator + auth emulator) is still NOT done.
-
-Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (PWA) → 6 (stats) →
-7 (optional photo) → 8 (polish, incl. wiring the `test:rules` CI job + BUILD_REPORT).
-
-- 2026-07-24 — GameSetup's "other players" fields are validated (≥1 required) only once hosting
-  resolves to the OFFLINE branch, never up front — online hosting proceeds with just the host,
-  any typed other-player names silently unused. — Two independent reasons, not just UX taste:
-  (a) docs/PLAN.md's host flow is "Reachable → normal synced room ... players join by code", i.e.
-  online hosting is meant to start solo; (b) `FirestoreGameRepository.addPlayer` seats *this
-  device's own* auth uid (`room/{code}/players/${uid}`) — looping it from the host's device for
-  each named "other player" would silently overwrite the same doc every time, not just be
-  redundant. Which branch we're on isn't known until the connectivity probe resolves, so the
-  fieldset stays visible and un-blocking until then (see GameSetup.test.ts).
-- 2026-07-24 — RoomView's entry-row seat order is a `ref` that only ever GROWS (append new
-  playerIds as first seen via a `watch(standings, ..., {immediate:true})`), replacing the slice-3
-  frozen "snapshot `standings` once at mount" list. — The frozen version broke online: `start()`
-  only awaits `createGame`, not the first `onSnapshot`, so `standings` can still be empty when
-  RoomView mounts; a frozen empty snapshot would permanently show zero entry rows (including the
-  host's own). Growing the list also correctly picks up players who join online mid-game. Verified
-  by RoomView.test.ts's existing "stable seat order" test (still passes, offline) plus new online
-  tests.
-- 2026-07-24 — RoomView's Next/Finish "has everyone scored this round" gate is derived from the
-  store's synced `roundScores` (`roundScores.filter(round === currentRound)`), not the old
-  view-local "which playerIds did I just commit through this component" `Set`. — The view-local
-  version silently broke the online host: online, `entryStandings` is filtered to `myPlayerId`
-  only (Firestore rules enforce own-score-only writes; see the 2026-07-24 trust-model entry), so
-  the view-local set could only ever contain one id — for any room with ≥2 players,
-  "all players scored" would never become true and the host's Next/Finish button would be
-  permanently disabled. `roundScores` is synced state, so it reflects every player's committed
-  score regardless of which device entered it — correct for both modes, and it let the view-local
-  `scoredPlayerIds` ref + its round-change `watch` be deleted outright.
-- 2026-07-24 — RoomView shows a persistent, icon+text (not color-only) banner keyed off
-  `!isOnline`: "You're offline — playing a local game on this device." — Per the error-ux skill's
-  "the offline→local path shows WHY": before this slice, local was the *only* mode, so there was
-  nothing to explain; now that online hosting is attempted first, `!isOnline` reliably means "this
-  device fell back to a local game" (the only remaining way to get a `null` room code), so it's a
-  correct hook for the explanation without touching the actual offline scoring mechanics (host
-  enters everyone, Next/Finish as before — unchanged).
-- 2026-07-24 — `useGameConnectivity.ts` loads `lib/firebase.ts` + `lib/firestore-repository.ts` via
-  dynamic `import()`, not a static top-level import. — `HomeView` is eager-loaded (landing route)
-  and renders `GameSetup`/`JoinGame` immediately; a static import would put the whole Firebase +
-  Firestore SDK in the app's initial bundle, so a fully offline host would download it before the
-  home screen even paints — directly against the "offline-capable host" golden rule and
-  mobile-first (a card table is exactly where connectivity is worst). Confirmed empirically: static
-  import inflated the main chunk from ~90 KB to ~282 KB gzip; the dynamic import keeps the main
-  chunk ~92 KB and puts Firebase in its own ~189 KB chunk fetched only when a player actually
-  submits the host/join form. `lib/connectivity.ts`/`lib/game-mode.ts`/`lib/local-repository.ts`
-  stay static — none of them touch Firebase.
-
-- 2026-07-24 — Offline-host robustness (slice 5b): `firebase.ts` `db`/`auth` are LAZY getters
-  (`getDb()`/`getFirebaseAuth()`), no Firebase calls at import; `useGameConnectivity` wraps the whole
-  online setup (dynamic import + getters + probe + sign-in) in try/catch so ANY failure (blank/bad
-  `VITE_FIREBASE_*`, import failure, sign-in reject, probe timeout) lands the HOST in a working LOCAL
-  game and JOIN in a friendly "unreachable" message — never a crash. — Honors the offline-host golden
-  rule: a broken/absent backend must not break local play. Accepted residual: a probe-success then
-  `createGame` write failure shows a friendly retry (not a local fallback) — narrower window, still
-  no raw error.
-- 2026-07-24 — Firestore persistence degrades: `persistentLocalCache` + `persistentSingleTabManager`
-  when storage is usable (`canUsePersistentCache` feature-detects IndexedDB + a localStorage probe),
-  else `memoryLocalCache`. — Single-tab (not multi-tab) drops the cross-tab zombie-leadership work
-  (multi-tab sync isn't needed one-device-per-player); memory fallback keeps iOS Safari PRIVATE mode
-  working. (Firestore still logs internal "zombie client id" noise in some test browsers — cosmetic,
-  non-fatal, tests pass.)
-- 2026-07-24 — Local-game resume-on-reload: store `resume()` reconstructs a `LocalGameRepository`
-  from localStorage and re-subscribes, GATED to the `local` room route only. — Documented exception
-  to "store never touches a concrete repository" (resume is local-only by construction, no online
-  counterpart). The route gate prevents resurrecting a stale local game onto a real online room URL
-  (regression-tested). Reconnecting indicator uses `navigator.onLine` (same signal as the probe),
-  distinct from the never-connected local banner.
-
-- 2026-07-24 — Stats identity keying (slice 6): stats are keyed by device UUID. They AGGREGATE
-  across games for real devices — the host (their own persisted `device_uuid`) and online joiners
-  (each their own device). In a LOCAL game the host's other players are ad-hoc names on one device
-  with per-game synthetic UUIDs (slice 3), so they appear in THAT game's result + head-to-head but
-  do NOT aggregate across games. — This is the documented "history follows the device, not the
-  person" limitation (PLAN "Stats & history"), not a bug; the highest-value stat (the host's own
-  record) works everywhere, online opponents aggregate correctly, and we avoid inventing a
-  cross-game identity for ad-hoc local players that PLAN never specified. Surface the caveat in the
-  Stats UI.
-
-- 2026-07-24 — Slice 6 (stats backend) built: `lib/stats.ts` (pure `playerStats`/`headToHead`/
-  `bestAndWorstRound`, no `GameResult[]` needed — every stat PLAN asks for lives on `GamePlayer`
-  rows, grouped by their own `gameId`), persistence in both repositories' `finishGame`
-  (`LocalGameRepository` queues `{result, players}` to a localStorage `pending-results` list via
-  new `lib/pending-results.ts`; `FirestoreGameRepository` writes straight to top-level
-  `game_result/{gameId}` + `game_player/{gameId}_{deviceUuid}` via new `lib/firestore-stats.ts`),
-  a reconnect flush (`pending-results.ts`'s `flushPendingResults`, wired minimally at launch via
-  `lib/reconnect-flush.ts` + `main.ts`), and `firestore.rules` append-only records for both
-  collections. `lib/key-value-storage.ts` extracted from `local-repository.ts` (2nd real
-  duplication) so `pending-results.ts` can share the `KeyValueStorage` interface without a
-  circular import.
-- 2026-07-24 — `game_result`/`game_player` create-authorization is a HYBRID, not a flat "any
-  authed user": when a gameId corresponds to an existing `room/{code}` doc (an online game — the
-  common case, since `FirestoreGameRepository` uses the room code as the gameId), only that
-  room's host may create its stats rows (`roomExists(gameId) → isHost(gameId)`), matching "the
-  host is the one finishing, so it writes all rows". When no room exists for that gameId (a
-  purely local/offline game only reaching Firestore via the reconnect flush — there is no room
-  doc to check a participant against for a game that was never online), the floor is bare
-  authed-create + well-formed fields + referential integrity (`game_player` requires a matching
-  `game_result` to already exist, via `exists()` — not batched with it, since a `get()` inside a
-  rule can't see a sibling write from the same batch, so the two are genuine sequential writes,
-  same pattern as `createGame`'s room-then-player order). Both are read-open to any authed user
-  (shared game outcomes among friends, not sensitive per PLAN) and always deny `update`/`delete`.
-- 2026-07-24 — `writeGameResult` (`lib/firestore-stats.ts`) is per-document IDEMPOTENT
-  (`getDoc` existence check before every `setDoc`, skipping docs already written) — found in
-  review, not in the original design. The reconnect flush retries a whole queued result on the
-  NEXT launch after ANY failure, including a partial one: `Promise.all` over `game_player` writes
-  rejects on the first failure, but sibling writes that already resolved are already committed.
-  Without the idempotency check, retrying would re-`setDoc` an already-written append-only doc,
-  which the rules' `update` denial would reject forever — turning one transient failure into a
-  permanent block on that game (and, since the flush stops at the first failure, on every later
-  queued game too). The extra reads are cheap for this low-frequency, tiny-record feature.
-
-- 2026-07-24 — Stats rows key on the anon UID, NOT the separate localStorage `device_uuid`, and
-  writes are tied to auth in rules (closes a targeted-forgery BLOCK from the 6-backend review).
-  `game_player.deviceUuid` = the player's uid (= their `room/{code}/players/{uid}` id). Create rule:
-  ONLINE (room exists) → only the host may write, and only for a real participant
-  (`exists(players/{uid})`); LOCAL (flushed offline game) → `deviceUuid == request.auth.uid`
-  (self-write only), and only the HOST's own row is flushed (local ad-hoc co-players don't
-  aggregate). — Without tying the written deviceUuid to `request.auth.uid`, any authed stranger
-  could forge a permanent append-only win/loss on any victim's stats. The room already keys players
-  by uid, so this is a bounded slice-6 change (no identity rewrite, no finish-flow rewrite).
-  Mutation-tested: the forgery negatives fail against the pre-fix rule.
-- 2026-07-24 — Stats reads (`game_result`/`game_player`) stay OPEN to any authed user (not
-  per-device-scoped). — Head-to-head must read opponents' rows, so per-device read scoping would
-  break it; now that forgery is closed by the create rules, open reads are just "friends see the
-  group's shared game history" (intended). Numeric bounds pinned by rules tests (finalScore ≤5000,
-  placement 1..50, best/worst round ≤1000, totalRounds == 5).
-- 2026-07-24 — ACCEPTED RESIDUAL (within PLAN's "stats are only as trustworthy as the identity
-  model"): a malicious HOST can still misreport the result of a game played IN THEIR OWN room —
-  rules can't recompute a total from N per-round docs (no server). This is the same trust line
-  already accepted for live play; correcting it would need a server. Not a blocker.
-
-## Carried-forward TODOs (flagged by implementers, not yet wired)
-
-- ~~Slice 3: call `identityStore.ensureDeviceUuid()` at app bootstrap~~ — DONE in slice 3 (wired in
-  main.ts before router, so identity is set before the first nav guard).
-- ~~Slice 4: the game store's only entry is `start()`... needs a new store action `join(repo,
-  code)`~~ — DONE: `useGameStore.join()` exists (seats via `addPlayer`, subscribes, never calls
-  `createGame`), with `callOrder` regression coverage in game.test.ts.
-- Slice 5: reload/resume of an in-progress LOCAL game. `LocalGameRepository` persists to
-  localStorage, but the game store doesn't re-subscribe on mount — a hard reload mid-game loses
-  the in-memory store (repo data survives, nothing reads it back). RoomView degrades gracefully
-  (empty state → back home, no crash). Wire resume where offline robustness lives (slice 5).
-- Slice 5 (robustness, surfaced by the 4b-ii e2e): Firestore persistence should GRACEFULLY DEGRADE.
-  The live-sync e2e passes on chromium+firefox but logs `@firebase/firestore: Failed to set zombie
-  client id` + `removeItem NS_ERROR_FAILURE`, and Playwright-WebKit fails the spec ~8/10 — all
-  pointing at `persistentLocalCache({ tabManager: persistentMultipleTabManager() })` in
-  `src/lib/firebase.ts` choking where IndexedDB/localStorage is constrained (test browsers; iOS
-  Safari PRIVATE mode blocks them entirely — and iOS Safari is a target platform). Slice 5: try
-  persistent cache but fall back to memory cache (or `persistentSingleTabManager`) when persistence
-  is unavailable, so a constrained/private context still runs. Likely also clears the WebKit e2e flake.
-- KNOWN LIMITATION (needs real-device verification, cannot do autonomously): live sync is unverified
-  on REAL Safari / iOS Safari. Playwright's bundled WebKit ≠ real Safari (known networking/streaming
-  divergence), so the WebKit e2e failure may be a harness artifact — but do a manual live-sync smoke
-  test on a real iPhone/Safari before relying on online multiplayer there. Recorded for BUILD_REPORT.
-- Slice 5: the error-ux "reconnecting…" indicator for a mid-game connectivity BLIP during an
-  ONLINE game (distinct from never-connected → local). Firestore `persistentLocalCache` is already
-  on (slice 4a), so a blip keeps working from cache; slice 5 adds the subtle "reconnecting…" UI +
-  host-editing-others online (deferred from 4b-i) can be revisited then or in polish.
-- ~~Slice 6 (stats): local non-host players get a fresh synthetic `crypto.randomUUID()` per
-  game...~~ RECONCILED (2026-07-24, see the "Stats identity keying" entry above): `lib/stats.ts`
-  doesn't special-case it — a synthetic per-game UUID just never repeats across games, so it
-  naturally never aggregates, which is the documented behavior, not a bug to fix here.
-- Slice 6 (stats) — left for the Stats UI/store slice, NOT built here per this slice's scope
-  (backend only): the actual views/routes/store reading `game_result`/`game_player` back out and
-  rendering `playerStats`/`headToHead`, and surfacing the identity caveats (device-follows-not-
-  person, local non-aggregation) in that UI per PLAN.
-- Slice 6 (stats) — residual gap, accepted for this slice: an ONLINE game's `finishGame` writes
-  `game_result`/`game_player` directly (no queue) after the room already flipped to `'finished'`;
-  if that specific write fails (as opposed to the room update, which is a separate, already-
-  awaited call), there's no retry — unlike the offline path, which always has the
-  `pending-results` queue as a safety net. Not treated as a blocker (the game itself still ends
-  correctly for players either way), but worth a queue-on-failure fallback if it's ever observed
-  in practice.
-- Slice 6 (stats): the new `finishGame`-writes-`game_result`/`game_player` end-to-end assertion
-  lives in `tests/integration/firestore-repository.test.ts` — the quarantined, NOT-in-CI,
-  documented-flake suite (see the KNOWN FLAKE entry below), not `pnpm test:rules`/`test:run`. It
-  passed every run this session; treat it as bonus real-emulator evidence, not a CI gate.
-- Slice 8 (polish): slice 3 UI is behavior-tested + static-checked (tokens/a11y/i18n) but not yet
-  visually verified in a real browser at a phone viewport — do the cross-platform visual pass here.
-- ~~Slice 4b: ONLINE UI must handle...~~ DONE (4b-i, 2026-07-24): RoomView filters entry rows to
-  `myPlayerId` online, gates Next/Finish on `isHost`, and never gates on `status==='playing'` (the
-  Next/Finish gate itself was rebuilt off synced `roundScores`, not view-local state — see the
-  dated entry above). Host-editing-others' scores online is still explicitly deferred (not built).
-  Still open: **4b-ii's e2e** needs BOTH firestore + auth emulators + `connectAuthEmulator`
-  (`VITE_USE_EMULATOR`) — not started this session.
-- CI: `.github/workflows/ci.yml` has a commented `test:rules` job — wire it now that rules exist
-  (needs Java + firebase-tools on the runner). Do in 4b or polish. ~~Do NOT add `test:integration`
-  to CI (see flake below).~~ Added 2026-09-27 once the flake was fixed.
-- ~~KNOWN FLAKE~~ FIXED 2026-09-27 (see the dated entry at the end). Original note: `pnpm test:integration` (emulator-backed FirestoreGameRepository
-  test) intermittently fails on a cold-booted emulator via Vitest — a Node24 + grpc-js + emulator
-  HTTP/2 cold-boot transport race (browser uses WebChannel, so NOT a product bug). Isolated into its
-  own `vitest.integration.config.ts`, OUT of `test:run`/CI/hooks. The join-order correctness it
-  demonstrates is ALSO covered by a deterministic store-level `callOrder` unit test. Per tdd's flake
-  rules this is the "quarantine with documented root cause" path, not a silent skip.
-
-## Polish-slice nits (swept in slice 8)
-
-- `src/stores/stats.ts` — replace the ad-hoc `as { finishedAt: string }` cast with `as GameResult`
-  (the domain type already has the field) for clean-code consistency. (Nit, 6-ui review.)
-
-- 2026-07-24 — Photo-count gate (slice 7) uses the caller's FIREBASE ID TOKEN (verified by the
-  Admin SDK) + room membership, NOT the skill's self-asserted `sessionToken` field. — Consistent
-  with the anon-auth decision and not forgeable (same lesson as the stats-forgery fix): the client
-  sends its Firebase ID token, the function verifies it → uid → checks the room exists/active/
-  not-expired AND `players/{uid}` exists in it. A self-asserted token field would be spoofable.
-
-- 2026-07-24 — Slice 8 polish: theme toggle + locale switcher shipped (the slice-3 deferral).
-  `useTheme` is a non-singleton composable persisting `localStorage['theme']` byte-for-byte like
-  index.html's no-flash script (NOT via pinia-persistedstate, which JSON-wraps and would break the
-  match + reintroduce flash). Reduced-motion audit: only real motion was the shadcn Sheet
-  enter/exit — gated via an UNLAYERED `@media (prefers-reduced-motion: reduce)` in main.css
-  (Tailwind v4 `motion-reduce:` utilities lost to source-order within `@layer utilities`; unlayered
-  rules beat all layered ones — verified against compiled CSS). No score/win-celebration motion exists.
-- 2026-07-24 — Two cosmetic follow-ups (non-blocking, for BUILD_REPORT): index.html's
-  `<meta name="theme-color">` stays dark-tinted in light mode (a clean fix needs reading
-  `--background` at runtime, not a second hardcoded hex); shadcn `SheetContent`'s built-in "Close"
-  label is hardcoded English but unreachable today (`PhotoCountSheet` sets `:show-close-button="false"`).
-- 2026-09-27 — Card values changed to the house rule: **2–9 = 5, 10 = 10**, J/Q/K = 10, Ace = 15,
-  Joker = 25 (was number = face value). Every value is now a multiple of 5, so a round score must be
-  too — `isValidRoundScore` in `rules.ts` rejects anything else, and `firestore.rules` mirrors it
-  with `points % 5 == 0` on `roundScores` only. `gamePlayers` bounds are deliberately NOT tightened:
-  an offline host's pending result recorded under the old values would otherwise be rejected on
-  reconnect forever.
-- 2026-09-27 — The game is played with **2 decks (sometimes 3)**. Scoring is per physical card, so
-  deck count changes nothing in `rules.ts`; the one single-deck assumption was the Gemini prompt
-  ("count each card once" invites merging two identical 7♥), now told to list every copy. No
-  deck-count game setting: its only use would be capping copies per card when validating a photo
-  read, which isn't worth a new field through types, both repositories, rules and UI.
-- 2026-09-27 — `test:integration` flake FIXED and the suite is back in CI (the `rules` job). Root
-  cause was not a warm-up race: the Node SDK's gRPC `Listen` stream loses its framing against the
-  emulator (reads protobuf bytes as a length prefix — `Received message larger than max
-  (1919182194 vs 4194304)` = ASCII "rder"), backs off ~60s, and the 30s test times out. Open
-  upstream: firebase/firebase-tools#8654. Failed ~1 in 3 cold runs, on `main` too. Fix: the suite
-  runs the SDK's browser build (WebChannel — what the app ships) via happy-dom + inlined `firebase`
-  + an alias to the browser entry (see vitest.integration.config.ts); the `warmUpListenChannel`
-  workaround is gone. 20/20 cold runs green, ~2s each (was ~15–30s).
-- 2026-09-27 — Correction to the entry above: "20/20 cold runs green" was partly judged on the
-  "Tests passed" line, not the exit code. A second, exit-code-only flake remained (3 in 35 runs
-  during the full review): on `deleteApp` the SDK sends WebChannel's `TYPE=terminate` request via
-  `navigator.sendBeacon` without awaiting it, happy-dom implements the beacon as a `fetch()` whose
-  promise nobody handles, and when Vitest aborts the window at teardown that rejection is unhandled,
-  so the run exits 1 with every assertion passing. Re-calling `terminate()` wouldn't help:
-  `deleteApp` already runs it. Fix: `tests/integration/beacon.setup.ts` makes the beacon send and
-  drop its outcome, as a browser does. Verified all 8 terminate beacons per run go through it, then
-  40/40 cold runs exited 0. Flake checks on emulator suites now count exit codes (tdd skill).
-- 2026-09-27 — CI made real (review round 1): node24 Actions pinned by commit SHA, a read-only
-  `GITHUB_TOKEN`, `workflow_dispatch`, and non-fixing `lint:check` / `format:check` gates. The v4
-  pins declared node20, which GitHub removed from runners on 2026-09-23; CI had not run since
-  2026-07-24.
-- 2026-09-27 — e2e added to CI as its own `e2e` job (`pnpm test:e2e:ci`): Chromium + Firefox against
-  the emulators and a production build. Playwright's CI server command now runs `vite build` before
-  `vite preview`, because Vite bakes `VITE_*` values in at build time and the emulator config is only
-  passed to that command. Retries dropped from 2 to 0 so a flake fails the job instead of hiding;
-  traces are kept on failure and the HTML report is uploaded as an artifact. WebKit stays excluded
-  from live sync (the documented flake). Make `e2e` a required check once it has passed a few runs.
-- 2026-09-27 — Review round 2, "scores always land":
-  - One round-score cap on both sides: `MAX_ROUND_SCORE` (1000) in `rules.ts`, `<= 1000` in
-    `firestore.rules`, parity pinned by rules tests that import the constant. `-0` is rejected.
-  - The reconnect flush moves permanently rejected results (`isPermanentWriteError`) to
-    `card-scorekeeper:pending-results-failed` and keeps going; transient errors still stop it. The
-    failed list is kept, not shown in the UI yet. Each success removes its own entry from a fresh
-    read, so a game queued mid-flush survives.
-  - ScoreCard: a blur saves only while the card is open and focus leaves the card; a press inside
-    the card counts as staying (iOS doesn't focus tapped buttons). Cancel/Escape restore the last
-    saved value. `e2e/score-entry.spec.ts` pins this in real browsers.
-  - RoomView shows an inline alert when a score, Next or Finish save fails, and says the room is
-    closed on permission-denied. Listener (onSnapshot) errors are still silent; that's round 3.
-  - Light `--primary`/`--ring` moved to #047857 and focus rings to 80% opacity for WCAG AA;
-    `src/assets/theme-contrast.test.ts` enforces the token pairs.
-- 2026-09-27 — Review round 3a, owner decisions:
-  - **Late joiners fill in the rounds they missed** (owner's rule, instead of closing joins or a
-    penalty). `missingRounds`/`isEveryRoundScored` in `rules.ts`; Next/Finish check every round
-    so far, so nobody is ranked on fewer rounds. Joining stays open for the room's life.
-  - **Host powers, online too:** the host enters or fixes anyone's score (this supersedes the
-    "host-editing-others online is deferred" notes above) and can remove another player's seat
-    with its scores. Rules: players/roundScores `delete` for the host only, never their own seat,
-    only while the room is live. A removed player can rejoin by code (accepted for now).
-  - **Seat validation in rules:** exact keys, name 1–40 chars (`MAX_PLAYER_NAME_LENGTH`), starting
-    total 0, integer `joinOrder`; updates keep name valid and total a non-negative int.
-  - Players without a phone in online rooms: deferred to its own round.
-- 2026-09-27 — Review round 3b, connection resilience:
-  - Reachability = sign in + `getDocFromServer('room/probe')`. Sign-in alone is answered from cache
-    for a returning device, so Wi-Fi without internet used to pass and Start then hung. (Not
-    `__probe__`: Firestore rejects ids matching `__.*__`, caught by the online e2e.)
-  - Creating a room / taking a seat time out after 10 s (`withTimeout`, a transient
-    `deadline-exceeded`); the host falls back to a local game, a joiner is told the game is
-    unreachable. The queued write may still land later as an orphan room; accepted.
-  - Reload resumes `/room/CODE`: `findSeat()` (seat read refused by the rules = not seated; host
-    from `hostUid`), idempotent `addPlayer`, and "Opening room" / "Join room CODE" states.
-  - `subscribe(onChange, onError)`: listener failures show "no longer in this room"
-    (permission-denied, e.g. removed or closed) or "connection lost, reload".
-  - The launch flush no longer loads Firebase when nothing is queued. The offline banner says
-    "Playing a local game on this device…" instead of claiming "You're offline".
-  - Still open: a snapshot-metadata "not synced yet" indicator (sync-7) and showing the
-    failed-results list.
-- 2026-09-27 — Review round 4, stats you can trust:
-  - Every `game_result`/`game_player` doc carries `participantUids` (the players' auth uids, from
-    the rows' `deviceUuid`). Only participants can get or list; the stats store filters
-    `array-contains uid` on every query. This replaces the "reads open to any authed user"
-    decision: that audience was anyone with the public config, not friends.
-  - Namespaces: room ids must be room codes, local game ids must be UUIDs, so neither can squat
-    the other's stats. A local result's participants must be exactly its writer, and only a
-    participant can add a row, which closes the head-to-head injection.
-  - Rooms: exact fields and a ≤7 h expiry on create; updates advance one round at a time, finish
-    only in round 5, never reopen. Round scores: seated writer, running game, started round; a
-    player may create a missed round but only the host updates an earlier one.
-  - `GameResult.winnerUuid` dropped (never read, wrong identity namespace); placement rules.
-  - Security headers in `vercel.json`; the CSP is Report-Only until a preview deploy is checked.
-  - Deferred to deploy time: App Check, and a room TTL. Online stats are keyed by room code, which
-    is safe only while rooms are never deleted; a TTL would need a per-game id first.
-- 2026-09-27 — Review round 5, photo count deployable:
-  - **Photo count ships on, with per-instance rate limits** (owner's call). The per-room and
-    global caps live in memory, so each Vercel instance and cold start gets a fresh budget; the
-    real ceiling is the no-billing Gemini key's free-tier quota. Accepted risk: a seated player can
-    use up the day's quota for everyone, and photo count then answers "busy" until it resets.
+- 2026-07-24 — **Tie handling:** equal lowest totals are co-winners and share placement 1
+  (standard competition ranking: 1, 1, 3). The least surprising rule for a friendly game, and
+  placement stays usable for head-to-head.
+- 2026-07-24 — **Contract data split:** `rules.ts` holds the 5 contracts as structured melds plus
+  an i18n key per round; the words live in the locale files. The rules stay in code, the prose
+  stays out of it.
+- 2026-07-24 — **`GameRepository` seam:** one mode-agnostic interface. The game store gets a
+  repository injected and imports no concrete one, so local vs online is a swap.
+  - The host is a player: `createGame` seats the host first, `addPlayer` is for everyone else.
+    Both repositories must uphold this; a test pins it.
+  - `LocalGameRepository` saves best-effort: a failing `setItem` (iOS Safari private mode) never
+    stops the live game.
+- 2026-07-24 — **Online auth:** the Firebase Anonymous Auth uid is the identity the rules check
+  (`request.auth.uid`). A device id carried as a field is spoofable, so rules couldn't enforce
+  "own score vs host" with it. Seats and scores carry `ownerUid`; the room carries `hostUid`.
+- 2026-07-24 — **Topology:** subcollections under `room/{code}` (`players/{uid}`,
+  `roundScores/{uid}_{round}`, later `names/{key}`), not flat collections. Room scoping is
+  structural: rules match `/room/{code}/**`, ownership is `docId == auth.uid`, expiry is one
+  `get()` of the room.
+- 2026-07-24 — **Read gate:** anyone signed in may `get` a room by code (joining needs it), but
+  seats and scores are readable only by members (`exists(players/{auth.uid})`).
+  - `allow get`, not `allow read`: `read` includes `list`, which let any signed-in stranger
+    enumerate every room. The app never lists rooms.
+- 2026-07-24 — **Trust model:** a player writes only their own scores; the host may correct
+  anyone's. No server recomputes totals, and rules can't sum N docs.
+  - Low total wins, so lowering your own score helps you. Rules therefore bound `points` and
+    `round` (1–5), pin the doc id to `{ownerUid}_{round}` (one score per player per round, no
+    double counting), and standings come from `roundScores`, never from the writable `totalScore`.
+  - Accepted: a player can still claim 0 for their own round, the same as lying aloud at the table.
+- 2026-07-24 — **Firebase loads lazily:** `firebase.ts` and the Firestore repository come in
+  through a dynamic `import()` on first use. A static import put about 190 KB gzip into the first
+  bundle, which an offline host would download before Home even painted.
+- 2026-07-24 — **Slice-5 offline robustness:**
+  - `getDb()`/`getFirebaseAuth()` are lazy getters, and `useGameConnectivity` wraps the whole
+    online setup in try/catch. Any failure (blank `VITE_FIREBASE_*`, failed import, refused
+    sign-in, probe timeout) sends the host to a local game and gives a joiner a friendly message.
+  - Firestore uses `persistentLocalCache` with a single-tab manager when storage works, else
+    `memoryLocalCache`, so iOS Safari private mode still runs. Multi-tab sync isn't needed.
+  - A reload resumes a local game, but only on `/room/local`, so a stale local game can't appear
+    on an online room's URL. This is the one place the store builds a concrete repository.
+- 2026-07-24 — **Seat order only grows:** RoomView appends player ids as they appear. `start()`
+  doesn't wait for the first snapshot, so a list frozen at mount could stay empty, and online
+  players join mid-game.
+- 2026-07-24 — **Next/Finish read synced `roundScores`,** not what this device entered. Online a
+  device enters only its own score, so a local record never saw "everyone scored".
+- 2026-07-24 — **Reconnect = push final result only:** a local game's Finish queues its result in
+  localStorage (`pending-results.ts`), and the next online launch flushes it (`reconnect-flush.ts`).
+  - `writeGameResult` is idempotent per doc (read before write). A partial failure is retried on
+    the next launch, and the rules deny updates, so rewriting an existing doc would block that
+    game, and every game queued after it, forever.
+- 2026-07-24 — **Stats identity keying: stats rows key on the anon UID (the forgery fix).** A stats
+  row's `deviceUuid` is the player's auth uid (their seat id), not the localStorage device uuid.
+  - Without tying the row to `request.auth.uid`, any signed-in stranger could forge a permanent
+    win or loss on anyone's stats. The forgery tests fail against the old rule.
+  - **Create-authorization trade-off:** online (a room exists at the gameId), only its host
+    writes, and only for a seated player. Local (no room) there is nothing to check against, so a
+    row may only be the writer's own (`deviceUuid == auth.uid`). Only the host's row is queued,
+    and the flush stamps it with the uid signed in at flush time.
+  - Other players in a local game get a new id each game, so their stats never aggregate. History
+    follows the device, not the person; not a bug.
+  - `game_player` needs its `game_result` to exist first, so the two are sequential writes: a
+    rule's `get()` doesn't see a sibling write in the same batch.
+  - Accepted: a host can misreport a game played in their own room. Fixing that needs a server.
+- 2026-07-24 — **Photo-count ID-token gate:** `/api/count` verifies the caller's Firebase ID token,
+  then checks the room (exists, active, not expired) and the caller's seat. Not a self-asserted
+  session token: a field in the body is forgeable, the same lesson as the forgery fix.
+- 2026-09-27 — **Card values** are the house rule: 2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15,
+  Joker = 25 (was face value). Every round score is a multiple of 5: `isValidRoundScore` checks it
+  and the rules mirror it with `points % 5 == 0` on `roundScores`. `game_player` bounds stay loose,
+  so a result queued offline under the old values isn't refused forever.
+- 2026-09-27 — **2 decks, sometimes 3.** Scoring is per card, so `rules.ts` doesn't change. The
+  Gemini prompt lists every copy of a card. No deck-count setting: its only use would be capping
+  copies in a photo read.
+- 2026-09-27 — **`test:integration` flake fixed** (the old known flake); the suite runs in CI.
+  - The Node SDK's gRPC Listen stream loses its framing against the emulator
+    (firebase/firebase-tools#8654). The suite now runs the SDK's browser build (WebChannel, what
+    the app ships) under happy-dom.
+  - A second flake failed only the exit code: happy-dom's `sendBeacon` rejection at teardown went
+    unhandled. `tests/integration/beacon.setup.ts` drops the beacon's outcome, as a browser does.
+    Flake checks count exit codes, not the "passed" line.
+- 2026-09-27 — **CI:** Actions pinned by commit SHA, a read-only `GITHUB_TOKEN`,
+  `workflow_dispatch`, and non-fixing `lint:check`/`format:check`. The v4 pins declared node20,
+  which GitHub removed from runners on 2026-09-23.
+  - e2e has its own job on a production build against the emulators. Playwright's CI server runs
+    `vite build` first, because `VITE_*` values are baked in at build time. No retries, so a
+    flake fails the job.
+  - Playwright-WebKit is left out of the two-device specs: it falls back to long-polling and
+    flakes. Live sync on a real iPhone still needs a check by hand.
+- 2026-09-27 — **Review round 2, scores always land:**
+  - One round-score cap, `MAX_ROUND_SCORE` (1000), in `rules.ts` and `firestore.rules`. The rules
+    tests import the constant to pin parity. `-0` is rejected.
+  - The flush moves permanently rejected results (`isPermanentWriteError`) to
+    `pending-results-failed` and keeps going; transient errors stop it. Each success removes its
+    own entry from a fresh read, so a game queued mid-flush survives.
+  - RoomView shows an inline alert when a score, Next or Finish fails, and says the room is closed
+    on permission-denied.
+  - Light `--primary`/`--ring` #047857 and 80% focus rings for WCAG AA; `theme-contrast.test.ts`
+    enforces the pairs.
+- 2026-09-27 — **Review round 3a, owner decisions:**
+  - Late joiners fill in the rounds they missed, instead of closing joins or a penalty. Next and
+    Finish check every round so far, so nobody is ranked on fewer rounds.
+  - Host powers online too: the host enters or fixes anyone's score and can remove another seat
+    with its scores. Rules: `delete` for the host only, never their own seat, only while the room
+    is live. A removed player can rejoin by code (accepted).
+  - Seats are validated in rules: exact keys, name 1–40 characters, starting total 0, integer
+    `joinOrder`.
+- 2026-09-27 — **Review round 3b, connection resilience:**
+  - Reachability is sign-in plus `getDocFromServer('room/probe')`. Sign-in alone is answered from
+    cache for a returning device, so Wi-Fi without internet passed and Start then hung. Not
+    `__probe__`: Firestore rejects ids matching `__.*__`.
+  - Create and join time out after 10 s (`withTimeout`): the host falls back to a local game, a
+    joiner is told the game is unreachable. The queued write may still land as an orphan room;
+    accepted.
+  - A reload resumes `/room/CODE` through `findSeat()` and an idempotent `addPlayer`.
+  - Listener errors show "no longer in this room" (permission-denied) or "connection lost".
+  - The launch flush doesn't load Firebase when nothing is queued. The local banner says "Playing
+    a local game on this device", not "You're offline".
+  - Still open: a "not synced yet" indicator, and showing the failed-results list.
+- 2026-09-27 — **Review round 4, stats you can trust:**
+  - Every `game_result`/`game_player` doc carries `participantUids`. Only participants can get or
+    list, and every stats query filters `array-contains uid`. This replaced "stats readable by any
+    signed-in user": with a public config, that meant anyone, not just friends.
+  - Namespaces: room ids are room codes and local game ids are UUIDs, so neither can squat the
+    other's stats. A local result's participants must be exactly its writer, which closes
+    head-to-head injection.
+  - Rooms: exact fields and at most 7 h expiry on create (6 h plus clock skew). Rounds advance one
+    at a time, finish only in round 5, and never reopen. Round scores need a seated writer, a
+    running game and a started round; a player may create a missed round, but only the host
+    updates an earlier one.
+  - `GameResult.winnerUuid` dropped: never read, and in the wrong identity namespace.
+  - Security headers in `vercel.json`; the CSP stays Report-Only until checked on a deploy.
+  - Deferred: App Check, and a room TTL. Online stats are keyed by room code, which is safe only
+    while rooms are never deleted, so a TTL needs a per-game id first.
+- 2026-09-27 — **Review round 5, photo count deployable:**
+  - Ships on, with in-memory rate limits per instance (owner's call). The real ceiling is the
+    no-billing key's free quota, so a seated player could use up the day's quota for everyone.
     Upgrade path: an Upstash/Redis `RateLimitStore`.
-  - **Model from `GEMINI_MODEL`**, default `gemini-3.8-flash` (Google's current Flash for new
-    projects; 2.5 Flash is limited to existing users). Thinking level low, capped output, 15 s
-    abort, `maxDuration: 30`; temperature left at the Gemini 3 default.
-  - `api/` runs as native ESM on Vercel, so relative imports carry `.js` (also in the `src/lib`
-    files it imports). `tsconfig.api.json` checks it and `pnpm test:api-load` loads the compiled
-    function in CI; before this the deployed function would have failed to load.
-  - Requests are checked before any I/O (room-code format, image type, base64, size). Only
-    `auth/*` token errors are a 401; other Admin SDK failures are logged 500s. Gemini failures
-    map to 504 (timeout), 503 (quota) or 502, and more than 60 detected cards is a 422.
-  - The sheet gives each failure its own message and offers "Try again" only when a retry can
-    work. The total is its own draft and must be a valid round score before it can be used.
-    Card inputs are named "Card 2 of 4: 7 of hearts" (fi: "Kortti 2/4: hertta 7"), so copies
-    from a second deck stay distinct. The picker no longer forces the camera.
-  - The Gemini key belongs in a separate Google Cloud project, restricted to the Generative
-    Language API; never the Firebase browser key.
-- 2026-09-27 — Deploy setup:
-  - **Two Firebase projects on Spark:** `card-scorekeeper-prod-1673f` for Production and
-    `card-scorekeeper-staging` shared by every PR preview. Each has its own free quota, and
-    preview code never touches real data or prod credentials. Open PRs share staging.
-  - **Vercel stays the host.** All-Firebase would need Blaze for Cloud Functions, or a
-    photo-count redesign on Firebase AI Logic (client calls through Firebase's proxy, gated by
-    App Check instead of room membership). Revisit if public preview links matter.
-  - **No Terraform.** Backends per PR are blocked by the free tier (one Firestore database per
-    project, a small project quota), not by tooling. Provisioning is `firebase.json` (`location`,
-    `auth.providers.anonymous`) plus one `firebase deploy --only firestore,auth --project <id>`;
-    see the vercel-deploy skill.
-- 2026-09-27 — First deploy fix: `/api/count` crashed on load on Vercel (`ERR_REQUIRE_ESM`).
-  `firebase-admin/auth` loads `jwks-rsa`, which `require()`s the ESM-only `jose` v6. Node 24
-  allows that; Vercel's function loader does not, and our checks ran plain Node, so only the real
-  deploy showed it. ID tokens are now verified with `jose` directly (`api/_lib/id-token.ts`,
-  Firebase's documented checks for third-party libraries), and `firebase-admin/auth` is no
-  longer imported. `test:api-load` now runs with `--no-experimental-require-module`, which
-  reproduces the failure locally. Pinning `jwks-rsa`'s `jose` to v5 was the alternative; rejected
-  as a pin on an old major.
-- 2026-09-27 — Stats results query: production Firestore refuses `documentId() in [...]`
-  combined with the `participantUids array-contains` filter (`permission-denied`), while the
-  emulator allows it, so every suite passed and Stats broke for anyone with a finished online
-  game. Stats now loads `game_result` with the participant filter alone (one query, the exact set
-  of games the player was in; the rules test for it already existed). The `game_player` queries
-  work on prod unchanged, and none of the three need a composite index. Lesson: the emulator can
-  be more permissive than production for rules on queries; the planned staging smoke check
-  covers that gap.
-- 2026-09-27 — Online Finish writes the stats before marking the room finished. Before, the room
-  flipped to finished first: every device showed the winner at once, so Stats opened right then
-  could miss the game (it surfaced as an e2e flake under load), and a failed stats write could
-  never be retried because a finished room refuses every write. The rules for online stats only
-  need the room to exist and the writer to be its host, so the order could simply swap, and
-  `writeGameResult` skips docs that already exist, so a retried Finish is safe. This replaces the
-  plan's "queue the online result first" idea for the review finding sync-5.
-- 2026-09-27 — Scoreboard reveals scores per round (tester notes 4 and 8):
-  - The board has five round columns before the total. During a round it shows only who has
-    entered (✓, live); numbers, totals and ranking change when the host taps Next, and round 5 on
-    Finish. This supersedes PLAN's "real-time" wording for score numbers: entries and the reveal
-    still sync live with no refresh button, only the numbers wait. Past-round corrections and
-    late joiners' missed rounds show at once, since those rounds are already revealed.
-  - Totals and ranking come from revealed round scores (`lib/scoreboard.ts`), not the stored
-    `totalScore`. A player with a revealed round still missing is unranked (no crown) until it's
-    filled. `standings` stays the full live ranking for seat order, the Next gate and the winner.
-  - Motion now exists: rows slide into the new order and changed totals fade in, both off for
-    reduced motion via unlayered rules in `main.css` (this updates the slice-8 "no score motion"
-    note). ContractBanner is no longer a live region; RoomView announces results, your place and
-    the next contract together, the host hears when every score is in, and a reopened room
-    announces nothing. Next and Finish use `aria-disabled` and wait for a score saved by the same
-    tap, so one tap is enough; tapping early says whose scores are missing.
-- 2026-09-27 — Back and Continue game (tester note 3, review finding ui-8):
-  - The header has a Back control on every screen except Home. It goes to the previous screen in
-    this tab, or Home when the page was opened directly (a room link, a new tab), detected by
-    Vue Router's `history.state.back` being null. Owner's call: previous screen, but never out of
-    the app.
-  - Leaving a room doesn't end its game. Home shows "Game in progress" with the game still running
-    in this session, the last online room this device was in (remembered in localStorage for
-    the room lifetime, forgotten when the game finishes or the seat is lost) and an unfinished
-    local game. The room lifetime constant moved to the pure `room-code.ts`.
-  - Starting a new local game while an unfinished one is saved now asks first; before, it
-    silently overwrote it. Online games never touch the saved local game, so they don't ask.
-  - At 360px the header is full, so the Stats link is an icon on phones (still named "Stats") and
-    the title truncates.
-- 2026-09-27 — Unique player names (tester note 6):
-  - A name is unique within a game, compared without regard to case or extra spaces: "Juho",
-    "juho" and " Juho " are the same, "Mari Anne" and "Marianne" are not (owner's call). Names
-    are stored cleaned (`cleanPlayerName`: NFC, whitespace runs collapsed, trimmed).
-  - Online the check is on the server, because a joiner can't read the room's names before being
-    seated. Every seat is created in one batch with `room/{code}/names/{key}`, owned by the same
-    player; a second record under the same key is an update, which the rules never allow, so two
-    people can't take one name even at the same moment. The rules derive the key from the stored
-    name (`'n_' + lower`, '/' made id-safe) and refuse unclean names. Owner's call: strict from
-    day one, no lenient phase for old clients, because the current data is test data that gets
-    deleted before launch.
-  - The rules' `lower()` only changes A to Z (found on the emulator: "Äimä" couldn't join, since
-    the app keyed it "n_äimä" and the rules "n_Äimä"). So both sides lowercase A to Z plus a
-    fixed list of Nordic capitals (Ä Ö Å Ü É Ø Æ) that the rules fold one by one. Any other
-    capital is kept as typed: "Ωmega" and "ωmega" are two names. A rules test checks the app's
-    key against the rules for each folded letter.
-  - Consequences: players can no longer rename their seat (nothing did), the host's removal
-    deletes the name record so the name is free again, and anyone signed in may read one name
-    record, so a refusal can say "name taken" instead of a generic error.
-  - Local games check the same keys in the setup form and in `LocalGameRepository.addPlayer`.
-  - A failed join now resets the store, so Home never offers to continue a room this device
-    never got into.
-- 2026-09-27 — Play again (tester note 7):
-  - Online, the host's Play again creates a new room first, then writes one field on the
-    finished room, `nextRoomCode`. Every device still in it sees "The host started a new game"
-    with "Join the next game", which seats them under their name from the finished game. A new
-    room, not a reset of the old one: stats are stored per room, and a finished room never
-    reopens (the /api photo gate trusts that).
-  - The rules let a finished room take exactly that one write: by its host, before it expires,
-    set once, pointing at another room the same host owns, and nothing else changes with it.
-  - The host moves on even if the link doesn't land (an expired room refuses it); the new room's
-    code is on screen to share instead. A link write that times out stays queued in the SDK.
-  - Never a local game when the server can't be reached here: the other phones wait for that
-    room, so the host gets an error and a retry (`nextRoomRepository`, online only).
-  - A local Play again opens the setup form with the finished game's names, host first, passed in
-    the history entry's state, so the host can add or remove players first.
-  - `join()` now takes the seat before leaving the current game, so a refused join from a
-    finished game leaves it on screen (with "Join with another name" when the name is taken)
-    instead of an empty room. From an empty store it still leaves nothing behind.
-  - Each room path gets a fresh RoomView (a keyed RouterView): Vue Router reuses the view when
-    only the code changes, and a device keeps its anonymous uid across rooms, so which scores
-    the host entered in the finished game would otherwise show a player's numbers early in the
-    next one.
-- 2026-09-27 — Production address rommi.vercel.app (second playtest):
-  - rommi.vercel.app is the only production domain. The old card-scorekeeper.vercel.app was
-    removed from the project outright, with no redirect (owner's call): nothing links to it
-    and the test data is being wiped anyway.
-  - Browser storage belongs to an address, so testers start fresh there: a new anonymous id,
-    empty stats, no saved local game. An app installed to the home screen from the old address
-    has to be removed and added again from the new one.
-- 2026-09-27 — Gitflow with a test site (owner's call):
-  - `develop` is the default branch; feature PRs squash-merge into it, and it deploys to
-    test-rommi.vercel.app on staging Firebase. `main` is production (rommi.vercel.app). Testers
-    play on test-rommi, so production holds only real games.
-  - test-rommi is a Preview domain tied to `develop` in the same Vercel project, not a second
-    project: the free plan has no custom environments, and the Preview variables already point
-    at staging, secrets included. Vercel login protection on previews is off, so testers get
-    in.
-  - Releases fast-forward `main` to a `develop` commit (`git push origin develop:main`) when the
-    owner says "release", with a release PR only for the record and CI. The owner asked for a
-    PR without squash or merge commits; GitHub's "Rebase and merge" rewrites every commit id,
-    so the fast-forward is the only way to keep both branches on the same commits. `main`'s
-    ruleset therefore drops its PR rule but keeps required checks, linear history, no
-    force-push and no deletion.
-  - Hotfixes go through `develop` and a release, so `develop` must stay releasable.
-- 2026-09-27 — Players without a phone: guest seats (second playtest, owner's call):
-  - Names typed in the start form used to be ignored online (they only fed the local fallback).
-    Now, in both modes, they become players the host scores for: online a guest seat, locally
-    just another player. "Lisää pelaaja" at the end of the host's cards adds one at any round;
-    added mid-game, they fill in the rounds they missed like a late joiner.
-  - A guest seat's id is `guest-<lowercase uuid>`. An anonymous uid has no '-', so a guest id
-    is never a signed-in identity and never a room member. The seat is owned by the host, its
-    deviceUuid is its own id (the stats rows' key), and it carries `isGuest: true`.
-  - Rules stay additive: new host-only branches create a guest seat and its name record, which
-    also names the seat (`playerId`). The joiner and old-record branches are unchanged, so the
-    rules can reach each environment before the app. The host already could write any seat's
-    scores and total, and a stats row only needs the seat to exist.
-  - The host always sees the numbers on a guest's card: nobody else can enter them.
-  - A joiner who picks a guest's name is told the host already added that player and to ask the
-    host to remove them. A phone taking over a guest seat is deferred.
-  - Online Play again seats the finished game's guests in the next room, since they can't join
-    by code.
-  - Guest ids land in a stats row's participantUids alongside the uids; harmless, since nobody
-    signs in as one. A guest gets a new id each game, as local players always have, so
-    head-to-head lists a guest once per game. No photo count on guest cards.
-  - Known gaps, deferred: an add that times out stays queued in the SDK and may still land, so
-    retrying the same name can then say it's taken (the first attempt got there). And the start
-    form still falls back to a local game if a guest write fails after the room was created,
-    leaving that room behind; the probe has just passed, so it's unlikely, but the better
-    behaviour is to stay in the room and say who couldn't be added.
-- 2026-09-27 — Room code in the header, invite sheet, join links (second playtest):
-  - In an online room the header shows "Huone 7K4RQ" with a copy button and Kutsu, on every
-    device, and the in-page code banner is gone. Kutsu opens a bottom sheet with a QR code of the
-    join link (for people at the same table), the code in large type, Kopioi koodi, and Jaa
-    linkki: the phone's share sheet, or copying the link where there is none. Owner's call over
-    two plain buttons or a sheet only.
+  - Model from `GEMINI_MODEL`, default `gemini-3.8-flash` (2.5 Flash is closed to new projects).
+    Low thinking, capped output, 15 s abort, `maxDuration: 30`.
+  - `api/` runs as native ESM on Vercel, so relative imports end in `.js`. `tsconfig.api.json`
+    checks it and `test:api-load` loads the compiled function in CI.
+  - Requests are checked before any I/O. Only `auth/*` token errors are 401. Gemini failures map to
+    504, 503 or 502, and over 60 cards is 422. The sheet offers "Try again" only when a retry can
+    work, and names each card input with its position, so copies from a second deck stay distinct.
+  - The Gemini key lives in its own Google Cloud project, limited to the Generative Language API,
+    never the Firebase browser key.
+- 2026-09-27 — **Deploy setup:**
+  - Two Firebase projects on Spark: `card-scorekeeper-prod-1673f` for production and
+    `card-scorekeeper-staging` for `develop` and PR previews. Each has its own quota, and preview
+    code never touches real data.
+  - Vercel stays the host. All-Firebase would need Blaze for Cloud Functions, or a photo-count
+    redesign on Firebase AI Logic gated by App Check.
+  - No Terraform: the free tier (one database per project), not tooling, blocks a backend per PR.
+    Provisioning is `firebase.json` plus `firebase deploy --only firestore,auth --project <id>`.
+- 2026-09-27 — **Deploy fix:** `/api/count` crashed on load on Vercel (`ERR_REQUIRE_ESM`), because
+  `firebase-admin/auth` loads `jwks-rsa`, which `require()`s the ESM-only `jose` v6. ID tokens are
+  now verified with `jose` directly (`api/_lib/id-token.ts`), and `test:api-load` runs with
+  `--no-experimental-require-module` to match Vercel's loader. Pinning `jose` v5 was rejected as a
+  pin on an old major.
+- 2026-09-27 — **Stats query:** production Firestore refuses `documentId() in [...]` combined with
+  `participantUids array-contains`, while the emulator allows it. Stats loads `game_result` with
+  the participant filter alone. Lesson: the emulator can be looser than production for query
+  rules, so check on staging.
+- 2026-09-27 — **Online Finish writes the stats before marking the room finished.** Otherwise
+  Stats opened at the winner screen could miss the game, and a failed stats write could never be
+  retried, since a finished room refuses every write. `writeGameResult` skips existing docs, so a
+  retried Finish is safe.
+- 2026-09-27 — **Scoreboard reveals scores per round:**
+  - Five round columns and a total. During a round it shows only who has entered (✓, live);
+    numbers, totals and ranking change on Next, round 5 on Finish. Entries and the reveal still
+    sync live. Past-round corrections and missed rounds show at once.
+  - Totals and ranking come from revealed rounds (`lib/game/scoreboard.ts`). A player with a
+    revealed round still missing is unranked until it's filled.
+  - Rows slide into the new order and changed totals fade in. Both are off for reduced motion
+    through unlayered rules in `main.css`: Tailwind's `motion-reduce:` lost on source order inside
+    `@layer utilities`.
+  - RoomView announces results, your place and the next contract together. Next and Finish use
+    `aria-disabled` and say whose scores are missing when tapped early.
+- 2026-09-27 — **Back and Continue game:**
+  - Back goes to the previous screen in this tab, or Home when the page was opened directly
+    (`history.state.back` is null). Never out of the app (owner's call).
+  - Leaving a room doesn't end its game. Home offers the game running in this session, the last
+    online room (kept in localStorage for the room's lifetime) and an unfinished local game.
+  - Starting a new local game over an unfinished one asks first.
+- 2026-09-27 — **Unique player names:**
+  - Unique within a game, ignoring case and extra spaces: "Juho" and " juho " are the same,
+    "Mari Anne" and "Marianne" are not. Names are stored cleaned (`cleanPlayerName`: NFC,
+    whitespace collapsed, trimmed).
+  - Online the server checks it, because a joiner can't read the room's names before being
+    seated. Each seat is created in one batch with `room/{code}/names/{key}`. A second record under
+    the same key would be an update, which the rules never allow, so two people can't take one
+    name even at the same moment. The rules derive the key from the stored name and refuse
+    unclean names. Strict from day one (owner's call).
+  - The rules' `lower()` only folds A–Z, so both sides also fold a fixed list of Nordic capitals
+    (Ä Ö Å Ü É Ø Æ). Other capitals stay as typed. A rules test checks each folded letter.
+  - Seats can't be renamed, removing a seat frees its name, and anyone signed in may read one name
+    record, so a refusal can say "name taken".
+  - A failed join resets the store, so Home never offers a room this device never got into.
+- 2026-09-27 — **Production address rommi.vercel.app.** The old card-scorekeeper.vercel.app was
+  removed with no redirect (owner's call). Browser storage belongs to an address, so testers start
+  fresh there and reinstall the home-screen app.
+- 2026-09-27 — **Gitflow with a test site** (owner's call):
+  - `develop` is the default branch. Feature PRs squash-merge into it, and it deploys to
+    test-rommi.vercel.app on staging. `main` is production. Testers play on test-rommi.
+  - test-rommi is a Preview domain tied to `develop` in the same Vercel project: the free plan has
+    no custom environments, and the Preview variables already point at staging.
+  - A release fast-forwards `main` (`git push origin develop:main`) when the owner says "release",
+    with a release PR for the record and CI. "Rebase and merge" rewrites commit ids, so only the
+    fast-forward keeps both branches on the same commits. `main`'s ruleset keeps required checks,
+    linear history, no force-push and no deletion.
+  - Hotfixes go through `develop`, so `develop` must stay releasable.
+- 2026-09-27 — **Guest seats** for players without a phone (owner's call):
+  - The host adds them with the Add player card at any round, in both modes. Added mid-game, they
+    fill in missed rounds like a late joiner.
+  - The id is `guest-<lowercase uuid>`. An anonymous uid has no '-', so a guest id is never a
+    signed-in identity or a room member. The seat is owned by the host, its `deviceUuid` is its own
+    id (the stats key), and it carries `isGuest: true`.
+  - The rules stay additive: new host-only branches create a guest seat and its name record, so
+    the rules can deploy before the app. The host could already write any seat's scores.
+  - The host always sees a guest's numbers. A joiner who picks a guest's name is told to ask the
+    host to remove the guest. No photo count on guest cards.
+  - Guest ids land in `participantUids`; harmless, since nobody signs in as one. A guest keeps its
+    id into Play again's next room, otherwise gets a new one each game.
+  - Known gap: an add that times out stays queued in the SDK and may still land, so retrying the
+    same name can then say it's taken.
+- 2026-09-27 — **Room code in the header, invite sheet, join links:**
+  - In an online room the header shows the code with copy and Kutsu. Kutsu opens a sheet with a QR
+    code of the join link, the code in large type, copy, and share (the share sheet, or copying the
+    link where there is none).
   - The link is `/join/CODE`, built from the current address, so previews and test-rommi link to
-    themselves. That page asks only for a name. A device already seated there goes straight to
-    the room; a finished, expired or missing room says so first (a new `roomAvailability()`
-    read), and when the room can't be read at all, the form shows and a join says why. The
-    not-seated screen and Play again's "Join with another name" point there too.
-  - The QR comes from `uqr` (small, no dependencies), loaded only when the sheet opens, and is
-    drawn as one SVG path from its module grid, dark on white in both themes. Copying uses the
-    Clipboard API with a hidden-textarea fallback (`useCopyText`), not VueUse's useClipboard,
-    which only tries the Clipboard API after a permission query Firefox and Safari lack.
-- 2026-09-27 — The top bar stays on screen (second playtest: "the scroll should target the
-  players list … keep the table and header always visible"):
-  - Tried first: the round banner and the scoreboard pinned under the header while only the cards
-    scrolled. The owner found that a mistake: only the top bar with the menu stays; everything
-    else, board included, scrolls with the page.
-  - The app header is sticky on every page. `html { scroll-padding-top }` equals its height
-    (`--app-header-height`), so anything scrolled or focused into view lands below it.
-  - Kept from the attempt: the round banner is one small line and the board's rows are tighter,
-    so more of the game fits on a phone.
-- 2026-09-27 — Rules page (second playtest: "rules sections … with visual examples"):
-  - "Säännöt" in the menu opens /rules: the five contracts (from CONTRACTS), the melds with
-    example cards, and what each card left in the hand costs (from cardValue), so the page can't
-    drift from the scoring. Part of the precached app, so it opens offline.
-  - Owner's rule: an ace counts as 1 or 14 in a straight, never both, so K-A-2-3 doesn't count.
-  - Drafted on assumptions for the owner to correct on test-rommi: a värisuora is four or more
-    cards; a set of three may repeat suits (2–3 decks); a joker stands in for any card; twos are
-    not wild. Nothing about going out or laying off is on the page yet.
-  - Cards are white in both themes, like real cards; the suit symbol tells suits apart, not only
-    red and black, and each card has a spoken name ("hertta seitsemän").
-- 2026-09-27 — The open card and the phone keyboard (third playtest: "the input fields are behind
-  the mobile keyboard"):
-  - What finally held (your iPhone tests): a phone only scrolls a field out from behind its
-    keyboard when the finger tapped that field, not when the app focuses it after a card opens. So
-    the lowest cards' fields stayed hidden while higher ones were fine. On a touch screen an
-    opening card now scrolls up to just under the header before its field is focused
-    (`useKeepInView`, the pure `scrollToTop`). The keyboard only covers the lower part of the
-    screen, so it never covers the field. While a card is open the room gets space below it
-    (`--open-card-room`), so even the last card can come up. The focus itself then skips the
-    browser's scroll, which would move the card again. With a mouse a card just moves clear of the
-    header and the Next bar (`scrollToReveal`).
-  - Tried and removed: following `window.visualViewport` resizes while the keyboard was up. On an
-    iPhone it also resizes while scrolling (the toolbars sliding), so the page jumped back
-    mid-scroll. A unit test pins that a resize never scrolls the page.
-  - The real cover-up on the iPhone was the sticky Next bar: with the keyboard up it sits right
-    above the keyboard, on top of the field. The room's bottom bars stop sticking while a card is
-    open (`:has([data-card-open])`) and drop back to the end of the list.
-  - Android Chrome gets `interactive-widget=resizes-content`, so its keyboard resizes the page.
-  - Found on the way: leaving a field by tapping another card saved and closed the first card on
-    the press, the list shifted, and the tap landed elsewhere. The score still saves at once,
-    but the card now closes only after that tap's click has landed (or after 500 ms when no tap
-    follows, as with the keyboard), and stays open when the tap lands back on it.
-  - How the iPhone keyboard behaves can only be checked on a real phone.
-- 2026-09-27 — "Syötä kaikki" for the host (third playtest: "Input all points"):
-  - Beside the round heading while anyone is missing a score this round, host only. It opens a
-    sheet that goes through those players one at a time, laid out like an open score card (the
-    owner's call): the name, then the field with ✓ (save and move on) and → (skip). "2/4" shows
-    progress, and a player who enters their own score meanwhile drops out. It closes when nobody
-    is left.
-  - The field stays the same element from player to player, so the phone keyboard stays up. The
-    sheet floats in the upper part of the screen (`--floating-sheet-top`), about the middle of
-    what stays visible with the keyboard up. The owner asked about the true middle, but an iPhone
-    centres on the whole screen, not the part above the keyboard, so a centred field lands behind
-    the keyboard.
-  - Saving goes through the room's own handler, so the saved-score announcement, the room's
-    error message, and which numbers the host may see work as they do for the cards.
-- 2026-09-27 — One form on Home (third playtest: "Other players not needed at start, combine with
-  join"):
-  - One card with a Liity | Uusi peli toggle, Liity first (the owner's call): most people at a
-    table join, one starts. The name field is shared, so a typed name stays when switching, and
-    Liity also asks for the room code.
-  - "Muut pelaajat" is gone from the start form: the host adds the others in the room (guest
-    seats), or they join with the code. A game on this device starts with the host alone and the
-    same Add player card fills the table.
-  - Play again on this device starts the next game at once with the same players, in the same
-    order, instead of going back to a prefilled Home form.
-- 2026-09-28 — Online Play again takes everyone along (third playtest: "no need to wait for the
-  input from the other users"):
-  - The host's Play again creates the next room naming the finished one (`previousRoomCode`),
-    links the finished room to it, then seats everyone from the finished room there as they were:
-    same seat ids, names and order, guests included (a guest keeps its id, so its stats stay
-    together). Each seat is its own write, so one that can't be taken doesn't stop the rest.
-  - Every other phone in the finished room watches for its own seat in the next room (a player
-    may now read their own seat before they have one) and moves there as soon as it appears. "Join
-    the next game" stays for when no seat comes, e.g. the host's phone lost the connection.
-  - Rules: the host may create a seat for another player's uid only in the one room the finished
-    room points at (its `nextRoomCode` is set once), before that game starts, with the same name
-    and device as in the finished room, and a name record that is the player's own. Linking first
-    is what stops a host from seating a former player in any number of rooms, which would let the
-    host write stats rows for games that player never saw. What remains: a host who played with
-    someone can take them along into each next game, one after another. The player sees each of
-    those games on their phone, so we accept that between people at the same table.
-  - The rules change is additive: an older app keeps working against the new rules, and its
-    players' "Join the next game" finds the seat already there. The new app needs the new rules,
-    so they go to production before the release.
-- 2026-09-28 — Menu rows and installing the app (third playtest: "language/theme as clickable
-  menu items"; "the PWA doesn't work on an iPhone with Chrome"):
-  - Kieli and Tumma tila are whole-width rows like the page links. Tapping the Kieli row flips the
-    language. Tumma tila is a shadcn Switch whose label is the whole row. Its off track uses
-    `muted-foreground`, so the white thumb shows in the light theme.
-  - "Asenna sovellus" in the menu. Android Chrome and desktop Chromium fire
-    `beforeinstallprompt`. We catch it at startup (the install store, `listen` in main.ts),
-    because it can fire before the menu opens, and the row opens that prompt. No iPhone browser
-    ever fires it, since they all run on WebKit. There the row opens two steps: Share, then Add to
-    Home Screen. Share sits in a different place per browser: in Chrome, the right end of the
-    address bar (Google's help); in Safari, the bottom or under ⋯; elsewhere, the browser's menu.
-    Android browsers without the prompt get "browser menu → Install app / Add to Home screen". The
-    row is hidden once the app runs installed, or where there's no way to install (desktop
-    Firefox).
-  - The installed app is called "Rommi" (manifest name and short_name, and
-    `apple-mobile-web-app-title` for the iPhone home screen).
-  - The tester's iPhone case can only be checked on the phone: the steps are for iOS 16.4 and
-    later.
-- 2026-09-28 — Folders (fourth round: "many files at the top level", "all files on one level"):
-  - `src/` keeps its layers, each split by area: `components/{home,room,header,menu,stats,rules}`
-    and `lib/{game,data,platform}`. `lib/utils.ts` stays put because the shadcn CLI imports it there.
-  - The repo root keeps only what tools look for there. The rules files moved to `firebase/`, the
-    Playwright specs and config to `tests/e2e/`, and `env.d.ts` to `src/`. commitlint's config
-    moved into `package.json`. One `vitest.config.ts` now has a project per suite (`unit`, `api`,
-    `rules`, `integration`) in place of three config files. `tsconfig.api.json` stays at the root:
-    moved into `api/`, Vercel would build the function with it and treat any other file there as
-    a function.
-  - CI runs e2e with 3 workers instead of 1 (each test makes its own rooms): about half the time.
-- 2026-09-28 — Small fixes (fourth round):
-  - The scroll bar was always there because every view was `min-h-dvh` under a sticky header
-    3.25rem tall. The app frame is now the full-height flex column, and each view `flex-1`.
-  - Home: no "Katso tilastosi" (the menu has Tilastot). The header shows "Rommi" on Home, and the
-    app is called "Rommi" everywhere (menu title, page title).
-  - A round can't have two zeros: only the player who went out scores nothing
-    (`roundsWithSeveralZeros` in `lib/game/rules.ts`). While any round so far has more than one
-    0, Next and Finish stay disabled and the host sees which round to check. The rule is "at most
-    one", not "exactly one".
-  - "Vain tällä puhelimella" under Uusi peli starts a game on this device without checking the
-    connection, for a table where nobody else has a phone. Off by default; the device remembers
-    the choice (`this-phone-only` in localStorage).
-- 2026-09-28 — Score entry (fourth round: "clicking outside the score card should close it and
-  dismiss the inputted points", "only the checkmark should accept"):
+    themselves. The page asks only for a name and checks `roomAvailability()` first.
+  - The QR comes from `uqr`, loaded when the sheet opens and drawn as one SVG path, dark on white.
+    Copying uses the Clipboard API with a textarea fallback (`useCopyText`); VueUse's
+    `useClipboard` needs a permission query that Firefox and Safari lack.
+- 2026-09-27 — **Sticky header:** only the top bar stays on screen, and everything else, the
+  scoreboard included, scrolls with the page (owner's call, after a pinned board was tried).
+  `html { scroll-padding-top }` equals the header height, so anything scrolled or focused into view
+  lands below it.
+- 2026-09-27 — **Rules page** (`/rules`): contracts from `CONTRACTS`, example melds, and card
+  values from `cardValue`, so the page can't drift from scoring. Precached, so it opens offline.
+  - Owner's rule: an ace is 1 or 14 in a flush, never both, so K-A-2-3 doesn't count.
+  - Drafted on assumptions for the owner to correct: a flush is 4+ cards, a set may repeat suits,
+    a joker stands in for any card, twos are not wild.
+  - Cards are white in both themes. The suit symbol tells suits apart, and each card has a spoken
+    name.
+- 2026-09-27 — **The open card and the phone keyboard:**
+  - A phone scrolls a field out from behind its keyboard only when the finger tapped that field,
+    not when the app focuses it. On touch, an opening card scrolls up under the header before its
+    field is focused (`useKeepInView`, `scrollToTop`), and the room adds space below an open card
+    (`--open-card-room`) so the last one can come up. With a mouse, a card just moves clear of the
+    header and the Next bar.
+  - Don't follow `visualViewport` resizes: an iPhone also resizes while scrolling, and the page
+    jumped back mid-scroll. A unit test pins that a resize never scrolls.
+  - The sticky Next bar sat on top of the field, right above the keyboard, so the room's bottom
+    bars stop sticking while a card is open (`:has([data-card-open])`).
+  - Android Chrome gets `interactive-widget=resizes-content`. Keyboard behaviour can only be
+    checked on a real phone.
+- 2026-09-27 — **"Syötä kaikki"** for the host, shown while anyone is missing a score this round. A
+  sheet goes through those players one at a time, laid out like an open score card, with ✓ (save
+  and next) and Skip. A player who enters their own score meanwhile drops out.
+  - The field stays the same element, so the keyboard stays up. The sheet floats in the upper part
+    of the screen (`--floating-sheet-top`): an iPhone centres on the whole screen, so a centred
+    field lands behind the keyboard.
+  - Saving goes through the room's own handler, so announcements, errors and which numbers the
+    host may see work as they do for the cards.
+  - ✓ and Skip hand focus straight back to the field while the tap is handled (`mousedown.prevent`
+    with a mouse). Refocusing after the save's network wait no longer counted as the tap on an
+    iPhone, and the keyboard dropped. Skip sits on the bottom row (owner's call).
+- 2026-09-27 — **One form on Home:** one card with a Liity | Uusi peli toggle, Liity first, since
+  most people at a table join. The name field is shared.
+  - No other players in the start form: the host adds them in the room as guests, or they join.
+  - A local Play again starts the next game at once with the same players in the same order.
+- 2026-09-28 — **Online Play again takes everyone along:**
+  - A new room, not a reset of the old one: stats are stored per room, and a finished room never
+    reopens (the photo gate trusts that).
+  - The host creates the next room naming the finished one (`previousRoomCode`), links the
+    finished room to it (`nextRoomCode`, set once), then seats everyone as they were: same ids,
+    names and order, guests included. Each seat is its own write, so one failure doesn't stop the
+    rest.
+  - Other phones watch for their own seat in the next room (a player may read their own seat
+    before having one) and move there. "Join the next game" stays for when no seat comes.
+  - **Carried seats** in the rules: the host may seat another player's uid only in the one room the
+    finished room points at, before that game starts, with the same name and device, and a name
+    record that is the player's own. Linking first stops a host from seating a former player in
+    any number of rooms and writing stats for games that player never saw. Accepted: a host can
+    take the same people along into each next game; they see every one on their phones.
+  - The rules change is additive, so older apps keep working. The new app needs the new rules, so
+    they go to production before the release.
+  - Never a local fallback here: the other phones wait for that room, so the host gets an error
+    and a retry. `join()` takes the seat before leaving the current game, so a refused join keeps
+    the finished game on screen.
+  - Each room path gets a fresh RoomView (a keyed RouterView). Vue Router reuses the view when only
+    the code changes, and a device keeps its uid across rooms, so the host's view would otherwise
+    show a player's numbers early in the next game.
+- 2026-09-28 — **Menu rows and installing the app:**
+  - Kieli, Teema and the pages are whole-width rows. Tapping Kieli flips the language.
+  - "Asenna sovellus": Android Chrome and desktop Chromium fire `beforeinstallprompt`, caught at
+    startup (the install store) because it can fire before the menu opens. No iPhone browser fires
+    it (they all run WebKit), so there the row shows Share, then Add to Home Screen, with where
+    Share sits in each browser. Other Android browsers get the browser-menu steps. The row is
+    hidden once installed, or where installing isn't possible.
+  - The app is called "Rommi" everywhere: manifest, `apple-mobile-web-app-title`, page and menu
+    title.
+- 2026-09-28 — **Folders:** `src/` keeps its layers, split by area:
+  `components/{home,room,header,menu,stats,rules}` and `lib/{game,data,platform}`. `lib/utils.ts`
+  stays because the shadcn CLI imports it there.
+  - The repo root keeps only what tools look for: rules in `firebase/`, Playwright in
+    `tests/e2e/`, commitlint config in `package.json`, and one `vitest.config.ts` with a project per
+    suite. `tsconfig.api.json` stays at the root: inside `api/`, Vercel would treat it as a
+    function.
+  - CI runs e2e with 3 workers, since each test makes its own rooms.
+- 2026-09-28 — **Small fixes (fourth round):**
+  - The app frame is the full-height flex column and each view is `flex-1`. `min-h-dvh` views
+    under a sticky header always showed a scroll bar.
+  - A round can't have two zeros (`roundsWithSeveralZeros`): Next and Finish stay disabled and the
+    host sees which round to check. "At most one", not "exactly one".
+  - "Vain tällä puhelimella" under Uusi peli starts a local game without the probe, for a table
+    where nobody else has a phone. Off by default, remembered per device.
+- 2026-09-28 — **Score entry:**
   - A card saves only on ✓ or Enter; leaving the field saves nothing. A tap outside the open card
-    closes it and throws the typed number away. So does another card opening: one card is open at
-    a time, Add player included (`useSingleOpenCard`, with the room providing which card is open).
-    A tap is a `pointerup`: a scroll ends in `pointercancel`, so scrolling never closes a card.
-    Taps inside a dialog or its overlay (photo count, remove confirm) don't count. The keyboard
-    closing by itself keeps the card open with its number. This replaces the blur save and the
-    delayed collapse from the third round.
-  - A number typed but not saved when Next is tapped is thrown away, so Next says whose score is
-    still missing instead of moving on.
-  - Removing a player asks in a shadcn AlertDialog with icon buttons, ✕ keep and 🗑 remove. Focus
-    starts on ✕ and returns to the trash button when declined.
-  - Syötä kaikki: Skip moved to the bottom row, opposite "Seuraavaksi" (the owner's call). The
-    next player's field lost the keyboard on an iPhone: the tap on ✓ takes focus from the field,
-    and focusing it again after the save's network wait no longer counts as the tap. ✓ and Skip
-    now hand focus straight back while the tap is handled; `mousedown.prevent` keeps it there
-    with a mouse.
-- 2026-09-28 — Themes and app updates (fourth round):
-  - Teema replaces Tumma tila: Tumma (default), Vaalea, Jani, Nord, Dracula, Solarized. Jani is
-    charcoal and orange after wingnet (#2D2D2D, #43413F, #BB5500, #DB8B31), with the orange lifted
-    to #EEA453 so it passes AA as text. Nord, Dracula and Solarized keep their character but
-    lighten or deepen what failed AA (Dracula's comment grey, the reds, Solarized's blue).
-    `theme-contrast.test.ts` checks every palette.
-  - Each palette is a `.theme-<id>` class after `.dark` in main.css. The dark ones also carry
-    `dark`, so Tailwind's `dark:` styles apply. The list lives in `lib/platform/themes.ts`, and
-    index.html's no-flash script repeats it (a test keeps the two the same). An unknown stored
-    value now means the default, dark. The CSP's script hash changed with the script. The
-    browser's `theme-color` follows the theme's background.
-  - The picker is a menu row naming the current theme, which opens a radio list with a swatch of
-    each theme; a swatch wears its theme's class, so it shows that palette's own tokens.
-  - Updates: the browser only looks for a new service worker on a navigation, and an installed app
-    left open at the table may not navigate for hours. It now checks every 30 minutes and
-    whenever the app comes back to the screen (while visible and online). A waiting version shows
-    as "Päivitä sovellus" in the menu, as well as in the banner. `useServiceWorker` became the
-    `app-update` store, since App and the menu both need it.
-- 2026-09-28 — Global highscores (fourth round; the owner chose best game, hall of shame and
-  biggest round, and left "most wins" for later because its cost grows with every game):
-  - A new public collection, `leaderboard/{gameId}_{deviceUuid}`: one entry per stats row
-    (`displayName`, `finalScore`, `worstRound`, `finishedAt`), written right after the row when a
-    game finishes, online or by the reconnect flush. Anyone signed in may read it, 10 documents per
-    query at most, so each list is one query of 10 reads.
-  - Trust: firestore.rules only accepts an entry that repeats its own `game_player` row (and that
-    game's `finishedAt`) exactly, published by one of that game's players. So who may write a stats
-    row decides what reaches the board. A host could still enter made-up scores in their own game;
-    that was accepted when choosing a global board.
-  - Privacy: names on the board are visible to everyone using the app; the entry id also carries
-    the game's code and the player's anonymous uid.
-  - An entry is an extra: if it can't be written (production rules not yet deployed, a dropped
-    connection) the game still finishes, and that entry is left out rather than retried.
-  - Stats shows the three lists below this device's own stats, with their own loading and error
-    states (`HighscoresSection`, the `highscores` store). Ties share a rank; this device's own
-    entries say "you".
-  - Entries start with this release. At the release, the production games played since the wipe
-    get their entries copied in once.
-- 2026-09-28 — Visual snapshots (fourth round; the owner chose Playwright over Chromatic, whose
-  free 5,000 snapshots a month our PR pace would use up):
-  - `tests/e2e/visual.spec.ts` screenshots the key screens in Finnish, dark and light: Home (both
-    modes), a room, an open card, the remove dialog, the points sheet, a finished game, the menu
-    with the theme list, and Säännöt. A local game, so no server and nothing that changes per run.
-  - Screenshots only match where fonts render identically, so they're made and compared in
-    Playwright's own Linux image, on x86 like GitHub's runners: `pnpm test:visual` compares and
-    `pnpm test:visual:update` makes new baselines, both through Docker (`tests/e2e/visual.sh`).
-    CI's `visual` job runs in the same image. The `visual` Playwright project only exists with
-    `VISUAL=1`, so ordinary e2e runs skip it. The image tag in ci.yml follows the
-    @playwright/test version.
+    closes it and drops the typed number, and so does another card opening: one card is open at a
+    time (`useSingleOpenCard`). A tap is a `pointerup`; a scroll ends in `pointercancel`, so
+    scrolling never closes a card. Taps inside a dialog don't count.
+  - A number typed but not saved when Next is tapped is dropped, so Next says whose score is
+    missing.
+  - Removing a player asks in an AlertDialog with ✕ (keep) and 🗑 (remove). Focus starts on ✕.
+- 2026-09-28 — **Themes and app updates:**
+  - Teema: Tumma (default), Vaalea, Jani, Nord, Dracula, Solarized. Colours that failed AA were
+    adjusted, and `theme-contrast.test.ts` checks every palette.
+  - Each palette is a `.theme-<id>` class; the dark ones also carry `dark`. The list lives in
+    `lib/platform/themes.ts`, and index.html's no-flash script repeats it (a test keeps them
+    equal). The theme is stored as a raw string, not through pinia-persistedstate, which would
+    JSON-wrap it and break the no-flash script. The CSP's script hash follows the script, and
+    `theme-color` follows the theme.
+  - Updates: the browser only looks for a new service worker on navigation, and an installed app
+    may stay open for hours. It now checks every 30 minutes and when it comes back on screen. A
+    waiting version shows in the menu and the banner, never as an automatic reload mid-game.
+- 2026-09-28 — **Global highscores** (owner's choice: best game, hall of shame and biggest round;
+  "most wins" later, as its cost grows with every game):
+  - `leaderboard/{gameId}_{deviceUuid}`, one entry per stats row, written right after the row.
+    Readable by anyone signed in, at most 10 per query.
+  - **Leaderboard trust:** the rules accept only an entry that copies its own `game_player` row
+    (and the game's `finishedAt`) exactly, written by one of that game's players. So who may write
+    a stats row decides what reaches the board. A host could still enter made-up scores in their
+    own game; accepted when choosing a global board.
+  - Names on the board are public to app users. The entry id carries the game code and the
+    player's anonymous uid.
+  - An entry is an extra: if it can't be written, the game still finishes and the entry is left
+    out, not retried.
+  - At the next release, the production games played since the wipe get their entries copied in
+    once.
+- 2026-09-28 — **Visual snapshots** with Playwright, not Chromatic, whose free 5,000 snapshots a
+  month our PR pace would use up:
+  - `tests/e2e/visual.spec.ts` covers the key screens in Finnish, dark and light, from a local
+    game, so nothing changes between runs.
+  - Screenshots only match where fonts render the same, so they run in Playwright's Linux image on
+    x86: `pnpm test:visual` and `test:visual:update` through Docker (`tests/e2e/visual.sh`), and
+    CI's `visual` job in the same image. The image tag follows `@playwright/test`.
 - 2026-09-28 — The connection check waits up to 8 s, not 3 s. A CI trace showed why: the anonymous
   sign-in took 0.1 s, but the first Firestore read on a cold connection took 2.7 s, so the host
   landed in a local game that nobody can join. A slow phone network hits the same. "Checking the

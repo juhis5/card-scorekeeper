@@ -1,8 +1,6 @@
 /**
- * The scoreboard's rows. A round's numbers are revealed only once the round is complete (the host
- * moved on, or finished the game); during a round the board only says who has entered. Totals and
- * ranking count revealed rounds only, so they change when a round is revealed, not with every
- * score. Pure: callers pass players, scores and how many rounds are complete.
+ * A round's numbers show only once it's complete; until then the board only says who has entered.
+ * Totals and ranking count revealed rounds only, so they change per round, not with every score.
  */
 import { CONTRACTS, pointsFor, standings, TOTAL_ROUNDS } from './rules'
 import type { ContractRoundNumber, Player, RoundScore } from './types'
@@ -11,12 +9,11 @@ export type RoundCell = { kind: 'points'; points: number } | { kind: 'entered' }
 
 export interface BoardRow {
   player: Player
-  /** One per round, 1 to 5. */
   cells: RoundCell[]
-  /** Points across revealed rounds only. */
+  /** Revealed rounds only. */
   total: number
-  /** Standard competition ranking (1, 1, 3), or null while a revealed round is still missing:
-   * a late joiner's low total means nothing until their missed rounds are filled in. */
+  /** 1, 1, 3 ranking, or null while a revealed round is missing: a late joiner's low total means
+   * nothing until their missed rounds are filled in. */
   placement: number | null
 }
 
@@ -39,8 +36,7 @@ function rowFor(player: Player, roundScores: RoundScore[], completedRounds: numb
   return { player, cells, total, isComplete }
 }
 
-/** Rows sorted for the board: ranked players by revealed total (lowest leads), then anyone with a
- * revealed round still to fill, unranked. */
+/** Ranked players, lowest total first, then the unranked ones with a revealed round to fill. */
 export function boardRows(
   players: Player[],
   roundScores: RoundScore[],

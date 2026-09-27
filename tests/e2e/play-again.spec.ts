@@ -1,9 +1,7 @@
 /**
- * Play again online (tester note 7, third playtest): the host finishes and starts the next room
- * with everyone in it, the guest too, and the other phone moves there by itself. The next game
- * starts clean: a score the host entered for a player in the finished game doesn't make that
- * player's next round-1 score visible to the host early. The local flow is in
- * play-again-local.spec.ts.
+ * Play again online: the next room has everyone in it, the guest too, and the other phone moves
+ * there by itself. A score the host entered in the finished game doesn't reveal that player's
+ * next round-1 score early. The local flow is in play-again-local.spec.ts.
  */
 import { expect, test } from '@playwright/test'
 import {
@@ -23,7 +21,6 @@ const PLAYERS = { hostName: 'Host', joinerName: 'Alice' }
 const GUEST_NAME = 'Mummo'
 const GUEST_POINTS = 30
 
-// Not run under the `webkit` project, like the other two-client specs: see playwright.config.ts.
 test.describe('play again', () => {
   test('the host starts the next room with everyone in it, and the other phone moves there', async ({
     browser,

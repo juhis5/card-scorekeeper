@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: one highscore list, as a table: rank, player and date, points. This device's own
- * entries say "you" in words, not only by color (a11y-mobile).
+ * Single job: one highscore list as a table. This device's own entries say "you" in words, not
+ * only by color.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'

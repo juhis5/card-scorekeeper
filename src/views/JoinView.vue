@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * The page an invite link or QR code opens: /join/CODE. It asks only for a name. A device already
- * seated there goes straight to the room, and a room that has finished, expired or doesn't exist
- * says so instead of offering a join that would fail. If the room can't be read (offline), the
- * form is shown anyway and reports that itself when submitted.
+ * /join/CODE, from an invite link or QR code: asks only for a name. A seated device goes straight
+ * to the room, and a finished, expired or missing room says so. If the room can't be read
+ * (offline), the form shows anyway and reports the problem on submit.
  */
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'

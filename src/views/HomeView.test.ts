@@ -9,7 +9,7 @@ import { LocalGameRepository } from '@/lib/data/local-repository'
 
 const blank = { template: '<div />' }
 
-/** The forms are stubbed unless a test is about them; nothing here submits, so no network. */
+/** The forms are stubbed unless a test is about them. */
 async function renderHome({ withForms = false } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),

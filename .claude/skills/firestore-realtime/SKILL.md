@@ -47,10 +47,10 @@ function leave() { unsub?.(); unsub = null }
 
 ## Data model
 
-Mirror docs/PLAN.md. Ephemeral game state (`room`, `player`, `round_score`) and the permanent stats layer (`player_profile`, `game_result`, `game_player`) are **two separate layers**:
+Mirror docs/PLAN.md. Ephemeral game state (`room/{code}` with `players`, `names` and `roundScores` below it) and the permanent layer (`game_result`, `game_player`, and the public `leaderboard`) are **two separate layers**:
 
-- Rooms are transient and carry `created_at` / `expires_at`. A leaked room code stops working when the room expires.
-- On **game finish**, write the permanent records (`game_result` + one `game_player` per player, keyed by `device_uuid`). Stats and head-to-head are computed from these — head-to-head by comparing `placement` between two UUIDs across shared `game_id`s (no separate table).
+- Rooms are transient and carry `createdAt` / `expiresAt`. A leaked room code stops working when the room expires.
+- On **game finish**, write the permanent records: `game_result`, then one `game_player` per player keyed by `{gameId}_{uid}` (the anonymous auth uid, which the rules can check against the room's seats), then each row's `leaderboard` entry. Stats and head-to-head are computed from `game_player` rows, head-to-head by comparing `placement` between two uids across shared games (no separate table).
 - The 5 contracts and card values are a **code constant** (`src/lib/game/rules.ts`), not DB data.
 
 ## Identity — device UUID + display name

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 /**
- * The persistent Stats screen (see docs/PLAN.md "Stats & history"): this device's own record —
- * games played, wins/win rate, best/worst final score, best/worst single round, average final
- * score — plus a head-to-head list per opponent, then the app-wide highscores. Pure read-side UI: all math and Firestore I/O
- * live in `useStatsStore`; this view only renders its four states (see the error-ux skill) and
- * always surfaces the identity caveats (docs/PLAN.md's "Stats & history" failure modes), since
- * they apply regardless of whether the load itself succeeded.
+ * This device's record, head-to-head per opponent, then the global highscores. The identity
+ * caveats show whatever the load state, since they apply either way.
  */
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Single job: announce the winner(s) after round 5 — handles a single winner or a tie. */
+/** Single job: announce the winner, or the tied winners, after round 5. */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Trophy } from '@lucide/vue'
@@ -9,8 +9,7 @@ const { winners } = defineProps<{ winners: Standing[] }>()
 
 const { t, locale } = useI18n()
 
-// Locale-correct "Alice, Bob and Carol" / "Alice, Bob ja Carol" — Intl, never hand-joined
-// strings (see the i18n skill).
+// Intl gives the locale's own "Alice, Bob and Carol" / "Alice, Bob ja Carol".
 const joinedNames = computed(() =>
   new Intl.ListFormat(locale.value, { style: 'long', type: 'conjunction' }).format(
     winners.map((standing) => standing.player.name),
@@ -25,7 +24,7 @@ const message = computed(() =>
 </script>
 
 <template>
-  <!-- role="status" announces this on insertion, once, when the game finishes. -->
+  <!-- role="status" announces it once, when the game finishes. -->
   <p
     role="status"
     class="bg-muted border-primary text-foreground flex items-center gap-2 rounded-lg border px-4 py-3 text-lg font-semibold"

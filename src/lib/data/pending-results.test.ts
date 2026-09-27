@@ -9,7 +9,6 @@ import {
 import type { PendingResult, PendingResultWriter } from './pending-results'
 import type { KeyValueStorage } from './key-value-storage'
 
-/** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
 function makeMemoryStorage(): KeyValueStorage {
   const values = new Map<string, string>()
   return {

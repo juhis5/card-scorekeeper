@@ -7,7 +7,7 @@ import {
   ROOM_CODE_LENGTH,
 } from './room-code'
 
-/** Returns a `randomInt` that always yields the next value from a fixed sequence. */
+/** A `randomInt` that yields the given values in order. */
 function sequenceOf(...indices: number[]): (maxExclusive: number) => number {
   let call = 0
   return () => {

@@ -1,15 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: the host enters this round's points for everyone still missing one, one player at a
- * time (third playtest: "Input all points"). Laid out like an open score card: the name, then the
- * field with ✓ (save and move on); Skip sits in the bottom row, away from ✓ (fourth round). The
- * field stays the same element from one player to the next, and a tap on ✓ or Skip hands focus
- * straight back to it, so the phone keyboard stays up throughout.
- *
- * It floats in the upper part of the screen, about the middle of what stays visible with the
- * keyboard up. A centred or bottom dialog would put its field behind the keyboard: an iPhone
- * centres on the whole screen, not the part above the keyboard. Whoever it started with and still lacks a score is next; someone entering their own
- * score meanwhile just drops out. It closes when nobody is left.
+ * Single job: the host enters this round's missing points, one player at a time. It floats near
+ * the top: an iPhone centres on the whole screen, so a centred or bottom sheet sits behind the
+ * keyboard. The field stays one element and takes focus back on each tap, keeping the keyboard up.
  */
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -33,7 +26,7 @@ const { players, round, save } = defineProps<{
   /** Everyone still missing a score this round, in seat order. */
   players: Player[]
   round: ContractRoundNumber
-  /** Saves one score; resolves false when it didn't save. */
+  /** Resolves false when the score didn't save. */
   save: (playerId: PlayerId, round: ContractRoundNumber, points: number) => Promise<boolean>
 }>()
 
@@ -41,7 +34,7 @@ const { t, n } = useI18n()
 
 const INPUT_ID = 'enter-all-scores-points'
 
-/** Who the sheet started with, fixed while it's open, so progress reads "2/4" steadily. */
+/** Who the sheet started with, fixed while open, so progress reads "2/4" steadily. */
 const queue = ref<Player[]>([])
 const skipped = ref(new Set<PlayerId>())
 const points = ref<number | null>(null)
@@ -70,8 +63,8 @@ async function focusField(): Promise<void> {
   refocusField()
 }
 
-/** On an iPhone the tap on a button takes focus from the field and the keyboard closes. Focus
- * returns only while the tap is still being handled, not after the save's network wait. */
+/** On an iPhone a button tap takes focus from the field, closing the keyboard. Refocus while the
+ * tap is still being handled; after the save's network wait is too late. */
 function saveTapped(): void {
   refocusField()
   void saveAndMoveOn()
@@ -94,13 +87,13 @@ watch(
   { immediate: true },
 )
 
-/** The dialog would focus its first button; the field goes first instead, so the keyboard opens. */
+/** Focus the field, not the dialog's first button, so the keyboard opens. */
 function focusFieldOnOpen(event: Event): void {
   event.preventDefault()
   document.getElementById(INPUT_ID)?.focus({ preventScroll: true })
 }
 
-// Nobody left (all entered here, skipped, or entered on their own phones): done.
+// Nobody left (entered here, skipped, or entered on their own phones): done.
 watch(current, (player) => {
   if (open.value && player === null) open.value = false
 })
@@ -131,7 +124,7 @@ async function saveAndMoveOn(): Promise<void> {
   } finally {
     isSaving.value = false
   }
-  // Moves on once the saved score shows up in `players`; nothing to do here but reset the field.
+  // The queue advances once the score shows up in `players`; just reset the field.
   moveOn()
 }
 

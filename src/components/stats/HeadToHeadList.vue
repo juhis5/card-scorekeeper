@@ -1,11 +1,7 @@
 <script setup lang="ts">
 /**
- * The head-to-head record list: one row per opponent this device has shared a finished game
- * with, showing their most-recently-used displayName (see `useStatsStore`'s doc comment — a
- * `GamePlayer` row carries no timestamp, so recency comes from the matching `game_result`) and
- * the W-L-T record. A real `<table>` — this is tabular data (a11y-mobile: right element for the
- * shape), not a hand-rolled chart (charts are explicitly deferred to polish, see the delegation
- * brief).
+ * Single job: the head-to-head table, one row per opponent from a shared finished game, with their
+ * latest display name (see `useStatsStore`) and W-L-T record.
  */
 import { useI18n } from 'vue-i18n'
 import {

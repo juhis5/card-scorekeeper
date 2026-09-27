@@ -1,7 +1,4 @@
-/**
- * The reachability check must hit the Firestore server: signing in alone can succeed from a
- * cached session with no network (Wi-Fi with no internet), which used to leave Start hanging.
- */
+/** The reachability check must hit the server: a cached session signs in with no network. */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const getDocFromServerMock = vi.fn()

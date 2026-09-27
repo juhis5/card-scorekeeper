@@ -1,14 +1,10 @@
-/**
- * Shared two-device helpers for the online e2e specs: host and join through the real UI, read the
- * room code, enter a score, play a round, and find a scoreboard row. Queries by role/label/text
- * only.
- */
+/** Shared e2e helpers: host, join, score and read the board through the real UI, by role, label
+ * and text. */
 import { expect, type Page } from '@playwright/test'
 
 const TOTAL_ROUNDS = 5
 
-/** Mirrors src/lib/room-code.ts's alphabet (no 0/O/1/I) — used only to locate/parse the code
- * rendered in the UI, not to generate one. */
+/** src/lib/game/room-code.ts's alphabet (no 0/O/1/I), to read the code off the page. */
 export const ROOM_CODE_PATTERN = /[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}/
 
 /** Home shows one form at a time: Join (the default) or, after switching, New game. */
@@ -16,9 +12,7 @@ export function homeForm(page: Page) {
   return page.locator('form')
 }
 
-/** Host flow: switch Home to New game and start under a name. Online (emulator reachable) is the
- * outcome under test here — the connectivity probe resolving true is asserted implicitly by the
- * caller expecting a room code to appear. */
+/** Host flow: switch Home to New game and start under a name. */
 export async function startHostedGame(page: Page, hostName: string): Promise<void> {
   await page.goto('/')
   await page.getByRole('button', { name: 'New game' }).click()
@@ -45,8 +39,6 @@ export async function addPlayerInRoom(page: Page, name: string): Promise<void> {
   ).toBeVisible()
 }
 
-/** Reads the room code the host's RoomView is displaying. Throws (failing the test with a clear
- * message) if the text doesn't contain a well-formed code — never silently returns garbage. */
 function roomCodeCopyButton(page: Page) {
   return page.getByRole('button', { name: /^Copy room code / })
 }
@@ -78,8 +70,8 @@ export async function joinHostedGame(
   await homeForm(page).getByRole('button', { name: 'Join game' }).click()
 }
 
-/** Expands the player's ScoreCard (collapsed by default), fills their round-score input and taps
- * Save, the way a phone saves (its number keypad has no Enter key). */
+/** Opens the player's card, types the score and taps Save, as on a phone (its number keypad has
+ * no Enter key). */
 export async function enterRoundScore(
   page: Page,
   playerName: string,
@@ -99,9 +91,7 @@ export async function enterOwnRoundScore(page: Page, round: number, points: numb
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 }
 
-/** The scoreboard (ScoreBoard.vue) renders one real <table> with one <tr> per player, so a row
- * scoped by that player's name is a stable, ambiguity-free target for both "did they show up"
- * and "did their total update" assertions. */
+/** The scoreboard is a real <table> with a row per player, found by the player's name. */
 export function scoreboardRow(page: Page, playerName: string) {
   return page.getByRole('row', { name: new RegExp(playerName) })
 }

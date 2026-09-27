@@ -1,14 +1,5 @@
-/**
- * FirestoreGameRepository — online, room-code multiplayer GameRepository. Firestore is the
- * source of truth; this class writes to it and maps its live `onSnapshot` state back to the
- * pure `GameState` the store/UI already understand. See the firestore-realtime skill and
- * docs/DECISIONS.md's 2026-07-24 online-auth / topology / read-gate / trust-model entries,
- * which this class implements against `firestore.rules`.
- *
- * Every doc under `room/{code}` is written only by this class, using the shapes below — unlike
- * `LocalGameRepository`'s localStorage boundary (foreign/corrupted data risk), so snapshot data
- * is read back with a typed cast rather than a full runtime shape guard.
- */
+/** Online, room-code game; Firestore is the source of truth. Only this class writes room docs,
+ * so snapshots are read with a typed cast rather than a runtime shape guard. */
 import {
   collection,
   doc,
@@ -61,8 +52,7 @@ import type {
   Unsubscribe,
 } from './repository'
 
-/** Bounds the room-code retry loop below — collisions are astronomically rare (see room-code.ts's
- * alphabet/length); this is a backstop against an infinite loop, not an expected path. */
+/** A backstop: room-code collisions are astronomically rare. */
 const MAX_CREATE_GAME_ATTEMPTS = 5
 
 interface RoomDocData {
@@ -83,7 +73,6 @@ interface PlayerDocData {
   deviceUuid: string
   totalScore: number
   joinOrder: number
-  /** Set only on a guest seat (see addGuest). */
   isGuest?: true
 }
 
@@ -118,21 +107,18 @@ function toRoundScore(snapshot: QueryDocumentSnapshot): RoundScore {
 export interface FirestoreGameRepositoryDeps {
   db: Firestore
   auth: Auth
-  /** Room code to join an existing game. Omit to host — `createGame` mints a fresh one and
-   * this repository becomes that room's host for its lifetime. */
+  /** The room to join. Omit to host: `createGame` mints one. */
   roomCode?: string
-  /** Clock, injected for deterministic tests — epoch milliseconds. Defaults to `Date.now`. */
+  /** Epoch ms. */
   now?: () => number
-  /** Injected for deterministic tests. Defaults to the real `generateRoomCode`. */
   generateRoomCode?: () => string
-  /** How long creating a room or taking a seat may wait for the server. Defaults to 10 s. */
   writeTimeoutMs?: number
-  /** A lowercase UUID for a guest seat's id. Injected for deterministic tests. */
+  /** A lowercase UUID for a guest seat's id. */
   newGuestId?: () => string
 }
 
-/** Firestore writes wait for the server indefinitely while offline, so the two writes the user
- * waits on before entering a room (create, join) get a bound; the caller then falls back. */
+/** Offline writes wait forever, so the writes the user waits on get a bound and the caller can
+ * fall back. */
 const DEFAULT_WRITE_TIMEOUT_MS = 10_000
 
 export class FirestoreGameRepository implements ResumableGameRepository, ReplayableGameRepository {
@@ -143,7 +129,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
   private readonly writeTimeoutMs: number
   private readonly newGuestId: () => string
   private roomCode: string | null
-  /** The finished room this one's players come from (Play again), once createNextGame made it. */
+  /** Set by createNextGame: the finished room this one's players come from. */
   private previousRoomCode: string | null = null
   private readonly unsubscribes = new Set<Unsubscribe>()
 
@@ -192,9 +178,8 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
           }),
           this.writeTimeoutMs,
         )
-        // After the room, not batched with it: the player-create rule's roomNotExpired() reads
-        // the room doc via get(), which does not see a sibling write in the same batch — so the
-        // room doc must already be committed (see docs/DECISIONS.md's trust-model entry).
+        // After the room, not batched with it: the seat rule get()s the room, and get() doesn't
+        // see a sibling write in the same batch.
         await withTimeout(
           this.takeSeat(roomCode, hostUid, {
             name: cleanPlayerName(config.hostDisplayName),
@@ -206,14 +191,12 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
         this.roomCode = roomCode
         return { gameId: roomCode, roomCode, hostPlayerId: hostUid }
       } catch (error) {
-        // A code collision surfaces as permission-denied: an existing room at that code makes
-        // this a Firestore `update` (not `create`), and only its own host may update it (see
-        // firestore.rules). Mint a new code and retry rather than pre-reading for collisions
-        // (which would just add a race of its own). Any other error is a real failure — rethrow.
+        // A code collision shows up as permission-denied: an existing room makes this an update,
+        // which only its host may do. Retrying beats pre-reading, which would race anyway.
         if (!isPermissionDenied(error) || attempt === MAX_CREATE_GAME_ATTEMPTS) throw error
       }
     }
-    // Unreachable: the loop above always returns or throws on its final attempt.
+    // Unreachable: the last attempt returns or throws.
     throw new Error('createGame: exhausted room-code attempts')
   }
 
@@ -323,9 +306,8 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     return this.takeSeat(roomCode, playerId, { ...kept, deviceUuid: seat.deviceUuid })
   }
 
-  /** The seat and its name record in one batch: the rules only accept a seat together with its
-   * own record under names/, and refuse a second record for the same name, which is how names
-   * stay unique in a room (see lib/player-names.ts). */
+  /** One batch: the rules accept a seat only with its own record under names/, and refuse a
+   * second record for a name, which keeps names unique in a room. */
   private takeSeat(
     roomCode: string,
     uid: string,
@@ -371,8 +353,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     return data.status === 'finished' ? 'finished' : 'open'
   }
 
-  /** A refused read means "not seated", not an error: rules before the own-seat read (Play
-   * again) only let members read seats. */
+  /** A refused read means not seated: rules without the own-seat `get` only let members read. */
   private async isSeated(uid: string): Promise<boolean> {
     try {
       const seat = await getDoc(doc(this.db, `room/${this.requireRoomCode()}/players/${uid}`))
@@ -393,15 +374,14 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     let hasSeatInNextRoom = false
     let nextSeatUnsub: Unsubscribe | null = null
 
-    // Waits for the room doc's first snapshot before emitting — status/currentRound are
-    // required fields on GameState, so there is nothing coherent to emit before then.
+    // Nothing coherent to emit before the room doc's first snapshot.
     const emit = () => {
       if (!room) return
       onChange({ ...room, players, roundScores, ...(hasSeatInNextRoom && { hasSeatInNextRoom }) })
     }
 
-    // Play again: the host seats everyone in the next room right after linking to it, so this
-    // device watches for its own seat there, and can move as soon as it has one.
+    // Play again: the host seats everyone in the next room right after linking it, so this
+    // device watches for its seat there.
     const watchNextSeat = (nextRoomCode: string) => {
       const uid = this.auth.currentUser?.uid
       if (nextSeatUnsub || !uid) return
@@ -465,9 +445,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     await ensureSignedIn(this.auth)
     const roomCode = this.requireRoomCode()
 
-    // A fresh read of this player's own existing scores — not the live subscription cache,
-    // which may not exist yet (setRoundScore must be correct even if called before subscribe())
-    // — merged with the new round, matching LocalGameRepository's "replace, don't duplicate".
+    // A fresh read, not the live cache, which may not exist before subscribe().
     const ownScores = await getDocs(
       query(
         collection(this.db, `room/${roomCode}/roundScores`),
@@ -500,8 +478,8 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     const roomCode = this.requireRoomCode()
     const seat = await getDoc(doc(this.db, `room/${roomCode}/players/${playerId}`))
     const name = (seat.data() as PlayerDocData | undefined)?.name
-    // One batch: the seat, its name record (so the name is free again) and every round's score
-    // doc (ids are `{playerId}_{round}`), all-or-nothing. Deleting a doc never written is a no-op.
+    // One batch, so the name is free again only with the seat gone. Deleting a score doc that was
+    // never written is a no-op.
     const batch = writeBatch(this.db)
     batch.delete(doc(this.db, `room/${roomCode}/players/${playerId}`))
     if (name) batch.delete(doc(this.db, `room/${roomCode}/names/${playerNameKey(name)}`))
@@ -530,9 +508,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     const roundScoresSnapshot = await getDocs(collection(this.db, `room/${roomCode}/roundScores`))
     const roundScores = roundScoresSnapshot.docs.map(toRoundScore)
 
-    // Recomputed from roundScores, not the players' own writable totalScore field — same reason
-    // the game store's rankedPlayers does (see docs/DECISIONS.md's trust-model entry): a
-    // permanent stats row is worth getting exactly right regardless of any denormalized field.
+    // From roundScores, not the player-writable totalScore: a permanent stats row must be exact.
     const rankedPlayers = players.map((player) => ({
       ...player,
       totalScore: runningTotal(player.id, roundScores),
@@ -548,21 +524,14 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       const points = roundScores
         .filter((score) => score.playerId === player.id)
         .map((score) => score.points)
-      // Trusts the same "everyone scored every round" assumption the UI's Finish-button gate
-      // relies on (see LocalGameRepository.finishGame's matching comment) — guarded rather than
-      // left to bestAndWorstRound's empty-input throw, for the edge case of a player with no
-      // recorded rounds at all.
+      // No rounds shouldn't happen past the Finish gate, but mustn't throw.
       const { bestRound, worstRound } =
         points.length > 0 ? bestAndWorstRound(points) : { bestRound: 0, worstRound: 0 }
       return {
         gameId: roomCode,
-        // The room participant's own auth uid (player.id — `room/{code}/players/{uid}` is keyed
-        // by it), NOT the localStorage device_uuid on their player doc. firestore.rules can only
-        // verify "this deviceUuid was a real participant in this room" via
-        // exists(room/{gameId}/players/{deviceUuid}) — a check that only works if the value
-        // matches how player docs are actually keyed. Using the spoofable localStorage
-        // device_uuid here would let the host forge a stats row for a deviceUuid nobody ever
-        // seated (see docs/DECISIONS.md's forgery-fix entry).
+        // The auth uid that keys the player doc, never the localStorage device_uuid: the rules
+        // check exists(room/{gameId}/players/{deviceUuid}), so a device_uuid would let the host
+        // forge a stats row for someone never seated.
         deviceUuid: player.id,
         displayName: player.name,
         finalScore: player.totalScore,
@@ -572,17 +541,16 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       }
     })
 
-    // Stats first, then the room. Every device shows the winner the moment the room is finished,
-    // and a player may open Stats right then. And a finished room refuses every write, so if the
-    // stats write fails first the host can still retry Finish (writeGameResult is idempotent).
+    // Stats first: players may open Stats the moment the room is finished, and a finished room
+    // refuses every write, so a failed stats write leaves Finish retryable.
     await writeGameResult(this.db, result, gamePlayers)
     await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
 
     return result
   }
 
-  /** Bounded like create and join: the host waits on it before moving to the next room. A write
-   * that times out stays queued in the SDK and still lands once the connection is back. */
+  /** Bounded, as the host waits on it. A write that times out stays queued in the SDK and still
+   * lands once the connection is back. */
   async linkNextRoom(nextRoomCode: string): Promise<void> {
     await ensureSignedIn(this.auth)
     const roomRef = doc(this.db, `room/${this.requireRoomCode()}`)

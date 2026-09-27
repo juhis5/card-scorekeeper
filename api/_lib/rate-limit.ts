@@ -1,9 +1,7 @@
 /**
- * Layers 2/3 of the vercel-gemini skill's gate: per-room and global rate limits. The decision
- * (`decideRateLimit`) is a pure fixed-window function, unit-tested directly with injected clock
- * values — no store, no mocking. `RateLimitStore` is the injectable persistence seam: production
- * uses `InMemoryRateLimitStore` below, a per-instance cap the owner accepted (docs/DECISIONS.md,
- * review round 5). A shared Upstash/Redis store can implement the same interface if that changes.
+ * Per-room and global rate limits: a pure fixed-window decision and an injectable store. The
+ * in-memory store caps per instance, which the owner accepted (docs/DECISIONS.md); a shared store
+ * such as Upstash/Redis can implement the same interface.
  */
 
 export interface RateLimitWindowState {
@@ -21,11 +19,8 @@ export interface RateLimitDecision {
   nextState: RateLimitWindowState
 }
 
-/**
- * Pure fixed-window rate-limit decision: given the previous window (if any) for a key, decides
- * whether one more request is allowed right now, and returns the state to persist either way (a
- * rejected request does not consume a slot).
- */
+/** Whether one more request is allowed now, and the state to persist either way (a rejected
+ * request uses no slot). */
 export function decideRateLimit(
   previous: RateLimitWindowState | undefined,
   nowMs: number,
@@ -41,18 +36,14 @@ export function decideRateLimit(
   return { allowed, nextState: { count: nextCount, windowStartMs: current.windowStartMs } }
 }
 
-/** Injectable persistence for rate-limit windows, keyed by an arbitrary string (a room code, or a
- * fixed key for the global cap). */
+/** Rate-limit windows by key: a room, or the global key. */
 export interface RateLimitStore {
   get(key: string): Promise<RateLimitWindowState | undefined>
   set(key: string, state: RateLimitWindowState): Promise<void>
 }
 
-/**
- * In-memory `RateLimitStore` — exact within one process. In production each Vercel instance, and
- * each cold start, gets its own Map, so the caps are per instance; Gemini's free-tier quota is the
- * real ceiling (see the module doc comment).
- */
+/** Exact within one process. Each Vercel instance and cold start gets its own Map, so the caps are
+ * per instance; Gemini's free-tier quota is the real ceiling. */
 export class InMemoryRateLimitStore implements RateLimitStore {
   private readonly windows = new Map<string, RateLimitWindowState>()
 
@@ -65,8 +56,7 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   }
 }
 
-/** Checks and records one request against `key`'s rate limit, using the injected store. Returns
- * whether the request is allowed. */
+/** Checks and records one request against `key`. Returns whether it's allowed. */
 export async function checkRateLimit(
   store: RateLimitStore,
   key: string,

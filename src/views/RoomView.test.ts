@@ -33,7 +33,7 @@ vi.mock('@/composables/useGameConnectivity', () => ({
   }),
 }))
 
-/** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
+/** An in-memory stand-in for localStorage. */
 function makeMemoryStorage(): KeyValueStorage {
   const values = new Map<string, string>()
   return {
@@ -53,8 +53,7 @@ function makeRepository(): LocalGameRepository {
   })
 }
 
-/** A local repository whose saves can be made to reject, standing in for a write the backend
- * refuses (offline too long, expired room, rules). */
+/** A local repository whose saves can be made to reject, like a write the backend refuses. */
 class FailingRepository extends LocalGameRepository {
   failure: unknown = null
 
@@ -83,12 +82,8 @@ function makeFailingRepository(): FailingRepository {
   })
 }
 
-/**
- * A minimal fake `GameRepository` that behaves like a shared Firestore room: every subscriber —
- * host or joiner — sees the same state, so a host-side and a joiner-side Pinia/store pair can be
- * driven against ONE instance to simulate two devices in the same online room, without a real
- * Firestore emulator (see the tdd skill's "mock at the boundary").
- */
+/** A fake shared Firestore room: every subscriber sees the same state, so a host store and a
+ * joiner store driven against one instance act as two devices in the same room. */
 class FakeOnlineRepository implements GameRepository {
   private readonly listeners = new Set<(state: GameState) => void>()
   private state: GameState = { status: 'waiting', currentRound: 1, players: [], roundScores: [] }
@@ -200,9 +195,7 @@ class FakeOnlineRepository implements GameRepository {
 
 const RouterLinkStub = { template: '<a><slot /></a>' }
 
-/** A minimal real router — RoomView reads `route.params.code` (to gate resume() to the local
- * sentinel route; see stores/game.ts + lib/local-game-route.ts), so `useRoute()` needs an
- * actually-installed router, not just the `RouterLink` stub used for navigation elsewhere. */
+/** A real router: RoomView reads `route.params.code` to tell the local sentinel from a room. */
 function makeTestRouter(): Router {
   return createRouter({
     history: createMemoryHistory(),
@@ -213,8 +206,7 @@ function makeTestRouter(): Router {
   })
 }
 
-/** Navigates a fresh test router to `/room/:code` and mounts RoomView there — `routeCode`
- * defaults to the local-game sentinel since most of this file's tests are local games. */
+/** Mounts RoomView at `/room/:code` on a fresh test router. */
 async function renderRoomAt(routeCode: string) {
   const router = makeTestRouter()
   await router.push(`/room/${routeCode}`)
@@ -228,7 +220,7 @@ function renderRoom() {
 }
 
 async function enterScore(name: string, round: number, points: number): Promise<void> {
-  // ScoreCard starts collapsed — click the card header to expand it
+  // Cards start collapsed.
   const cardButton = screen.getByRole('button', {
     name: new RegExp(`^(Enter|Edit) ${name}'s score`),
   })
@@ -251,11 +243,8 @@ beforeEach(() => {
   resumeRepository.mockReset()
   resumeRepository.mockResolvedValue(null)
   setActivePinia(createPinia())
-  // RoomView's resume() reads real browser localStorage by default (see the "resume after
-  // reload" describe block below, which seeds it directly with the real `LocalGameRepository`
-  // default storage). Cleared before EVERY test, file-wide — not just within that describe block
-  // — so a persisted game from one test can never leak into an unrelated test's mount, whatever
-  // order `--sequence.shuffle` happens to run them in (found by exactly that shuffle run).
+  // resume() reads the real localStorage: cleared before every test so a saved game can't leak
+  // into another test in a shuffled run.
   localStorage.clear()
 })
 
@@ -476,9 +465,7 @@ describe('RoomView with no active game', () => {
 })
 
 describe('RoomView resume after reload (slice 5 offline robustness)', () => {
-  // RoomView's resume() call (on mount, with no active store game) uses the real browser
-  // localStorage by default — the same boundary a hard page reload actually loses and restores
-  // from — so these tests seed it directly (the file-wide `beforeEach` above clears it first).
+  // resume() uses the real localStorage, which a reload keeps, so these tests seed it directly.
 
   it('resumes a persisted local game on mount instead of showing the empty state', async () => {
     let count = 0
@@ -491,8 +478,7 @@ describe('RoomView resume after reload (slice 5 offline robustness)', () => {
     seed.leave()
 
     await renderRoom()
-    // resume() runs inside onMounted, so the state it reads back is applied reactively — same
-    // "await a tick before asserting" need as the seat-order growth test above.
+    // resume() runs in onMounted; let its state apply.
     await flushPromises()
 
     expect(screen.queryByRole('heading', { name: 'No local game in progress' })).toBeNull()
@@ -520,9 +506,7 @@ describe('RoomView resume after reload (slice 5 offline robustness)', () => {
   })
 
   it('never resumes a stale local game onto an ONLINE room route — the two must never mix', async () => {
-    // A leftover local game from an earlier offline session sits in localStorage. Reloading a
-    // real online room (a different, non-'local' route code) must NOT resurrect it — that would
-    // silently show the wrong game instead of the online room the URL actually asked for.
+    // A leftover local game from an earlier offline session.
     const seed = new LocalGameRepository({ now: () => '2026-01-01T00:00:00.000Z' })
     await seed.createGame({ hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
@@ -531,8 +515,7 @@ describe('RoomView resume after reload (slice 5 offline robustness)', () => {
     await renderRoomAt('7K4RQ')
     await flushPromises()
 
-    // This device has no seat in 7K4RQ, so it's offered a rejoin — never Alice's stale local
-    // game just because one happens to be sitting in storage.
+    // No seat in 7K4RQ: offered a rejoin, not the stale local game.
     expect(
       screen.getByRole('heading', { name: "This room isn't open on this device" }),
     ).toBeTruthy()
@@ -550,7 +533,7 @@ describe('RoomView score entry order', () => {
     const getCardNames = () =>
       screen.getAllByRole('button', { name: /^(enter|edit) .+'s score/i }).map((button) => {
         const label = button.getAttribute('aria-label') ?? ''
-        // Extract player name from "Enter <name>'s score" or "Edit <name>'s score (scored)"
+        // "Enter <name>'s score" or "Edit <name>'s score (scored)"
         const match = label.match(/(?:Enter|Edit) (.+?)'s score/)
         return match?.[1] ?? label
       })
@@ -739,8 +722,7 @@ describe('RoomView offline banner', () => {
 describe('RoomView online mode', () => {
   const ROOM_CODE = '7K4RQ'
 
-  /** Seats a host and a joiner against the SAME fake online repository, each behind its own
-   * Pinia (simulating two devices), and returns their stores + a render() for either seat. */
+  /** Seats a host and a joiner in one fake room, each with its own Pinia, as two devices. */
   async function setUpOnlineRoom() {
     const repository = new FakeOnlineRepository(ROOM_CODE)
 
@@ -760,8 +742,7 @@ describe('RoomView online mode', () => {
     return { repository, hostPinia, hostGame, joinerPinia, joinerGame, aliceId }
   }
 
-  // Every online-room render needs a router at the REAL room code, not the local sentinel — see
-  // renderRoomAt's doc comment above; onMounted's resume() gate depends on telling them apart.
+  // At the real room code, not the local sentinel: onMounted's resume depends on the difference.
   async function renderAs(pinia: ReturnType<typeof createPinia>) {
     const router = makeTestRouter()
     await router.push(`/room/${ROOM_CODE}`)
@@ -1205,8 +1186,7 @@ describe('RoomView players the host adds', () => {
 describe('RoomView reconnecting indicator (slice 5 offline robustness)', () => {
   const ROOM_CODE = '7K4RQ'
 
-  /** Restores the real navigator.onLine value so a test's stub never leaks into another file's
-   * shared happy-dom window. */
+  /** Restores navigator.onLine so a stub never leaks into other tests. */
   afterEach(() => {
     Object.defineProperty(navigator, 'onLine', { value: true, configurable: true })
   })

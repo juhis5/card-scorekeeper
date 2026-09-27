@@ -1,16 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: what a finished game offers next (tester note 7).
- *
- * - Local: Play again starts the next game at once with the same players; the host adds or
- *   removes players in the room.
- * - Online host: Play again creates the next room, points this one at it, seats everyone there as
- *   they were here, and moves there. Never a local game when the server can't be reached: the
- *   other phones wait for that room, so the host gets an error and a retry instead.
- * - Online, once the host has started the next game: every phone still here moves there by itself
- *   as soon as it has its seat (third playtest: nobody should have to join again). "Join the next
- *   game" stays as the way in when that seat never comes, e.g. the host's phone lost the
- *   connection. A host back in this room later gets there the same way.
+ * Single job: what a finished game offers next. Local: Play again restarts with the same players.
+ * Online, the host opens the next room with everyone seated (never a local game: other phones wait
+ * for it), and each phone moves there once seated. "Join" covers a seat that never comes.
  */
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -24,10 +16,8 @@ import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 
 const { myName, otherNames } = defineProps<{
-  /** This device's name in the finished game. */
   myName: string
-  /** Everyone else's, in seat order: a local Play again seats them again. (Online, the next room
-   * takes everyone's seat as it was.) */
+  /** Everyone else's, in seat order, for a local Play again. */
   otherNames: string[]
 }>()
 
@@ -49,13 +39,12 @@ const errorMessages = computed<Record<PlayAgainError, string>>(() => ({
   joinFailed: t('room.playAgain.errors.joinFailed'),
   nameTaken: t('room.playAgain.errors.nameTaken'),
 }))
-/** Kept in the DOM while empty, so the message is announced when the host starts the next game. */
+/** Kept in the DOM while empty, so it's announced when the host starts the next game. */
 const nextGameStatus = computed(() => {
   if (!nextRoomCode.value) return ''
   return isHost.value ? t('room.playAgain.youStarted') : t('room.playAgain.hostStarted')
 })
 
-/** Local: the next game at once, with the same players; the host adds or removes in the room. */
 async function playLocalAgain(): Promise<void> {
   await game.playAgain(
     localRepository().repository,
@@ -122,8 +111,8 @@ function handleJoinNext(code: string): Promise<void> {
   return run(() => joinNextRoom(code))
 }
 
-// The seat is already there, so joining just moves this phone over. On the host's own phone this
-// fires while Play again is still busy, and is skipped.
+// Already seated in the next room: move this phone there. On the host's phone this fires while
+// Play again is still busy, so `run` skips it.
 watch(
   hasSeatInNextRoom,
   (isSeated) => {

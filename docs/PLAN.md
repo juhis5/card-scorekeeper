@@ -1,366 +1,154 @@
-# Card Game Scorekeeper — Project Plan
+# Rommi scorekeeper: the app as it is
 
-A web app for keeping score in a card game. A host starts a game; players join with a
-room code and everyone sees scores update live.
-
-> **Mobile-first.** This is designed for phones and will almost never be used on a PC.
-> Every UI decision assumes a phone held one-handed at a card table: large tap targets,
-> single-column layouts, thumb-reachable primary actions, and the camera (for photo
-> counting) as a first-class input. Desktop should still work in a browser, but it is
-> not a design target — nothing is optimised for wide screens, mouse, or keyboard.
-
-## Decisions locked
-
-Finalised during planning. **This section wins** over the "Recommended/Alternative/Hosting" framing below; `CLAUDE.md` + `.claude/skills/` are the source of truth for *how*.
-
-- **Stack:** Vite + Vue 3.5 + TypeScript (strict) + Pinia + **pnpm**.
-- **Realtime backend:** **Firebase / Firestore** (Spark free tier). **Supabase is NOT used** — kept below only as the alternative that was weighed.
-- **Frontend hosting:** **Vercel** (Firestore is host-agnostic; consistency with schedule-app). The optional photo-count function is a **Vercel** `/api` function — not Firebase Cloud Functions.
-- **UI:** Tailwind v4 + shadcn-vue (Reka UI); **dark-default** theme (light via toggle). Vue Router; vue-i18n (fi/en, device-default — no hardcoded strings).
-- **Target platforms:** must work on **Android (Chrome), iOS (Safari), and desktop browsers** — mobile-first, not mobile-only. Responsive ~360px→desktop (no overflow on wide screens); camera (photo-count) → file-upload fallback on desktop.
-- **Offline host mode:** required (see the section above) — `GameRepository` seam, single-device local game, reconnect pushes final result only.
-- **Vision (optional):** Gemini Flash, free-tier key, room + session-token gated; image downscaled client-side.
-- **Testing/quality:** Vitest + @vue/test-utils + Playwright + Firebase emulator (rules), pragmatic TDD; PWA shell (makes offline load); Prettier + ESLint; Conventional Commits + git hooks + CI.
-- **Identity / stats / rules:** per the Confirmed decisions section (device UUID, five contracts, low-total-wins).
+This file describes what the app does today. `DECISIONS.md` says why it works this way,
+`CLAUDE.md` and `.claude/skills/` hold the conventions, and `TOOLCHAIN.md` the versions.
 
 ## What it does
 
-1. **Host** starts a new game → app generates a short room code.
-2. **Players** open the app, enter the code and a name, and join the room.
-3. Host (or players) update scores as rounds are played.
-4. Everyone in the room sees changes **in real time**, no refresh.
-
-## The defining requirement: real-time
-
-The scores are tiny — kilobytes. Storage size is a non-issue on any free tier. The
-thing that actually shapes the tech choice is **live sync**: when one person updates a
-score, others should see it immediately. That rules out plain databases with no
-real-time layer (Neon, Turso) unless you hand-roll websockets or polling.
-
-## Offline host mode (required)
-
-The app must be playable by the **host on a single device with the backend unreachable**. Because the scoring rules are pure (no network), offline play is a swap of the data layer, not a rewrite of the game:
-
-- **On "start game", probe connectivity.** Reachable → normal synced room (players join by code, live sync). Unreachable → **local host game**: the host runs the scoreboard on their phone and enters everyone's scores; no room code, no remote players.
-- A **repository interface** abstracts the data layer so the domain and UI don't change between modes (local vs Firestore) — see the `firestore-realtime` skill.
-- **Firestore offline persistence** covers brief disconnects during an online game (queued writes, cached reads) — separate from "never connected".
-- **Photo card-count is online-only** (needs Gemini); offline falls back to manual entry, which is always available.
-- **Reconnect = push final result only.** Offline games stay local; when back online, only the finished `game_result` + `game_player` rows upload so stats stay complete. No mid-game merge or conflict resolution.
-- Offline cannot do: remote join, live cross-device sync, photo-count. Everything else works.
-
-## Recommended stack: Firebase
-
-Firebase is built for exactly this live-sync, room-based pattern and has a generous
-free tier.
-
-- **Firestore** (or Realtime Database) — clients subscribe to a room document and get
-  pushed updates automatically. This is the "host updates, players see it" mechanic
-  with no extra service to run.
-- **Free tier (Spark plan)** — generous daily reads/writes and storage, sized well
-  beyond a hobby card game with a handful of concurrent players.
-- Simple client SDK; no backend server to maintain.
-
-### One extra piece: the photo-count vision function
-The optional photo-count feature (see scoring below) needs a vision model, and the API
-key must stay hidden — same constraint as the schedule app. So the card game gains one
-small serverless function (a **Vercel** `/api` function — see Decisions locked)
-that holds the Gemini key and reads the hand photo. If you skip photo counting, you
-don't need this function at all — manual scoring needs only Firebase.
-
-### Is it really free for your use?
-For a hobby scoreboard — a few players, modest reads/writes — yes, comfortably within
-the free Spark plan. The free tier's ceilings are daily operation counts and storage,
-which casual multiplayer use won't approach. Two honest caveats:
-
-- **NoSQL, not SQL.** Data is documents/collections, not tables. Different mental
-  model from your Oracle/SQL background, though simple for this shape of data.
-- **Google infrastructure.** If EU data residency matters, Firebase has EU regions,
-  but consider Supabase (EU) as the SQL alternative.
-- **Tiers change.** Verify the current Firebase free-tier limits before relying on
-  specific numbers — this doc is directional.
-
-## Alternative: Supabase (considered, NOT chosen)
-
-> **Decided: Firebase** (see *Decisions locked*). This section is kept only to record the alternative that was weighed — do not build on Supabase.
-
-If you'd rather have SQL (rooms/players/scores as real tables) and EU data:
-
-- Postgres **plus built-in Realtime** — subscribe to a room, get live updates. Covers
-  the same need as Firebase, with SQL.
-- Free tier ample for hobby use; note free-tier projects **pause after inactivity**
-  (a click to wake). Minor for a game played occasionally.
-
-**Steer:** Firebase for the smoothest real-time and simplest setup (NoSQL, Google);
-Supabase if you want SQL and EU residency.
-
-## Data model (sketch)
-
-Small and simple:
-
-```
-room
-  code          (short unique string, e.g. 4–6 chars)
-  status        (waiting | playing | finished)
-  current_round (1..5)
-  created_at
-  expires_at    (room auto-expires — limits leaked-code abuse)
-
-player
-  room_code     (which room)
-  name
-  total_score   (running sum, ascending = winning)
-  join_order
-  session_token (issued on join; sent with photo-count calls to gate the function)
-
-round_score     (one per player per round — enables per-round history)
-  room_code
-  player
-  round_number  (1..5)
-  points        (leftover-card points that round; low is good)
-```
-
-The 5 rounds and their contracts are fixed rules, so they live in the app code (a
-constant), not the database — the DB only stores which round a room is on plus the
-scores. `round_score` is optional; drop it if you only want running totals, keep it to
-show each round and fix mistakes. `expires_at` and `session_token` support the Gemini
-protection model above.
-
-## Design notes for the room-code pattern
-
-- **Room code** = short unique string generated on "host starts game"; players type it
-  to join. It's just a lookup key.
-- **Concurrency** is where real-time earns its keep — multiple players on the same
-  room. Polling (refetch every few seconds) is the simpler fallback but feels laggy
-  and wastes requests; real-time is the better fit.
-- **Room lifecycle** — decide when rooms expire. Hobby-fine answer: a `created_at`
-  timestamp with periodic cleanup, or just let old tiny rows sit.
-
-## Hosting the frontend
-
-- **Decided: Vercel** (Firestore is host-agnostic, so live sync works from any host;
-  keeps one deploy workflow across both apps). Firebase Hosting / Netlify were the
-  other free options considered.
-
-## Protecting your Gemini free tier
-
-The photo-count feature calls Gemini through a serverless function. The key lives only
-in that function's env var, never in the browser — but an open function URL is an open
-door, so it needs a gate plus caps.
-
-**The wrinkle vs. the schedule app:** the card game is joined by strangers via a room
-code, and *any player* can snap a photo. A fixed shared passphrase (fine for a
-2-person tool) doesn't fit — you can't hand a secret to people you don't know. So the
-gate is the **room itself**.
-
-### Layered protection
-
-1. **Room-validated calls.** Every photo-count request must include a valid room code
-   plus a per-session token the app issued when the player joined. The function checks
-   in Firebase that the room exists and is an active game *before* calling Gemini.
-   Random pokes at the URL with no valid room are rejected.
-2. **Per-room rate limit.** Cap calls per room (a hand-count a few times per round is
-   plenty). Stops one abusive room from draining the quota.
-3. **Global rate limit.** A ceiling across all rooms as a backstop — stops someone
-   spinning up many fake rooms to get around the per-room cap.
-4. **Short-lived rooms.** Rooms expire after a game or a few hours, so a leaked room
-   code stops working quickly. The gate is naturally temporary.
-5. **Free-tier key, no billing.** Create the Gemini key with no billing attached. The
-   free tier rate-limits rather than bills, so the hard ceiling is your safety net —
-   worst case is "quota exhausted today," not a surprise invoice.
-
-### Honest limits of this
-This is *good enough for a hobby game*, not airtight. Someone who joined a real game
-could still burn some calls. But the layered caps bound the damage (per-room + global)
-and it self-heals (rooms expire, quota resets daily). For a scorekeeper played by
-friends, that's the right amount — real accounts / per-user auth would be overkill for
-the stakes.
-
-### If abuse ever became real
-Two escape hatches, only if needed: make photo-count fully optional (manual scoring
-needs no key at all), or let the **host paste their own Gemini key** into the room so
-usage runs on their quota, not yours. Not worth the friction for a friends game unless
-a problem actually shows up.
-
-## The game: Rommi (Finnish Rummy) — confirmed rules
-
-The scorekeeper is built around this specific ruleset, not generic Rummy:
-
-- **Decks:** played with **2 decks** shuffled together (sometimes 3), jokers included. So
-  the same card (rank + suit) can appear more than once in a hand or a meld, and a hand
-  can hold several jokers. Scoring counts every physical card.
-- **Scoring direction:** points count **against** cards left in your hand when someone
-  goes out. Low is good.
-- **Card values (cards left in hand):**
-  - Number cards 2–9 = 5 each; 10 = 10
-  - Face cards (J, Q, K) = 10 each
-  - **Ace = 15**
-  - **Joker = 25**
-- **Game end:** a **fixed 5-round progression** (see contracts below).
-- **No bonus** for going out in one turn (a clean "rommi").
-- **Winner:** **lowest total points** after all 5 rounds.
-
-### The 5 rounds (contracts)
-
-This is a Contract Rummy style: each round requires a specific set of melds to go
-down. Terms:
-
-- **Set of three** = at least 3 cards of the same rank (suits may differ or repeat —
-  multiple decks).
-- **Flush** = at least 4 sequential cards of the same suit (a run).
-
-| Round | Required contract |
-|-------|-------------------|
-| 1 | Two sets of threes |
-| 2 | One set of three + one flush |
-| 3 | Three sets of threes |
-| 4 | One flush + two sets of threes |
-| 5 | Two flushes + one set of three |
-
-The app doesn't need to validate melds (players judge that at the table) — but it
-should **display the current round's contract** so everyone knows what they're
-building toward, and step through rounds 1→5 automatically.
-
-### What this means for the app
-
-- Each round, the host enters each player's leftover-card points (or the app tallies
-  from selected cards — see below). Scores accumulate across the 5 rounds.
-- A running total per player, sorted ascending (leader = lowest).
-- Each player enters their own round score; the host can enter or correct anyone's.
-- A player who joins the app mid-game fills in their scores for the rounds already
-  played (they were at the table, just not in the app). Next and Finish stay disabled
-  until every player has a score for every round so far. The host can remove a seat.
-- The app shows **"Round 3 of 5 — Three sets of threes"** so everyone sees the current
-  contract (reminder only, no validation), and declares the winner automatically after
-  round 5 is scored.
-
-### Entering a round's score — two ways
-
-**1. Manual (always available).** Player or host types the leftover-card total. This
-is the primary, never-fails path and is never removed.
-
-**2. Photo count (optional shortcut).** A player snaps a picture of their own leftover
-cards; a vision model reads them and suggests the total.
-
-- **Who:** any player, for their own hand.
-- **What it shows before committing:** the **list of cards it detected + the total**,
-  e.g. "4♦, K♠, A♥, Joker → 5 + 10 + 15 + 25 = 55". The player then **confirms or
-  edits** — the photo never silently sets a score.
-- **Fallback:** manual typing stays right there; if the read looks wrong or the photo
-  fails, the player just types the number.
-- **Values applied:** 2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25 (the
-  round rules, encoded in the prompt).
-
-#### Accuracy notes (important)
-Counting cards from a photo is harder than reading printed text — overlap, glare, and
-half-hidden cards cause misreads, and a wrong count matters in a scored game. So:
-
-- Cards laid **flat and non-overlapping** read far better than a fan.
-- Treat the result as a **suggestion needing a glance**, not a trusted auto-total —
-  which is why the confirm step and the card-by-card breakdown exist.
-- Reuses the **same Gemini function pattern** as the schedule app (no new
-  infrastructure), but adds API calls — the existing rate limit covers this.
-
-#### Extraction shape
-The vision function returns something like:
-```json
-{ "cards": [
-    {"rank":"4","suit":"diamonds","value":5},
-    {"rank":"K","suit":"spades","value":10},
-    {"rank":"A","suit":"hearts","value":15},
-    {"rank":"Joker","suit":null,"value":25}
-  ],
-  "total": 55 }
-```
-The app shows the list, lets the player fix any card (or the total directly), then
-commits the confirmed number to `round_score`.
-
-## Stats & history (persistent across games)
-
-This turns the app from throwaway rooms into something with lasting player stats.
-Rooms still expire; but when a game **finishes**, a permanent result is written and the
-stats read from that.
-
-### Player identity: device UUID + display name
-- On first use the app generates a random **UUID stored on the device** (localStorage).
-  That UUID is the stable identity; the **name is just an editable display label**.
-- No login, no PIN — near-zero friction for a group each on their own phone.
-
-**Failure modes (documented so stats aren't misleading):**
-- **New device or cleared storage = new identity.** History follows the *device*, not
-  the person; a new phone starts fresh.
-- **Shared device = merged stats.** Two people passing one phone share a UUID and blend
-  their stats. Fine if everyone's on their own device.
-- **No cross-device view.** Stats on the phone won't appear on the tablet.
-
-**Upgrade path (future, not built now):** let a device optionally claim a handle + PIN
-so identity can move between devices. Noted as an option, not v1.
-
-### Stats tracked (all confirmed)
-Per player identity:
-- **Wins / win rate** — games finished in 1st ÷ games played.
-- **Best & worst final score** — lowest and highest final totals across games.
-- **Best & worst single round** — lowest and highest one-round points.
-- **Games played + averages** — count, average final score.
-
-Plus **head-to-head records** — who beats whom, across games they shared.
-
-### Persistence model
-History is a **second layer** separate from ephemeral rooms:
-- Rooms stay transient (they expire).
-- On game finish, write a permanent `game_result` + one `game_player` row per player,
-  keyed to device UUIDs. Stats and head-to-head are computed from these.
-- Tiny, infrequent records — well within Firebase's free tier.
-
-```
-player_profile        (stable identity)
-  device_uuid         (primary id, from localStorage)
-  display_name        (editable label)
-  last_seen
-
-game_result           (one per finished game)
-  game_id
-  finished_at
-  total_rounds        (5)
-  winner_uuid
-
-game_player           (one per player per finished game — powers all stats)
-  game_id
-  device_uuid
-  display_name        (as used that game)
-  final_score
-  placement           (1 = winner)
-  best_round          (lowest single-round points that game)
-  worst_round         (highest single-round points that game)
-```
-
-Head-to-head is derived by comparing `placement` between two `device_uuid`s across
-games that share a `game_id` — no separate table needed.
-
-### Honest caveat
-Stats are only as trustworthy as the identity model. With device UUIDs, someone can pad
-wins by "playing" alone in a room, and shared/cleared devices muddy the numbers. Not a
-reason to skip the feature — just why the caveats above are documented rather than
-hidden.
-
-## Confirmed decisions
-
-- **Scoring permissions:** any player can enter/edit **their own** round score; the
-  **host can enter/edit anyone's**. (Enforced in the function/rules, not just the UI.)
-- **History:** keep **per-round scores** (`round_score` table), not just running
-  totals — lets players see each round and fix mistakes.
-- **Contract display:** show the current round's required melds as a **reminder only**
-  — no meld tick-off or validation. Players judge melds at the table.
-- **Max players per room:** not capped by anything technical; the **mobile-first**
-  single-column layout should stay readable for a typical group (roughly 2–6) on a
-  phone screen. Adjust if your group is larger.
-- **Player identity for stats:** device UUID (localStorage) + editable display name;
-  no login. Caveats documented (history follows the device, not the person).
-- **Stats tracked:** wins/win rate, best & worst final score, best & worst single
-  round, games played + averages, and head-to-head records.
-
-## Notes / disclaimers
-
-- Free-tier limits and pause/inactivity behavior vary by provider and change over
-  time. Figures here are directional — check current pricing pages before committing.
-- Firebase is NoSQL; if that friction matters, Supabase gives you SQL with the same
-  real-time capability.
+A live scoreboard for Rommi (Finnish Rummy), made for a phone held in one hand at a card table.
+A host starts a game and the others join with a room code, a link or a QR code. Each player
+enters their own score every round, the host can enter or fix anyone's, and every phone follows
+the game live. The lowest total after five rounds wins. With no connection, the host can run the
+whole game on one phone. Finished games feed per-player stats and global highscores. An optional
+photo count reads a picture of the cards left in a hand and suggests the points.
+
+## The game: confirmed rules
+
+- Played with 2 decks (sometimes 3), jokers included, so duplicate cards are normal. Scoring
+  counts every physical card left in the hand when someone goes out.
+- Card values: 2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25. A round score is a multiple
+  of 5, at most 1000. Only the player who went out scores 0: at most one zero per round.
+- Five fixed rounds, each with a contract: two sets of three; a set and a flush; three sets; a
+  flush and two sets; two flushes and a set. A set is 3+ cards of one rank, suits may repeat. A
+  flush is 4+ cards in sequence in one suit; an ace is 1 or 14, never both. The contract is a
+  reminder; the app never checks melds.
+- Lowest total wins. Ties share the place (1, 1, 3).
+- All of this lives in `src/lib/game/rules.ts`. The rules page renders contracts and card values
+  from that file, so it can't drift from the scoring.
+
+## Screens
+
+- **Home** (`/`): one card with a Liity | Uusi peli toggle and a shared name field. Liity also
+  asks for the room code. Uusi peli has a "Vain tällä puhelimella" switch that starts a local
+  game without checking the connection. "Game in progress" links back to an unfinished game.
+- **Room** (`/room/CODE`, or `/room/local`): the round banner, the scoreboard, a score card per
+  player, and the host's Next or Finish bar. The host also gets an Add player card and "Syötä
+  kaikki", a sheet for everyone still missing a score. After Finish: the winner and Play again.
+- **Join** (`/join/CODE`): what an invite link or QR code opens. It asks only for a name, and
+  says so first when the room has finished, expired or doesn't exist.
+- **Stats** (`/stats`), **Rules** (`/rules`) and a 404 page.
+- **Header**, sticky: Back (not on Home), the room code with copy and Kutsu (a sheet with a QR
+  code and a share link) in an online room, and the menu: Tilastot, Säännöt, Kieli, Teema (six
+  themes), Asenna sovellus, and Päivitä sovellus when a new version is waiting.
+
+One score card is open at a time and saves only on ✓ or Enter; a tap outside drops the typed
+number. The scoreboard has five round columns and a total. During a round it shows only who has
+entered (✓, live); numbers, totals and ranking update when the host taps Next (or Finish). Next
+and Finish wait until everyone has a score for every round so far and no round has two zeros.
+
+## Online games
+
+- Start probes the backend: anonymous sign-in plus a server read of `room/probe`, 3 s timeout.
+  Reachable means a `FirestoreGameRepository` room; unreachable means a local game.
+- Identity is the Firebase Anonymous Auth uid. The host creates `room/CODE` (5 characters, no
+  0/O/1/I, 6 h expiry) and is seated first. Others seat themselves. Names are unique per room,
+  ignoring case and extra spaces.
+- Late joiners fill in the rounds they missed. The host can add guests (players without a phone,
+  scored by the host), fix any score, and remove any seat but their own.
+- Creating a room or taking a seat times out after 10 s: a host falls back to a local game, a
+  joiner is told the game is unreachable. Reloading `/room/CODE` finds the seat again.
+- Play again: the host creates the next room, links the finished room to it (`nextRoomCode`),
+  and seats everyone there as they were, guests included. Other phones move over when their seat
+  appears; "Join the next game" is the fallback. It never falls back to a local game.
+
+## Offline host mode
+
+- `LocalGameRepository` keeps the game in localStorage (`card-scorekeeper:local-game`). No room
+  code, no remote players: the host enters every score. A reload resumes the game.
+- Used when the probe fails, when online setup throws (bad config, sign-in refused), or with
+  "Vain tällä puhelimella" on. No photo count.
+- **Reconnect = push final result only.** Finish queues the host's own stats row in
+  `card-scorekeeper:pending-results`, and the next online launch uploads it under the device's
+  anonymous uid. No mid-game merge. A result the rules reject for good moves to
+  `card-scorekeeper:pending-results-failed`, so it can't block later ones.
+- Firebase loads with a dynamic `import()` on first use, so it never delays the first screen.
+
+## Data model (Firestore)
+
+| Path | Fields | Written by |
+|---|---|---|
+| `room/{code}` | code, status, currentRound, hostUid, createdAt, expiresAt, previousRoomCode?, nextRoomCode? | host |
+| `room/{code}/players/{id}` | name, ownerUid, deviceUuid, totalScore, joinOrder, isGuest? | the player (own seat); the host (guests, carried seats, removal) |
+| `room/{code}/names/{key}` | ownerUid, playerId? (guests) | same batch as its seat |
+| `room/{code}/roundScores/{id}_{round}` | playerId, ownerUid, round, points | the player (own); the host (anyone) |
+| `game_result/{gameId}` | gameId, finishedAt, totalRounds, participantUids | host at Finish, or the reconnect flush |
+| `game_player/{gameId}_{id}` | gameId, participantUids, deviceUuid, displayName, finalScore, placement, bestRound, worstRound | same |
+| `leaderboard/{gameId}_{id}` | displayName, finalScore, worstRound, finishedAt | same, right after each row |
+
+- `{id}` is the anonymous uid, or `guest-<uuid>` for a guest; stats rows carry it as `deviceUuid`.
+  A name key is `n_` plus the lowercased name. `gameId` is the room code online, a UUID locally.
+- Standings and stats come from `roundScores`, never from the writable `totalScore`.
+- Rooms are never deleted: online stats are keyed by room code, so a TTL needs a per-game id first.
+
+## Security
+
+`firebase/firestore.rules` is the security boundary, tested in `tests/rules`. Every rule needs a
+signed-in user. A room can be fetched by code but never listed. Seats and scores are readable
+only by room members. A player writes only their own seat and scores; the host may write any
+score in their room, create guest and carried seats, and remove seats. Values are bounded: round
+1–5, points a multiple of 5 up to 1000, rounds advance one at a time, and a finished room never
+reopens. Stats rows are append-only and readable only by the game's participants. Online, only
+the host writes them, and only for seated players; a local result can only name its writer. A
+highscore entry must copy its stats row exactly. Accepted limit: a host can enter made-up scores
+in their own game.
+
+## Stats & history
+
+- Keyed by the anonymous uid. Clearing browser storage or changing device starts a new identity,
+  and a shared phone shares one.
+- Stats shows games played, wins and win rate, best and worst final score, best and worst round,
+  average final score, and head-to-head records per opponent. Every query filters
+  `participantUids array-contains uid`.
+- A local game uploads only the host's row, since the other players on that phone have no
+  identity. A guest keeps its id only through Play again, so its stats don't carry over to other
+  games.
+- Highscores: three public top-10 lists (best game, worst game, biggest round) from `leaderboard`.
+  An entry that can't be written is left out and never blocks the game.
+
+## Photo count
+
+- **Entering a round's score.** Typing the number always works. In an online room a player can
+  photograph their own cards instead: the phone downscales the picture and posts it with its
+  Firebase ID token to `/api/count`. The sheet lists each detected card and the total; the player
+  fixes either and confirms. Nothing is saved without that.
+- **Extraction shape:** `{ cards: [{ rank, suit, value }], total }`. The server recomputes every
+  value and the total with `rules.ts` and never trusts the model's sum. Over 60 cards is refused.
+- **Protecting your Gemini free tier.** `api/count.ts` checks the request shape and size (1.5 MB)
+  first, then verifies the ID token with `jose`. The room must exist, be neither finished nor
+  expired, and have the caller seated. Limits: 30 calls per 15 min per room and 300 per hour
+  overall, in memory per instance. Gemini (`GEMINI_MODEL`, default `gemini-3.8-flash`) gets 15 s.
+  The key has no billing and lives in its own Google Cloud project, so the worst case is "quota
+  used up today". Server env: `GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `GEMINI_MODEL`.
+
+## Hosting
+
+- Vercel serves the SPA and `/api` (`vercel.json`: SPA rewrite, security headers with the CSP in
+  Report-Only, 30 s function limit). The public `VITE_FIREBASE_*` config is baked in at build.
+- Feature PRs squash-merge into `develop`, which deploys to test-rommi.vercel.app on
+  `card-scorekeeper-staging` (PR previews use it too). A release fast-forwards `main`, which
+  deploys to rommi.vercel.app on `card-scorekeeper-prod-1673f`. Both are free Spark projects;
+  rules go out with `firebase deploy --only firestore,auth --project <id>`.
+- PWA: installable as "Rommi", with a precached shell so a local game opens offline. A new
+  version waits for Päivitä; the app checks every 30 min and when it returns to the screen.
+
+## Testing
+
+- **Unit** (`pnpm test:run`): Vitest and happy-dom, next to the code. Strict test-first for
+  `lib/game`, behaviour tests for stores and components, Firebase mocked at the boundary.
+- **API** (`pnpm test:api`, `test:api-load`): the function with fakes, then loaded as Vercel does.
+- **Rules** (`pnpm test:rules`) and **integration** (`pnpm test:integration`, the real browser
+  SDK) on the emulator.
+- **E2E** (`pnpm test:e2e`): Playwright against the emulators (a production build in CI),
+  Chromium and Firefox, two-device flows included. **Visual** (`pnpm test:visual`): the key screens in dark
+  and light, compared in Playwright's Linux image through Docker.
+- CI runs them all (`verify`, `rules`, `e2e` and `visual` jobs), with no retries.

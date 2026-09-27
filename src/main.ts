@@ -18,8 +18,7 @@ pinia.use(piniaPluginPersistedstate)
 
 app.use(pinia)
 
-// Assign the per-device identity before the router's first navigation guard runs (it checks
-// `deviceUuid` for `requiresIdentity` routes) — see the identity store and routing skill.
+// Before the router's first guard, which checks `deviceUuid` on `requiresIdentity` routes.
 useIdentityStore().ensureDeviceUuid()
 // Before mount: the browser's install prompt can fire before the menu is ever opened.
 useInstallStore().listen(window)
@@ -30,10 +29,8 @@ app.use(i18n)
 app.mount('#app')
 applyStoredTheme()
 
-// Best-effort reconnect flush (see docs/PLAN.md "Reconnect = push final result only"): push any
-// locally-queued finished-game results up to Firestore now that we're launching online. Never
-// awaited — must never delay app mount (see the offline-capable host golden rule) — and any
-// failure just leaves the queue for the next launch (see reconnect-flush.ts).
+// Push results of games finished offline. Not awaited, so it never delays mount; a failure
+// leaves them queued for the next launch.
 if (navigator.onLine) {
   void flushPendingResultsOnLaunch()
 }

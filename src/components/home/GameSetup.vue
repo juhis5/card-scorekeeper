@@ -1,11 +1,8 @@
 <script setup lang="ts">
 /**
- * Home's "Uusi peli": start a game under your name. On submit, probes backend reachability and
- * picks the repository — an online room others join with its code when reachable, a local
- * single-device game otherwise (see `useGameConnectivity`/`lib/data/game-mode.ts`). "This phone
- * only" skips the probe for a table where nobody else has a phone (fourth round). Everyone else is
- * added in the room with "Lisää pelaaja", so the form is just the name, which Home shares with
- * "Liity" (`v-model:name`). A bare form: Home provides the card around it.
+ * Single job: Home's "Uusi peli" form. Starts an online room when the backend is reachable, else a
+ * local game; "This phone only" skips the check. Other players are added in the room, so it asks
+ * only for the name, which Home shares with "Liity".
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -38,8 +35,7 @@ const attemptedSubmit = ref(false)
 const isSubmitting = ref(false)
 const isCheckingConnection = ref(false)
 const submitError = ref('')
-/** A local game waiting for "Start new game": starting it would overwrite the unfinished local
- * game on this device, so the host is asked first (online games never touch that one). */
+/** A local game waiting for the host's OK: it would overwrite this device's unfinished one. */
 const pendingReplaceMode = ref<HostGameMode | null>(null)
 let hasConfirmedReplace = false
 const keepPlayingButton = useTemplateRef<InstanceType<typeof Button>>('keepPlaying')
@@ -58,8 +54,7 @@ async function startGame(mode: HostGameMode): Promise<void> {
   await router.push({ name: 'room', params: { code: roomCodeParam } })
 }
 
-/** Starts the chosen game. If the online room can't be created (the check passed, then the write
- * failed or timed out), play locally instead, exactly like an unreachable backend. */
+/** If creating the online room fails after the check passed, plays locally instead. */
 async function startOrFallBack(mode: HostGameMode): Promise<void> {
   if (mode.kind === 'offline' && !hasConfirmedReplace && hasUnfinishedPersistedGame()) {
     pendingReplaceMode.value = mode

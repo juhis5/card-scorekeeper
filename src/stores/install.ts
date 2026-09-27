@@ -1,8 +1,7 @@
 /**
- * Installing the app from the menu (third playtest). Android Chrome and desktop Chromium fire
- * `beforeinstallprompt` once, early, whether or not the menu is open, so it's caught at startup
- * (`listen` in main.ts) and kept here until "Install the app" is tapped. Everywhere else the
- * menu shows the steps for this device (lib/install-guide.ts), or nothing when there are none.
+ * Installing from the menu. Chromium fires `beforeinstallprompt` once, early, so main.ts catches
+ * it at startup and it waits here until "Install the app" is tapped. Elsewhere the menu shows
+ * this device's install steps, or nothing.
  */
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
