@@ -214,6 +214,70 @@ describe('ScoreCard', () => {
   })
 })
 
+describe('ScoreCard, the Save button', () => {
+  function saveButton(): HTMLElement {
+    return screen.getByRole('button', { name: 'Save' })
+  }
+
+  it('saves the typed score, collapses and hands focus back to the card', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    await fireEvent.click(saveButton())
+    await flushPromises()
+
+    expect(emitted().commit).toEqual([[ALICE.id, 1, 25]])
+    expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
+    expect(document.activeElement).toBe(headerButton())
+  })
+
+  it('saves once when the tap on Save also blurs the field', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    await pressInsideCard(saveButton())
+
+    expect(emitted().commit).toEqual([[ALICE.id, 1, 25]])
+  })
+
+  it('keeps the card open with the error for a score that is not a multiple of 5', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '12')
+    await fireEvent.click(saveButton())
+
+    expect(emitted().commit).toBeUndefined()
+    expect(screen.getByRole('alert').textContent).toContain('multiple of 5')
+    expect(scoreInput().value).toBe('12')
+  })
+
+  it('asks for the points when Save or Enter finds the field empty', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.click(saveButton())
+    expect(screen.getByRole('alert').textContent).toBe('Enter the points first.')
+
+    await fireEvent.update(scoreInput(), '')
+    await fireEvent.keyUp(scoreInput(), { key: 'Enter' })
+    expect(screen.getByRole('alert').textContent).toBe('Enter the points first.')
+    expect(emitted().commit).toBeUndefined()
+  })
+
+  it('says nothing when an empty field is simply left', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.blur(scoreInput())
+
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(emitted().commit).toBeUndefined()
+  })
+})
+
 describe('ScoreCard for a missed round', () => {
   it('names the round in its label and shows it on the card', () => {
     renderCard({ round: 2, isMissedRound: true })

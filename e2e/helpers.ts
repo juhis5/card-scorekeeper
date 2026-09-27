@@ -52,9 +52,8 @@ export async function joinHostedGame(
   await joinForm(page).getByRole('button', { name: 'Join game' }).click()
 }
 
-/** Expands the player's ScoreCard (collapsed by default), then fills and commits their round-score
- * input. RoundScoreInput (src/components/RoundScoreInput.vue) commits on blur or Enter — trigger
- * blur explicitly rather than pressing Enter, which would also submit the ancestor <form>. */
+/** Expands the player's ScoreCard (collapsed by default), fills their round-score input and taps
+ * Save, the way a phone saves (its number keypad has no Enter key). */
 export async function enterRoundScore(
   page: Page,
   playerName: string,
@@ -62,18 +61,16 @@ export async function enterRoundScore(
   points: number,
 ): Promise<void> {
   await page.getByRole('button', { name: `Enter ${playerName}'s score` }).click()
-  const input = page.getByLabel(`${playerName}'s round ${round} score`)
-  await input.fill(String(points))
-  await input.blur()
+  await page.getByLabel(`${playerName}'s round ${round} score`).fill(String(points))
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 }
 
 /** A non-host player's own card reads "Enter your points" instead of their name. */
 export async function enterOwnRoundScore(page: Page, round: number, points: number): Promise<void> {
   // exact: the missed-round cards' names also start with "Enter your points".
   await page.getByRole('button', { name: 'Enter your points', exact: true }).click()
-  const input = page.getByLabel(`Your round ${round} points`)
-  await input.fill(String(points))
-  await input.blur()
+  await page.getByLabel(`Your round ${round} points`).fill(String(points))
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
 }
 
 /** The scoreboard (ScoreBoard.vue) renders one real <table> with one <tr> per player, so a row

@@ -2,7 +2,8 @@
 /**
  * Single job: a labelled numeric field for one leftover-card score. Wraps the shadcn
  * Input/Label primitives; exposes its value as `number | null` via `defineModel` (Input's own
- * v-model is string-only, so the string<->number conversion lives here, once).
+ * v-model is string-only, so the string<->number conversion lives here, once). The default slot
+ * sits beside the field, under the label, for an action such as ScoreCard's Save.
  */
 import { computed } from 'vue'
 import { Input } from '@/components/ui/input'
@@ -42,18 +43,21 @@ const rawValue = computed<string | number>({
 <template>
   <div class="flex flex-col gap-1">
     <Label :for="id" :class="{ 'sr-only': isLabelHidden }">{{ label }}</Label>
-    <Input
-      :id="id"
-      v-model="rawValue"
-      type="number"
-      inputmode="numeric"
-      enterkeyhint="done"
-      min="0"
-      class="h-11 text-base"
-      :aria-invalid="isInvalid"
-      :aria-describedby="describedBy"
-      @blur="emit('blur', $event)"
-      @keyup.enter="emit('commit')"
-    />
+    <div class="flex gap-2">
+      <Input
+        :id="id"
+        v-model="rawValue"
+        type="number"
+        inputmode="numeric"
+        enterkeyhint="done"
+        min="0"
+        class="h-11 min-w-0 flex-1 text-base"
+        :aria-invalid="isInvalid"
+        :aria-describedby="describedBy"
+        @blur="emit('blur', $event)"
+        @keyup.enter="emit('commit')"
+      />
+      <slot />
+    </div>
   </div>
 </template>
