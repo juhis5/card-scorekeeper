@@ -286,7 +286,7 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
 - CI: `.github/workflows/ci.yml` has a commented `test:rules` job — wire it now that rules exist
   (needs Java + firebase-tools on the runner). Do in 4b or polish. Do NOT add `test:integration`
   to CI (see flake below).
-- KNOWN FLAKE (accepted, fenced off): `pnpm test:integration` (emulator-backed FirestoreGameRepository
+- ~~KNOWN FLAKE~~ FIXED 2026-09-27 (see the dated entry at the end). Original note: `pnpm test:integration` (emulator-backed FirestoreGameRepository
   test) intermittently fails on a cold-booted emulator via Vitest — a Node24 + grpc-js + emulator
   HTTP/2 cold-boot transport race (browser uses WebChannel, so NOT a product bug). Isolated into its
   own `vitest.integration.config.ts`, OUT of `test:run`/CI/hooks. The join-order correctness it
@@ -326,3 +326,11 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   ("count each card once" invites merging two identical 7♥), now told to list every copy. No
   deck-count game setting: its only use would be capping copies per card when validating a photo
   read, which isn't worth a new field through types, both repositories, rules and UI.
+- 2026-09-27 — `test:integration` flake FIXED and the suite is back in CI (the `rules` job). Root
+  cause was not a warm-up race: the Node SDK's gRPC `Listen` stream loses its framing against the
+  emulator (reads protobuf bytes as a length prefix — `Received message larger than max
+  (1919182194 vs 4194304)` = ASCII "rder"), backs off ~60s, and the 30s test times out. Open
+  upstream: firebase/firebase-tools#8654. Failed ~1 in 3 cold runs, on `main` too. Fix: the suite
+  runs the SDK's browser build (WebChannel — what the app ships) via happy-dom + inlined `firebase`
+  + an alias to the browser entry (see vitest.integration.config.ts); the `warmUpListenChannel`
+  workaround is gone. 20/20 cold runs green, ~2s each (was ~15–30s).

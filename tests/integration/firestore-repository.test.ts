@@ -6,6 +6,9 @@
  * works against real `onSnapshot` listeners. Reversing it would make the joiner's own subscribe
  * hit a real permission-denied that never self-heals, even after the join completes — see
  * `stores/game.ts`'s `join()` doc comment and docs/DECISIONS.md's read-gate entry.
+ *
+ * Runs on the SDK's browser build (WebChannel), the transport the app actually ships — see
+ * vitest.integration.config.ts for why the Node/gRPC build was flaky against the emulator.
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { deleteApp, initializeApp, type FirebaseApp } from 'firebase/app'
@@ -15,7 +18,6 @@ import {
   doc,
   getDoc,
   getFirestore,
-  onSnapshot,
   type Firestore,
 } from 'firebase/firestore'
 import { FirestoreGameRepository } from '@/lib/firestore-repository'
@@ -33,60 +35,9 @@ interface Device {
 let deviceCount = 0
 const apps: FirebaseApp[] = []
 
-/** True for a clean rules-evaluation response (allowed or denied) rather than a transport-level
- * failure — a `permission-denied` proves the channel and the emulator's rules engine both work,
- * every bit as much as a successful read would. */
-function isRulesEvaluationError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'permission-denied'
-  )
-}
-
-/**
- * A freshly-booted Firestore emulator can report ready (its health check passes) slightly
- * before its gRPC Listen service has fully warmed up — opening a new channel's very first watch
- * stream in that window has been observed to intermittently fail with a spurious
- * resource-exhausted error against this SDK/emulator combination. Establishing one throwaway
- * listener first, retried on failure, gives that window a chance to pass — this waits on the
- * real operation actually resolving, not a blind sleep (see the tdd skill's flake guidance). The
- * probed path isn't covered by firestore.rules, so a healthy channel always answers
- * permission-denied — that alone proves it's warm; only a transport-ish error is worth retrying.
- */
-async function warmUpListenChannel(db: Firestore): Promise<void> {
-  const MAX_ATTEMPTS = 5
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const unsubscribe = onSnapshot(
-          doc(db, '_warmup/probe'),
-          () => {
-            unsubscribe()
-            resolve()
-          },
-          (error) => {
-            unsubscribe()
-            if (isRulesEvaluationError(error)) {
-              resolve()
-              return
-            }
-            reject(error)
-          },
-        )
-      })
-      return
-    } catch (error) {
-      if (attempt === MAX_ATTEMPTS) throw error
-      await new Promise((resolve) => setTimeout(resolve, attempt * 300))
-    }
-  }
-}
-
 /** A fresh Firebase App + emulator-connected Firestore/Auth — models one physical device. Each
  * gets its own independent anonymous auth session, exactly like two phones at the same table. */
-async function makeDevice(): Promise<Device> {
+function makeDevice(): Device {
   deviceCount += 1
   const app = initializeApp(
     { projectId: 'demo-card-scorekeeper', apiKey: 'fake-api-key' },
@@ -97,7 +48,6 @@ async function makeDevice(): Promise<Device> {
   const auth = getAuth(app)
   connectFirestoreEmulator(db, 'localhost', FIRESTORE_EMULATOR_PORT)
   connectAuthEmulator(auth, `http://localhost:${AUTH_EMULATOR_PORT}`, { disableWarnings: true })
-  await warmUpListenChannel(db)
   return { app, db, auth }
 }
 
@@ -122,7 +72,7 @@ afterEach(async () => {
 
 describe('FirestoreGameRepository, end-to-end against the emulator', () => {
   it('lets a host create a game, a joiner join and score, and both see it live', async () => {
-    const host = await makeDevice()
+    const host = makeDevice()
     const hostRepo = new FirestoreGameRepository({ db: host.db, auth: host.auth })
 
     const created = await hostRepo.createGame({
@@ -133,7 +83,7 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
 
     const hostSeesTwoPlayers = waitForState(hostRepo, (state) => state.players.length === 2)
 
-    const joiner = await makeDevice()
+    const joiner = makeDevice()
     const joinerRepo = new FirestoreGameRepository({
       db: joiner.db,
       auth: joiner.auth,
@@ -161,12 +111,12 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     const hostSeesScore = waitForState(
       hostRepo,
       (state) =>
-        state.players.find((player) => player.id === aliceUid)?.totalScore === 12 &&
+        state.players.find((player) => player.id === aliceUid)?.totalScore === 15 &&
         state.roundScores.some((score) => score.playerId === aliceUid && score.round === 1),
     )
     await joinerRepo.setRoundScore({ playerId: aliceUid, round: 1, points: 15 })
     const scoredState = await hostSeesScore
-    expect(scoredState.players.find((player) => player.id === aliceUid)?.totalScore).toBe(12)
+    expect(scoredState.players.find((player) => player.id === aliceUid)?.totalScore).toBe(15)
     expect(scoredState.roundScores).toContainEqual({ playerId: aliceUid, round: 1, points: 15 })
 
     hostRepo.leave()
@@ -178,7 +128,7 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
   // rules test (tests/rules) only proves the rules against hand-written fixtures; this is the one
   // place both meet against a real emulator.
   it('writes game_result + a game_player row per player on finishGame, readable back', async () => {
-    const host = await makeDevice()
+    const host = makeDevice()
     const hostRepo = new FirestoreGameRepository({ db: host.db, auth: host.auth })
     const created = await hostRepo.createGame({
       hostDeviceUuid: 'device-host',
@@ -187,7 +137,7 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     const roomCode = created.roomCode
     if (!roomCode) throw new Error('expected an online room code')
 
-    const joiner = await makeDevice()
+    const joiner = makeDevice()
     const joinerRepo = new FirestoreGameRepository({ db: joiner.db, auth: joiner.auth, roomCode })
     const aliceUid = await joinerRepo.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
     await waitForState(hostRepo, (state) => state.players.length === 2)

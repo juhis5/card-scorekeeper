@@ -49,7 +49,7 @@ pnpm test:run           # unit + component (fast, no network)
 pnpm test:api           # /api/count function (SDKs mocked)
 pnpm test:rules         # Firestore rules on the emulator (needs Java — installed locally)
 pnpm test:e2e           # two-client live-sync (boots firestore+auth emulators + a preview server)
-# pnpm test:integration # emulator-backed repo test — QUARANTINED (documented cold-boot flake), not in CI
+# pnpm test:integration # emulator-backed repo test (browser SDK build) — in CI since 2026-09-27
 
 vercel dev              # app + /api function together (needs the env vars below)
 ```
