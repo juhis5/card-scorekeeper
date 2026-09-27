@@ -355,6 +355,9 @@ const isOpeningRoom = computed(
     (isOnline.value && !hasActiveGame.value && connectionError.value === null),
 )
 
+const isGameShown = computed(
+  () => !isOpeningRoom.value && resumeState.value !== 'not-seated' && hasActiveGame.value,
+)
 const heading = computed(() => {
   if (isOpeningRoom.value) return t('room.opening', { code: routeCode.value })
   if (resumeState.value === 'not-seated') return t('room.notSeated.heading')
@@ -387,11 +390,16 @@ onMounted(async () => {
 <template>
   <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
     <!-- One heading for every state: navigation focuses it before the room's first snapshot
-         arrives, and a new element per state would drop that focus when the room opens. -->
+         arrives, and a new element per state would drop that focus when the room opens. While a
+         game is on screen it's for screen readers only; the board needs the space more. -->
     <h1
       id="main-heading"
       tabindex="-1"
-      class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      :class="
+        isGameShown
+          ? 'sr-only'
+          : 'focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none'
+      "
     >
       {{ heading }}
     </h1>

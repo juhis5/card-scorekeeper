@@ -11,6 +11,7 @@ import {
   enterRoundScore,
   hostForm,
   joinHostedGame,
+  openFromMenu,
   readRoomCode,
   roundHeading,
   scoreboardRow,
@@ -82,7 +83,7 @@ test.describe('players without a phone', () => {
       await expect(joinerPage.getByText('Mummo wins!')).toBeVisible()
       await expect(scoreboardRow(joinerPage, 'Ripa')).toContainText('150')
 
-      await hostPage.getByRole('link', { name: 'Stats' }).click()
+      await openFromMenu(hostPage, 'Stats')
       await expect(hostPage.getByRole('row', { name: /Mummo/ })).toBeVisible()
     } finally {
       await hostContext.close()

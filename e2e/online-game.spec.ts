@@ -8,6 +8,7 @@ import { expect, test } from '@playwright/test'
 import {
   ROOM_CODE_PATTERN,
   joinHostedGame,
+  openFromMenu,
   playOnlineRound,
   readRoomCode,
   roundHeading,
@@ -53,7 +54,7 @@ test.describe('a full online game', () => {
       await expect(hostPage.getByText('Alice wins!')).toBeVisible()
       await expect(joinerPage.getByText('Alice wins!')).toBeVisible()
 
-      await hostPage.getByRole('link', { name: 'Stats' }).click()
+      await openFromMenu(hostPage, 'Stats')
       const gamesPlayed = hostPage
         .getByText('Games played', { exact: true })
         .locator('xpath=following-sibling::dd[1]')
