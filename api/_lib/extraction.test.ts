@@ -38,6 +38,11 @@ describe('parseModelCards', () => {
     ])
   })
 
+  it('rejects more cards than three decks could leave in a hand', () => {
+    const tooMany = { cards: Array.from({ length: 61 }, () => ({ rank: '7', suit: 'hearts' })) }
+    expect(parseModelCards(tooMany)).toBeNull()
+  })
+
   it('tolerates an omitted (rather than null) suit on a Joker', () => {
     const raw = { cards: [{ rank: 'Joker', value: 25 }] }
     expect(parseModelCards(raw)).toEqual([{ rank: 'Joker', suit: null }])

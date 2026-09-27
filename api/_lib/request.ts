@@ -2,7 +2,20 @@
  * Pure request-shape validation — no SDKs, no I/O. Kept separate from the handler so every
  * malformed-input case is a plain unit test (see the tdd skill).
  */
+import { isValidRoomCode } from '../../src/lib/room-code.js'
 import type { CountRequestBody } from './types.js'
+
+/** The formats phone cameras and galleries produce. Anything else (SVG, arbitrary types) is
+ * rejected before it can reach Gemini. */
+const ACCEPTED_IMAGE_TYPES: ReadonlySet<string> = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+])
+
+const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/
 
 function tryParseJson(text: string): unknown {
   try {
@@ -23,9 +36,11 @@ export function parseCountRequestBody(rawBody: unknown): CountRequestBody | null
   if (typeof body !== 'object' || body === null) return null
 
   const { roomCode, image, mimeType } = body as Record<string, unknown>
-  if (typeof roomCode !== 'string' || roomCode.length === 0) return null
-  if (typeof image !== 'string' || image.length === 0) return null
-  if (typeof mimeType !== 'string' || !mimeType.startsWith('image/')) return null
+  // A strict room code, not just a string: the Admin SDK builds `room/${roomCode}` paths with
+  // rules bypassed, so a "/" in it could otherwise pick a different document to read.
+  if (typeof roomCode !== 'string' || !isValidRoomCode(roomCode)) return null
+  if (typeof image !== 'string' || !BASE64_PATTERN.test(image)) return null
+  if (typeof mimeType !== 'string' || !ACCEPTED_IMAGE_TYPES.has(mimeType)) return null
 
   return { roomCode, image, mimeType }
 }

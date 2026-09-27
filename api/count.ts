@@ -9,6 +9,7 @@
  * `/api` exposes exactly one route.
  */
 import { handleCountRequest, type CountApiRequest } from './_lib/handler.js'
+import { logServerError } from './_lib/log.js'
 import { createProductionDeps } from './_lib/production-deps.js'
 
 interface CountApiResponse {
@@ -21,10 +22,10 @@ export default async function handler(req: CountApiRequest, res: CountApiRespons
     const deps = createProductionDeps()
     const result = await handleCountRequest(req, deps)
     res.status(result.status).json(result.body)
-  } catch {
-    // Never surface the raw error (could be a misconfigured-env message, an SDK stack, ...) to
-    // the client — a clean, generic failure either way (see clean-code's "fail loud in dev,
-    // graceful in UI" and "never log image/token/keys" in the vercel-gemini skill).
+  } catch (error) {
+    // Logged for Vercel (name and message only, see log.ts), never shown to the client: a
+    // misconfigured env or an SDK error gets the same generic 500.
+    logServerError('request', error)
     res.status(500).json({ error: 'server_error' })
   }
 }

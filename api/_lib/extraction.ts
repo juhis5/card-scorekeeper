@@ -31,6 +31,10 @@ const VALID_RANKS: ReadonlySet<string> = new Set([
 
 const VALID_SUITS: ReadonlySet<string> = new Set(['clubs', 'diamonds', 'hearts', 'spades'])
 
+/** More than three decks' worth of leftovers could never be one hand; a longer list means the
+ * model is looping, so it's rejected rather than scored. */
+export const MAX_DETECTED_CARDS = 60
+
 function toCard(raw: unknown): Card | null {
   if (typeof raw !== 'object' || raw === null) return null
   const { rank, suit } = raw as Record<string, unknown>
@@ -56,7 +60,7 @@ function toCard(raw: unknown): Card | null {
 export function parseModelCards(raw: unknown): Card[] | null {
   if (typeof raw !== 'object' || raw === null) return null
   const { cards } = raw as Record<string, unknown>
-  if (!Array.isArray(cards) || cards.length === 0) return null
+  if (!Array.isArray(cards) || cards.length === 0 || cards.length > MAX_DETECTED_CARDS) return null
 
   const parsed: Card[] = []
   for (const rawCard of cards) {

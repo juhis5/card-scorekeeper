@@ -18,9 +18,23 @@ describe('authenticateRequest', () => {
   })
 
   it('rejects when the Admin SDK rejects the token (invalid/expired)', async () => {
-    const verifyIdToken = vi.fn().mockRejectedValue(new Error('invalid token'))
+    const verifyIdToken = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error('invalid token'), { code: 'auth/id-token-expired' }),
+      )
     const result = await authenticateRequest('a-bad-token', verifyIdToken)
     expect(result).toEqual({ ok: false })
+  })
+
+  it('rethrows a server-side failure instead of blaming the caller', async () => {
+    const verifyIdToken = vi
+      .fn()
+      .mockRejectedValue(new Error('FIREBASE_SERVICE_ACCOUNT is not set'))
+
+    await expect(authenticateRequest('a-token', verifyIdToken)).rejects.toThrow(
+      'FIREBASE_SERVICE_ACCOUNT is not set',
+    )
   })
 })
 

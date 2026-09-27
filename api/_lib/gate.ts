@@ -13,9 +13,10 @@ export type AuthResult = { ok: true; uid: string } | { ok: false }
 
 /**
  * Verifies the caller's Firebase ID token via the injected `verifyIdToken` (the Admin SDK call —
- * kept as a parameter so this stays unit-testable without a real Firebase project). Any failure
- * (no token, or `verifyIdToken` rejecting for an invalid/expired/malformed token) collapses to
- * the same `{ ok: false }` — the handler maps that to 401.
+ * kept as a parameter so this stays unit-testable without a real Firebase project). No token, or
+ * an `auth/...` rejection (invalid, expired, malformed), is the caller's problem: `{ ok: false }`,
+ * which the handler maps to 401. Anything else (e.g. missing server credentials) is rethrown, so
+ * a misconfigured deploy shows up as a 500 in the logs instead of looking like a bad token.
  */
 export async function authenticateRequest(
   token: string | null,
@@ -25,9 +26,16 @@ export async function authenticateRequest(
   try {
     const decoded = await verifyIdToken(token)
     return { ok: true, uid: decoded.uid }
-  } catch {
-    return { ok: false }
+  } catch (error) {
+    if (isFirebaseAuthError(error)) return { ok: false }
+    throw error
   }
+}
+
+function isFirebaseAuthError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return false
+  const { code } = error as { code: unknown }
+  return typeof code === 'string' && code.startsWith('auth/')
 }
 
 export type RoomStatus = 'waiting' | 'playing' | 'finished'

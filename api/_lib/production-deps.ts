@@ -11,8 +11,8 @@
  * `RateLimitStore`. Not built in this slice (out of scope — "don't require live KV"); flagged
  * here and in the handoff so it isn't mistaken for a real production guarantee.
  */
-import { createGeminiClient } from './gemini.js'
-import { getRoomSnapshot, verifyIdToken } from './firebase-admin.js'
+import { createGeminiClient, DEFAULT_GEMINI_MODEL } from './gemini.js'
+import { getAdminApp, getRoomSnapshot, verifyIdToken } from './firebase-admin.js'
 import { InMemoryRateLimitStore } from './rate-limit.js'
 import type { CountHandlerDeps } from './handler.js'
 
@@ -25,12 +25,16 @@ export function createProductionDeps(): CountHandlerDeps {
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not set')
   }
+  // Up front, so a missing or malformed FIREBASE_SERVICE_ACCOUNT fails as a logged 500 here
+  // instead of surfacing later inside token verification.
+  getAdminApp()
+  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
 
   return {
     verifyIdToken,
     getRoomSnapshot,
     rateLimitStore,
-    geminiClient: createGeminiClient(apiKey),
+    geminiClient: createGeminiClient(apiKey, model),
     now: () => Date.now(),
   }
 }

@@ -21,6 +21,7 @@ import { checkRateLimit, type RateLimitConfig, type RateLimitStore } from './rat
 import { exceedsSizeCap } from './image.js'
 import { parseModelOutput, buildExtractionResult } from './extraction.js'
 import type { GeminiClient } from './gemini.js'
+import { logServerError } from './log.js'
 import type { CountResponseBody } from './types.js'
 
 /** A hand-count happens a few times per round; 30 calls per 15 minutes comfortably covers every
@@ -67,6 +68,10 @@ export async function handleCountRequest(
   if (!parsedBody) {
     return { status: 400, body: { error: 'invalid_request' } }
   }
+  // Before any I/O: an oversized body must cost no auth call, Firestore read or rate-limit slot.
+  if (exceedsSizeCap(parsedBody.image)) {
+    return { status: 413, body: { error: 'image_too_large' } }
+  }
 
   const token = parseBearerToken(req.headers.authorization)
   const authResult = await authenticateRequest(token, deps.verifyIdToken)
@@ -101,18 +106,12 @@ export async function handleCountRequest(
     return { status: 429, body: { error: 'global_rate_limited' } }
   }
 
-  if (exceedsSizeCap(parsedBody.image)) {
-    return { status: 413, body: { error: 'image_too_large' } }
-  }
-
   let rawText: string
   try {
     rawText = await deps.geminiClient.extractCards(parsedBody.image, parsedBody.mimeType)
-  } catch {
-    // Upstream Gemini failure (quota, network, ...) — distinct from a shape problem below, so the
-    // UI could in principle distinguish "try again" from "type it in" (both fall back to manual
-    // entry today either way).
-    return { status: 502, body: { error: 'model_unavailable' } }
+  } catch (error) {
+    logServerError('gemini call', error)
+    return geminiFailureResult(error)
   }
 
   const cards = parseModelOutput(rawText)
@@ -121,4 +120,22 @@ export async function handleCountRequest(
   }
 
   return { status: 200, body: buildExtractionResult(cards) }
+}
+
+/** Maps an upstream Gemini failure to a status the client can act on: a timeout or a busy quota
+ * is worth retrying later, anything else means "type your total". */
+function geminiFailureResult(error: unknown): CountApiResult {
+  const failure = typeof error === 'object' && error !== null ? error : {}
+  const { name, status, message } = failure as {
+    name?: unknown
+    status?: unknown
+    message?: unknown
+  }
+  if (name === 'AbortError' || name === 'TimeoutError') {
+    return { status: 504, body: { error: 'model_timeout' } }
+  }
+  if (status === 429 || (typeof message === 'string' && message.includes('RESOURCE_EXHAUSTED'))) {
+    return { status: 503, body: { error: 'model_busy' } }
+  }
+  return { status: 502, body: { error: 'model_unavailable' } }
 }
