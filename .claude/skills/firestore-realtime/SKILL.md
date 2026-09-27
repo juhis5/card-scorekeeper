@@ -10,7 +10,7 @@ Firebase modular SDK (v9+). Firestore is the **source of truth** for live game s
 ## Firebase init
 
 ```ts
-// src/lib/firebase.ts
+// src/lib/data/firebase.ts
 import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
 
@@ -51,7 +51,7 @@ Mirror docs/PLAN.md. Ephemeral game state (`room`, `player`, `round_score`) and 
 
 - Rooms are transient and carry `created_at` / `expires_at`. A leaked room code stops working when the room expires.
 - On **game finish**, write the permanent records (`game_result` + one `game_player` per player, keyed by `device_uuid`). Stats and head-to-head are computed from these — head-to-head by comparing `placement` between two UUIDs across shared `game_id`s (no separate table).
-- The 5 contracts and card values are a **code constant** (`src/lib/rules.ts`), not DB data.
+- The 5 contracts and card values are a **code constant** (`src/lib/game/rules.ts`), not DB data.
 
 ## Identity — device UUID + display name
 
@@ -64,7 +64,7 @@ if (!id) { id = crypto.randomUUID(); localStorage.setItem('device_uuid', id) }
 - The UUID is the stable identity; the name is an editable label.
 - Document the known failure modes in the UI where stats show: new device / cleared storage = new identity; shared device = merged stats; no cross-device view. These are accepted trade-offs (no login), not bugs to fix.
 
-## Security rules (firestore.rules) — enforce, don't just hide in UI
+## Security rules (firebase/firestore.rules) — enforce, don't just hide in UI
 
 Permissions from the plan must live in rules, not only the client:
 
@@ -81,7 +81,7 @@ That feature calls Gemini through the serverless function, gated by room code + 
 
 ## Offline host mode (required)
 
-The host must be able to run a full game with the backend unreachable. Because `lib/rules.ts` is pure (no network), offline is a data-layer swap, not a rewrite.
+The host must be able to run a full game with the backend unreachable. Because `lib/game/rules.ts` is pure (no network), offline is a data-layer swap, not a rewrite.
 
 - **Repository seam.** The room/game store depends on a `GameRepository` interface, never on Firestore directly:
   ```ts

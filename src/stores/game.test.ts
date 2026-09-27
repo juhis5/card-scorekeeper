@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useGameStore } from './game'
-import { lastRoom, rememberRoom } from '@/lib/last-room'
-import { LocalGameRepository, STORAGE_KEY } from '@/lib/local-repository'
-import type { KeyValueStorage } from '@/lib/local-repository'
+import { lastRoom, rememberRoom } from '@/lib/data/last-room'
+import { LocalGameRepository, STORAGE_KEY } from '@/lib/data/local-repository'
+import type { KeyValueStorage } from '@/lib/data/local-repository'
 import type {
   AddGuestInput,
   AddPlayerInput,
@@ -16,8 +16,8 @@ import type {
   Seat,
   SetRoundScoreInput,
   Unsubscribe,
-} from '@/lib/repository'
-import type { ContractRoundNumber, GameResult, GameState } from '@/lib/types'
+} from '@/lib/data/repository'
+import type { ContractRoundNumber, GameResult, GameState } from '@/lib/game/types'
 
 const HOST_CONFIG: GameConfig = { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' }
 const ALL_ROUNDS: readonly ContractRoundNumber[] = [1, 2, 3, 4, 5]

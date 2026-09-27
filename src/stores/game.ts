@@ -18,11 +18,11 @@ import {
   runningTotal,
   standings as standingsFor,
   winners as winnersFor,
-} from '@/lib/rules'
-import { hasPersistedGame, LocalGameRepository } from '@/lib/local-repository'
-import { forgetRoom, rememberRoom } from '@/lib/last-room'
-import { boardRows } from '@/lib/scoreboard'
-import type { KeyValueStorage } from '@/lib/local-repository'
+} from '@/lib/game/rules'
+import { hasPersistedGame, LocalGameRepository } from '@/lib/data/local-repository'
+import { forgetRoom, rememberRoom } from '@/lib/data/last-room'
+import { boardRows } from '@/lib/game/scoreboard'
+import type { KeyValueStorage } from '@/lib/data/local-repository'
 import type {
   AddGuestInput,
   AddPlayerInput,
@@ -34,10 +34,10 @@ import type {
   ResumableGameRepository,
   SetRoundScoreInput,
   Unsubscribe,
-} from '@/lib/repository'
-import { isReplayable, isResumable } from '@/lib/repository'
-import { isPermissionDenied } from '@/lib/write-errors'
-import type { GameResult, GameState, Player } from '@/lib/types'
+} from '@/lib/data/repository'
+import { isReplayable, isResumable } from '@/lib/data/repository'
+import { isPermissionDenied } from '@/lib/data/write-errors'
+import type { GameResult, GameState, Player } from '@/lib/game/types'
 
 function initialGameState(): GameState {
   return { status: 'waiting', currentRound: 1, players: [], roundScores: [] }

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import type { GamePlayer } from '@/lib/types'
+import type { GamePlayer } from '@/lib/game/types'
 
 const ensureSignedInMock = vi.fn()
 const getDbMock = vi.fn(() => ({ marker: 'db' }))
 
-vi.mock('@/lib/firebase', () => ({
+vi.mock('@/lib/data/firebase', () => ({
   getDb: () => getDbMock(),
   getFirebaseAuth: () => ({}),
   ensureSignedIn: () => ensureSignedInMock(),

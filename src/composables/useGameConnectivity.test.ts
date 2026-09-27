@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const checkBackendReachableMock = vi.fn()
 
-vi.mock('@/lib/firebase', () => ({
+vi.mock('@/lib/data/firebase', () => ({
   getFirebaseAuth: () => ({ currentUser: null }),
   getDb: () => ({}),
   checkBackendReachable: checkBackendReachableMock,
 }))
 
-vi.mock('@/lib/firestore-repository', () => ({
+vi.mock('@/lib/data/firestore-repository', () => ({
   // `new`-able: `game-mode.ts`'s createOnlineRepository calls `new FirestoreGameRepository(...)`,
   // so the mock must be a constructor function, not an arrow function.
   FirestoreGameRepository: vi.fn(function FirestoreGameRepository(deps: unknown) {
@@ -19,8 +19,8 @@ vi.mock('@/lib/firestore-repository', () => ({
 // Imported after the mocks above so both pick up the mocked modules (vi.mock is hoisted, but
 // keeping the import order matching makes the wiring easy to follow).
 const { useGameConnectivity } = await import('./useGameConnectivity')
-const { FirestoreGameRepository } = await import('@/lib/firestore-repository')
-const { LocalGameRepository } = await import('@/lib/local-repository')
+const { FirestoreGameRepository } = await import('@/lib/data/firestore-repository')
+const { LocalGameRepository } = await import('@/lib/data/local-repository')
 
 beforeEach(() => {
   vi.clearAllMocks()

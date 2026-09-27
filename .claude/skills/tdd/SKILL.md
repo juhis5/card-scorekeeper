@@ -29,7 +29,7 @@ Don't chase a coverage number. Coverage is a signal (untested logic branch = wri
 
 ## What to test where
 
-- **`lib/rules.ts`** — the highest-value TDD target here. Test the fixed rules exactly: card values (2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25; repeated cards from 2–3 decks each count); a round total sums correctly; the 5 contracts map round → required melds; winner = lowest total after round 5; ties handled. Pure functions with exact expected values — ideal for test-first.
+- **`lib/game/rules.ts`** — the highest-value TDD target here. Test the fixed rules exactly: card values (2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25; repeated cards from 2–3 decks each count); a round total sums correctly; the 5 contracts map round → required melds; winner = lowest total after round 5; ties handled. Pure functions with exact expected values — ideal for test-first.
 - **Stats logic** — win rate, best/worst round, head-to-head derivation from `game_player` rows. Pure functions over fixtures; TDD them (the identity caveats don't change the math).
 - **Stores (Pinia)** — fresh Pinia per test (`setActivePinia(createPinia())`). Mock Firestore (`onSnapshot`/writes) at the boundary — never hit real Firebase in unit tests. Test that a snapshot payload maps to sorted standings, that the current round advances, that permissions are respected in the action.
 - **Serverless photo-count** — unit-test the pure parts: room+token gate logic, rate-limit windows, server-side recompute of the card total, response validation. Mock the Gemini SDK and the Admin SDK. Assert: no valid room/token → 403, over cap → 429, bad model output rejected.
@@ -61,10 +61,10 @@ Reproduce before declaring it fixed: run it many times, shuffled — `for s in $
 
 ## Wiring
 
-- `vitest.config.ts`: `environment: 'happy-dom'`, `globals: true`.
-- Scripts: `"test": "vitest"`, `"test:run": "vitest run"`, `"test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'"`, `"test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'"`, `"test:e2e:ci"` (the CI variant: production build, Chromium + Firefox), `"lint:check": "eslint ."`. Build runs `vue-tsc`.
-- Co-locate unit tests: `foo.ts` + `foo.test.ts`. Rules tests and E2E in their own folders.
+- `vitest.config.ts` holds one project per suite: `unit` (happy-dom, `src/**`), `api`, `rules` and `integration` (the last two need the emulator).
+- Scripts: `test`/`test:run` (unit), `test:api`, `test:rules` and `test:integration` (inside `firebase emulators:exec`), `test:e2e` (Playwright, config in `tests/e2e/`), `test:e2e:ci` (the CI variant: production build, Chromium + Firefox), `lint:check`. Build runs `vue-tsc`.
+- Co-locate unit tests: `foo.ts` + `foo.test.ts`. Rules, integration and E2E live in `tests/rules`, `tests/integration`, `tests/e2e`.
 
 ## This project (card-scorekeeper)
 
-Highest-leverage test-first targets: `lib/rules.ts` (card values + 5 contracts + winner), the stats/head-to-head derivation, the room+token gate and total-recompute in the photo-count function, and the Firestore security rules. One Playwright flow: two browser contexts, host + joiner, assert an entry syncs live and the round's numbers are revealed on both after Next.
+Highest-leverage test-first targets: `lib/game/rules.ts` (card values + 5 contracts + winner), the stats/head-to-head derivation, the room+token gate and total-recompute in the photo-count function, and the Firestore security rules. One Playwright flow: two browser contexts, host + joiner, assert an entry syncs live and the round's numbers are revealed on both after Next.

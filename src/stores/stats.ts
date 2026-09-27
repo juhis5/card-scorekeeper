@@ -34,10 +34,10 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { probeBackendReachable } from '@/lib/connectivity'
-import { headToHead, playerStats } from '@/lib/stats'
-import type { HeadToHeadRecord, PlayerStats } from '@/lib/stats'
-import type { GamePlayer, GameResult } from '@/lib/types'
+import { probeBackendReachable } from '@/lib/platform/connectivity'
+import { headToHead, playerStats } from '@/lib/game/stats'
+import type { HeadToHeadRecord, PlayerStats } from '@/lib/game/stats'
+import type { GamePlayer, GameResult } from '@/lib/game/types'
 
 /** Firestore's `in` operator compares against at most 30 values per query. */
 const IN_QUERY_CHUNK_SIZE = 30
@@ -117,7 +117,7 @@ export const useStatsStore = defineStore('stats', () => {
       const [
         { getDb, getFirebaseAuth, ensureSignedIn, checkBackendReachable },
         { collection, query, where, getDocs },
-      ] = await Promise.all([import('@/lib/firebase'), import('firebase/firestore')])
+      ] = await Promise.all([import('@/lib/data/firebase'), import('firebase/firestore')])
 
       const db = getDb()
       const reachable = await probeBackendReachable({

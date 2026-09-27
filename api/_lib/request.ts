@@ -2,7 +2,7 @@
  * Pure request-shape validation — no SDKs, no I/O. Kept separate from the handler so every
  * malformed-input case is a plain unit test (see the tdd skill).
  */
-import { isValidRoomCode } from '../../src/lib/room-code.js'
+import { isValidRoomCode } from '../../src/lib/game/room-code.js'
 import type { CountRequestBody } from './types.js'
 
 /** The formats phone cameras and galleries produce. Anything else (SVG, arbitrary types) is

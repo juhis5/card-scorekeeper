@@ -1,0 +1,124 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { fireEvent, render, screen } from '@testing-library/vue'
+import { flushPromises } from '@vue/test-utils'
+import AddPlayerCard from './AddPlayerCard.vue'
+import { i18n } from '@/i18n'
+import { LocalGameRepository } from '@/lib/data/local-repository'
+import type { KeyValueStorage } from '@/lib/data/local-repository'
+import { useGameStore } from '@/stores/game'
+
+function memoryStorage(): KeyValueStorage {
+  const values = new Map<string, string>()
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => {
+      values.set(key, value)
+    },
+  }
+}
+
+/** A local game hosted by "Juho", with the card on screen. `onAdded` hears its `added` event. */
+async function renderInGame(onAdded: (name: string) => void = () => undefined) {
+  const repository = new LocalGameRepository({ storage: memoryStorage() })
+  await useGameStore().start(repository, { hostDeviceUuid: 'device-host', hostDisplayName: 'Juho' })
+  return render(AddPlayerCard, { props: { onAdded }, global: { plugins: [i18n] } })
+}
+
+async function openAndType(name: string): Promise<void> {
+  await fireEvent.click(screen.getByRole('button', { name: 'Add player' }))
+  await fireEvent.update(screen.getByLabelText("Player's name"), name)
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
+
+describe('AddPlayerCard', () => {
+  it("doesn't pull focus back when the host has moved on before the add is confirmed", async () => {
+    const repository = new LocalGameRepository({ storage: memoryStorage() })
+    await useGameStore().start(repository, {
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Juho',
+    })
+    let confirm: (id: string) => void = () => undefined
+    vi.spyOn(repository, 'addGuest').mockImplementation(
+      () => new Promise((resolve) => (confirm = resolve)),
+    )
+    render(AddPlayerCard, { global: { plugins: [i18n] } })
+    const elsewhere = document.body.appendChild(document.createElement('input'))
+
+    await openAndType('Ripa')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    elsewhere.focus()
+    confirm('guest-ripa')
+    await flushPromises()
+
+    expect(document.activeElement).toBe(elsewhere)
+    elsewhere.remove()
+  })
+
+  it('adds a player by name, closes and says who was added', async () => {
+    const added: string[] = []
+    await renderInGame((name) => added.push(name))
+
+    await openAndType(' Mummo ')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await flushPromises()
+
+    expect(added).toEqual(['Mummo'])
+    expect(useGameStore().standings.map(({ player }) => player.name)).toContain('Mummo')
+    expect(screen.queryByLabelText("Player's name")).toBeNull()
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add player' }))
+  })
+
+  it('adds on Enter too, like a score card', async () => {
+    const added: string[] = []
+    await renderInGame((name) => added.push(name))
+
+    await openAndType('Ripa')
+    await fireEvent.keyDown(screen.getByLabelText("Player's name"), { key: 'Enter' })
+    await flushPromises()
+
+    expect(added).toEqual(['Ripa'])
+  })
+
+  it('asks for a name when the field is empty', async () => {
+    await renderInGame()
+
+    await openAndType('  ')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(screen.getByRole('alert').textContent).toBe("Enter the player's name.")
+  })
+
+  it('says so when the name is already in the game', async () => {
+    await renderInGame()
+
+    await openAndType('JUHO')
+    await fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    await flushPromises()
+
+    expect(screen.getByRole('alert').textContent).toContain('already uses that name')
+    expect((screen.getByLabelText("Player's name") as HTMLInputElement).value).toBe('JUHO')
+  })
+
+  it('closes on Cancel without adding anyone, handing focus back to its button', async () => {
+    await renderInGame()
+
+    await openAndType('Mummo')
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await flushPromises()
+
+    expect(useGameStore().standings).toHaveLength(1)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add player' }))
+  })
+
+  it("explains it's for players without a phone only in an online game", async () => {
+    await renderInGame()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Add player' }))
+
+    expect(screen.queryByText(/without a phone/)).toBeNull()
+  })
+})

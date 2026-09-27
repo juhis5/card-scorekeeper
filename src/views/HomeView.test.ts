@@ -4,8 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import HomeView from './HomeView.vue'
 import { i18n } from '@/i18n'
-import { rememberRoom } from '@/lib/last-room'
-import { LocalGameRepository } from '@/lib/local-repository'
+import { rememberRoom } from '@/lib/data/last-room'
+import { LocalGameRepository } from '@/lib/data/local-repository'
 
 const blank = { template: '<div />' }
 

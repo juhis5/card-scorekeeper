@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import StatsView from './StatsView.vue'
 import { i18n } from '@/i18n'
-import type { GamePlayer } from '@/lib/types'
+import type { GamePlayer } from '@/lib/game/types'
 
 /**
  * StatsView delegates all Firestore I/O to `useStatsStore` (see stores/stats.test.ts for the
@@ -16,7 +16,7 @@ import type { GamePlayer } from '@/lib/types'
 const ensureSignedInMock = vi.fn()
 const getDbMock = vi.fn(() => ({}))
 
-vi.mock('@/lib/firebase', () => ({
+vi.mock('@/lib/data/firebase', () => ({
   getDb: () => getDbMock(),
   getFirebaseAuth: () => ({}),
   ensureSignedIn: () => ensureSignedInMock(),

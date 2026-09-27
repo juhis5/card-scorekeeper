@@ -20,9 +20,9 @@ import {
   getFirestore,
   type Firestore,
 } from 'firebase/firestore'
-import { FirestoreGameRepository } from '@/lib/firestore-repository'
-import { NameTakenError } from '@/lib/player-names'
-import type { ContractRoundNumber, GameState } from '@/lib/types'
+import { FirestoreGameRepository } from '@/lib/data/firestore-repository'
+import { NameTakenError } from '@/lib/game/player-names'
+import type { ContractRoundNumber, GameState } from '@/lib/game/types'
 
 const FIRESTORE_EMULATOR_PORT = 8280
 const AUTH_EMULATOR_PORT = 9299

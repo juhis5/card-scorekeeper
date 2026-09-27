@@ -9,7 +9,7 @@ import router from './router'
 import { i18n } from './i18n'
 import { useIdentityStore } from './stores/identity'
 import { useInstallStore } from './stores/install'
-import { flushPendingResultsOnLaunch } from './lib/reconnect-flush'
+import { flushPendingResultsOnLaunch } from './lib/data/reconnect-flush'
 
 const app = createApp(App)
 const pinia = createPinia()

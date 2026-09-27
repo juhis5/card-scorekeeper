@@ -10,7 +10,7 @@
  * scrolling (the toolbars sliding in and out): the page jumped back mid-scroll (third playtest).
  */
 import type { Ref } from 'vue'
-import { scrollToReveal, scrollToTop, type VerticalBox } from '@/lib/keep-in-view'
+import { scrollToReveal, scrollToTop, type VerticalBox } from '@/lib/platform/keep-in-view'
 
 function isTouchScreen(): boolean {
   return window.matchMedia?.('(pointer: coarse)').matches ?? false

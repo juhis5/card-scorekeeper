@@ -10,8 +10,8 @@
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import HeadToHeadList from '@/components/HeadToHeadList.vue'
-import StatSummary from '@/components/StatSummary.vue'
+import HeadToHeadList from '@/components/stats/HeadToHeadList.vue'
+import StatSummary from '@/components/stats/StatSummary.vue'
 import { Button } from '@/components/ui/button'
 import { useStatsStore } from '@/stores/stats'
 

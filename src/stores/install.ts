@@ -6,7 +6,7 @@
  */
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { installGuideFor, type DeviceHints, type InstallGuide } from '@/lib/install-guide'
+import { installGuideFor, type DeviceHints, type InstallGuide } from '@/lib/platform/install-guide'
 
 /** Chromium only, so not in the DOM types. */
 interface BeforeInstallPromptEvent extends Event {

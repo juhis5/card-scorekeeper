@@ -32,7 +32,7 @@ Spec: https://www.conventionalcommits.org/en/v1.0.0/ — format `type(scope): su
 
 Wire after the first `pnpm install` (needs `package.json`). Install latest: `pnpm add -D husky lint-staged @commitlint/cli @commitlint/config-conventional`, then `pnpm exec husky init`.
 
-- **`commit-msg`** → `commitlint` — rejects non-conventional messages. `commitlint.config.js` extends `@commitlint/config-conventional`.
+- **`commit-msg`** → `commitlint` — rejects non-conventional messages. The `commitlint` key in `package.json` extends `@commitlint/config-conventional`.
 - **`pre-commit`** → `lint-staged` — `prettier --write` + `eslint --fix` on staged files only (fast).
 - **`pre-push`** → `vue-tsc` (typecheck) + `vitest run` (unit). **This is where flaky tests bite — fix them (see `tdd`), never bypass with `--no-verify`.**
 - These run for *any* committer/tool; separate from the Claude Code Prettier PostToolUse hook (which formats as Claude edits).

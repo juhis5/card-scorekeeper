@@ -32,15 +32,15 @@
  * A plain composable (no reactive state of its own) — tests mock this whole module rather than
  * the Firebase/Firestore modules it wires together (see the tdd skill's "mock at the boundary").
  */
-import { probeBackendReachable } from '@/lib/connectivity'
-import { createHostRepository, createJoinRepository } from '@/lib/game-mode'
-import type { HostGameMode, JoinGameMode } from '@/lib/game-mode'
-import { LocalGameRepository } from '@/lib/local-repository'
-import type { ResumableGameRepository } from '@/lib/repository'
+import { probeBackendReachable } from '@/lib/platform/connectivity'
+import { createHostRepository, createJoinRepository } from '@/lib/data/game-mode'
+import type { HostGameMode, JoinGameMode } from '@/lib/data/game-mode'
+import { LocalGameRepository } from '@/lib/data/local-repository'
+import type { ResumableGameRepository } from '@/lib/data/repository'
 
 async function loadFirebase() {
   const [{ getFirebaseAuth, getDb, checkBackendReachable }, { FirestoreGameRepository }] =
-    await Promise.all([import('@/lib/firebase'), import('@/lib/firestore-repository')])
+    await Promise.all([import('@/lib/data/firebase'), import('@/lib/data/firestore-repository')])
   // Calling the getters here (not passing them through unevaluated) means a bad config's
   // synchronous throw happens inside this async function — i.e. as a rejection of the promise
   // both callers below already wrap in try/catch — rather than leaking a raw exception.

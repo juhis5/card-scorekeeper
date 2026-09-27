@@ -5,10 +5,10 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import RoomView from './RoomView.vue'
 import { useGameStore } from '@/stores/game'
-import { LocalGameRepository } from '@/lib/local-repository'
-import type { KeyValueStorage } from '@/lib/local-repository'
-import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
-import { runningTotal } from '@/lib/rules'
+import { LocalGameRepository } from '@/lib/data/local-repository'
+import type { KeyValueStorage } from '@/lib/data/local-repository'
+import { LOCAL_GAME_ROUTE_CODE } from '@/lib/data/local-game-route'
+import { runningTotal } from '@/lib/game/rules'
 import { i18n } from '@/i18n'
 import type {
   AddGuestInput,
@@ -20,8 +20,8 @@ import type {
   Seat,
   SetRoundScoreInput,
   Unsubscribe,
-} from '@/lib/repository'
-import type { ContractRoundNumber, GameResult, GameState } from '@/lib/types'
+} from '@/lib/data/repository'
+import type { ContractRoundNumber, GameResult, GameState } from '@/lib/game/types'
 
 // RoomView resumes an online room after a reload through this seam; tests hand it a fake room.
 const { resumeRepository } = vi.hoisted(() => ({ resumeRepository: vi.fn() }))

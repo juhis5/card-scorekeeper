@@ -698,3 +698,13 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     `apple-mobile-web-app-title` for the iPhone home screen).
   - The tester's iPhone case can only be checked on the phone: the steps are for iOS 16.4 and
     later.
+- 2026-09-28 — Folders (fourth round: "many files at the top level", "all files on one level"):
+  - `src/` keeps its layers, each split by area: `components/{home,room,header,menu,stats,rules}`
+    and `lib/{game,data,platform}`. `lib/utils.ts` stays put because the shadcn CLI imports it there.
+  - The repo root keeps only what tools look for there. The rules files moved to `firebase/`, the
+    Playwright specs and config to `tests/e2e/`, and `env.d.ts` to `src/`. commitlint's config
+    moved into `package.json`. One `vitest.config.ts` now has a project per suite (`unit`, `api`,
+    `rules`, `integration`) in place of three config files. `tsconfig.api.json` stays at the root:
+    moved into `api/`, Vercel would build the function with it and treat any other file there as
+    a function.
+  - CI runs e2e with 3 workers instead of 1 (each test makes its own rooms): about half the time.

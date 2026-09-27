@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/vue'
 import RulesView from './RulesView.vue'
 import { i18n, setLocale } from '@/i18n'
-import { ACE_VALUE, CONTRACTS, JOKER_VALUE, LOW_NUMBER_CARD_VALUE } from '@/lib/rules'
+import { ACE_VALUE, CONTRACTS, JOKER_VALUE, LOW_NUMBER_CARD_VALUE } from '@/lib/game/rules'
 
 beforeEach(() => {
   localStorage.clear()

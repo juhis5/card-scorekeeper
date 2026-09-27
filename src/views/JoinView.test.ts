@@ -5,7 +5,7 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import JoinView from './JoinView.vue'
 import { i18n } from '@/i18n'
-import type { RoomAvailability, Seat } from '@/lib/repository'
+import type { RoomAvailability, Seat } from '@/lib/data/repository'
 
 const { resumeRepository, joinRepository } = vi.hoisted(() => ({
   resumeRepository: vi.fn(),
