@@ -48,6 +48,7 @@ Current Gemini Flash model (e.g. `gemini-2.5-flash` — verify current name/pric
 
 - number cards 2–9 = 5, 10 = 10, J/Q/K = 10, **Ace = 15**, **Joker = 25**.
 - Return one entry per detected card with `rank`, `suit` (null for Joker), `value`, plus the summed `total`.
+- The game uses **2 (sometimes 3) decks**, so identical cards (same rank + suit) and several Jokers are normal. Tell the model to list every physical card and never merge look-alikes; never dedupe or cap copies server-side.
 - Cards laid flat and non-overlapping read far better than a fan — the UI should tell players this.
 
 ## Response handling & accuracy

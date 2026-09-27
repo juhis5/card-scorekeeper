@@ -64,14 +64,17 @@ const RESPONSE_SCHEMA: Schema = {
 /** Encodes the Rommi (Finnish Rummy) leftover-card values (see src/lib/rules.ts) so the model
  * reads photographed cards the same way manual entry scores them. The `rank` token contract is
  * spelled out explicitly (not just implied by "Jack, Queen, King...") — a model left to describe
- * cards in prose would write "King"/"Ace" and fail the schema/validator on nearly every hand. */
+ * cards in prose would write "King"/"Ace" and fail the schema/validator on nearly every hand.
+ * The multi-deck line matters too: without it, "count each card once" invites the model to
+ * collapse two identical 7♥ into one and under-count the hand. */
 const PROMPT = `You are reading a photo of leftover playing cards at the end of a round of Finnish Rummy (Rommi). Identify every visible card and score it using these exact point values:
 - Number cards 2-9 are worth 5 points each. 10 is worth 10.
 - Jack, Queen, and King are each worth 10.
 - Ace is worth 15.
 - Joker is worth 25 and has no suit.
 For "rank", output EXACTLY one of these tokens: ${RANK_TOKENS.join(', ')} — use J, Q, K, A (never "Jack", "Queen", "King", "Ace" as words).
-Return one entry per detected card with its rank, suit ("clubs", "diamonds", "hearts", "spades", or null for a Joker), and value, plus the summed total across all cards. The cards are laid flat and non-overlapping — count each one exactly once.`
+The game is played with two or three decks shuffled together, so the same card (same rank AND suit) can appear more than once, and there can be several Jokers. Every physical card is its own entry — never merge identical-looking cards into one.
+Return one entry per detected card with its rank, suit ("clubs", "diamonds", "hearts", "spades", or null for a Joker), and value, plus the summed total across all cards. The cards are laid flat and non-overlapping — count each physical card exactly once.`
 
 export interface GeminiClient {
   /** Returns the model's raw response text (expected to be JSON per the response schema above) —

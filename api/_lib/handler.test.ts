@@ -53,7 +53,7 @@ describe('handleCountRequest', () => {
     const result = await handleCountRequest(validRequest(), deps)
 
     expect(result.status).toBe(200)
-    expect(result.body).toEqual({ cards: [{ rank: '4', suit: 'diamonds', value: 4 }], total: 4 })
+    expect(result.body).toEqual({ cards: [{ rank: '4', suit: 'diamonds', value: 5 }], total: 5 })
     expect(deps.getRoomSnapshot).toHaveBeenCalledWith('ABCD', 'player-1')
   })
 

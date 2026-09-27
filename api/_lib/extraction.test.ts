@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { buildExtractionResult, parseModelCards, parseModelOutput } from './extraction'
+import type { Card } from '../../src/lib/types'
 
 describe('parseModelCards', () => {
   it('parses a well-formed cards array', () => {
@@ -16,6 +17,23 @@ describe('parseModelCards', () => {
       { rank: '4', suit: 'diamonds' },
       { rank: 'K', suit: 'spades' },
       { rank: 'A', suit: 'hearts' },
+      { rank: 'Joker', suit: null },
+    ])
+  })
+
+  it('keeps repeated identical cards — Rommi is played with 2–3 decks, so duplicates are real', () => {
+    const raw = {
+      cards: [
+        { rank: '7', suit: 'hearts', value: 5 },
+        { rank: '7', suit: 'hearts', value: 5 },
+        { rank: 'Joker', suit: null, value: 25 },
+        { rank: 'Joker', suit: null, value: 25 },
+      ],
+    }
+    expect(parseModelCards(raw)).toEqual([
+      { rank: '7', suit: 'hearts' },
+      { rank: '7', suit: 'hearts' },
+      { rank: 'Joker', suit: null },
       { rank: 'Joker', suit: null },
     ])
   })
@@ -108,5 +126,15 @@ describe('buildExtractionResult', () => {
     // recompute contract directly: buildExtractionResult only ever trusts rank/suit.
     const cards = [{ rank: '2' as const, suit: 'clubs' as const }]
     expect(buildExtractionResult(cards).cards[0]).toEqual({ rank: '2', suit: 'clubs', value: 5 })
+  })
+
+  it('scores every copy of a repeated card toward the total', () => {
+    const cards: Card[] = [
+      { rank: '7', suit: 'hearts' },
+      { rank: '7', suit: 'hearts' },
+      { rank: 'Joker', suit: null },
+      { rank: 'Joker', suit: null },
+    ]
+    expect(buildExtractionResult(cards).total).toBe(60)
   })
 })
