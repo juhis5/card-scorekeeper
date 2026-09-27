@@ -83,6 +83,23 @@ export function isEveryRoundScored(
   )
 }
 
+/** Rounds so far where more than one seated player has 0. Only the player who went out scores
+ * nothing, so such a round has a typo in it, and Next waits until it's fixed. */
+export function roundsWithSeveralZeros(
+  playerIds: string[],
+  roundScores: RoundScore[],
+  throughRound: ContractRoundNumber,
+): ContractRoundNumber[] {
+  const seated = new Set(playerIds)
+  return CONTRACTS.map((contract) => contract.round).filter(
+    (round) =>
+      round <= throughRound &&
+      roundScores.filter(
+        (score) => score.round === round && score.points === 0 && seated.has(score.playerId),
+      ).length > 1,
+  )
+}
+
 /** Rounds whose scores are settled: those before the current one, or all of them once the game
  * is finished. The scoreboard marks a leader only after the first one. */
 export function completedRounds(currentRound: ContractRoundNumber, status: GameStatus): number {

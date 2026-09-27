@@ -708,3 +708,15 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     moved into `api/`, Vercel would build the function with it and treat any other file there as
     a function.
   - CI runs e2e with 3 workers instead of 1 (each test makes its own rooms): about half the time.
+- 2026-09-28 — Small fixes (fourth round):
+  - The scroll bar was always there because every view was `min-h-dvh` under a sticky header
+    3.25rem tall. The app frame is now the full-height flex column, and each view `flex-1`.
+  - Home: no "Katso tilastosi" (the menu has Tilastot). The header shows "Rommi" on Home, and the
+    app is called "Rommi" everywhere (menu title, page title).
+  - A round can't have two zeros: only the player who went out scores nothing
+    (`roundsWithSeveralZeros` in `lib/game/rules.ts`). While any round so far has more than one
+    0, Next and Finish stay disabled and the host sees which round to check. The rule is "at most
+    one", not "exactly one".
+  - "Vain tällä puhelimella" under Uusi peli starts a game on this device without checking the
+    connection, for a table where nobody else has a phone. Off by default; the device remembers
+    the choice (`this-phone-only` in localStorage).

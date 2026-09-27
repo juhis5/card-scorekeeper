@@ -28,7 +28,13 @@ import { Button } from '@/components/ui/button'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/data/local-game-route'
-import { isEveryRoundScored, missingRounds, pointsFor, TOTAL_ROUNDS } from '@/lib/game/rules'
+import {
+  isEveryRoundScored,
+  missingRounds,
+  pointsFor,
+  roundsWithSeveralZeros,
+  TOTAL_ROUNDS,
+} from '@/lib/game/rules'
 import { isPermissionDenied } from '@/lib/data/write-errors'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/data/repository'
@@ -135,6 +141,19 @@ const allPlayersScored = computed(() =>
     currentRound.value,
   ),
 )
+const roundsToCheck = computed(() =>
+  roundsWithSeveralZeros(
+    standings.value.map((standing) => standing.player.id),
+    roundScores.value,
+    currentRound.value,
+  ),
+)
+const roundsToCheckText = computed(() =>
+  new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
+    roundsToCheck.value.map((round) => n(round)),
+  ),
+)
+const canAdvance = computed(() => allPlayersScored.value && roundsToCheck.value.length === 0)
 
 // Card points come from the synced `roundScores`, not view-local commits: online, other devices'
 // scores only ever arrive through the subscription, and a host correction must show up too.
@@ -318,7 +337,7 @@ async function handleRemovePlayer(player: Player): Promise<void> {
 async function isReadyToAdvance(): Promise<boolean> {
   await pendingSave
   isWaitingHintShown.value = !allPlayersScored.value
-  return allPlayersScored.value
+  return canAdvance.value
 }
 
 async function handleNextRound(): Promise<void> {
@@ -398,7 +417,7 @@ onMounted(async () => {
   <!-- On a touch screen an open card needs room to scroll up under the header, even the last
        one, so the page gets space below while a card is open (see useKeepInView). -->
   <main
-    class="group/room mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4 pointer-coarse:has-[[data-card-open]]:pb-(--open-card-room)"
+    class="group/room mx-auto flex w-full max-w-md flex-1 flex-col gap-4 p-4 pointer-coarse:has-[[data-card-open]]:pb-(--open-card-room)"
   >
     <!-- One heading for every state: navigation focuses it before the room's first snapshot
          arrives, and a new element per state would drop that focus when the room opens. While a
@@ -555,6 +574,9 @@ onMounted(async () => {
       >
         {{ t('room.next.waiting', { names: waitingForNames }) }}
       </p>
+      <p v-if="isHost && roundsToCheck.length > 0" role="status" class="text-destructive text-sm">
+        {{ t('room.next.severalZeros', { rounds: roundsToCheckText }) }}
+      </p>
 
       <!-- The bottom bars stick to the bottom of the screen, except while a card is open: with
            the keyboard up the phone shows them right above it, on top of the field being typed
@@ -576,7 +598,7 @@ onMounted(async () => {
         <Button
           v-if="!isFinalRound"
           class="h-11 flex-1 aria-disabled:opacity-50"
-          :aria-disabled="!allPlayersScored"
+          :aria-disabled="!canAdvance"
           :disabled="isAdvancing"
           @click="handleNextRound"
         >
@@ -585,7 +607,7 @@ onMounted(async () => {
         <Button
           v-else
           class="h-11 flex-1 aria-disabled:opacity-50"
-          :aria-disabled="!allPlayersScored"
+          :aria-disabled="!canAdvance"
           :disabled="isFinishing"
           @click="handleFinish"
         >

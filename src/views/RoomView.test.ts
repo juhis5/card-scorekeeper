@@ -351,6 +351,24 @@ describe('RoomView moving to the next round', () => {
     expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
   })
 
+  it('keeps Next disabled while more than one player has 0 in a round, and says why', async () => {
+    await startWithAlice()
+    await renderRoom()
+    await enterScore('Host', 1, 0)
+    await enterScore('Alice', 1, 0)
+    const nextButton = () => screen.getByRole('button', { name: 'Next round' })
+
+    expect(nextButton().getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByText('Only one player can score 0 in a round. Check round 1.')).toBeTruthy()
+    await fireEvent.click(nextButton())
+    await flushPromises()
+    expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
+
+    await enterScore('Alice', 1, 15)
+    expect(nextButton().getAttribute('aria-disabled')).toBe('false')
+    expect(screen.queryByText(/Only one player can score 0/)).toBeNull()
+  })
+
   it('announces the revealed results, your place and the next contract in one message', async () => {
     await startWithAlice()
     const { container } = await renderRoom()

@@ -37,7 +37,7 @@ const canContinueLocalGame = computed(
 
 <template>
   <main
-    class="bg-background text-foreground mx-auto flex min-h-dvh w-full max-w-md flex-col gap-6 p-4"
+    class="bg-background text-foreground mx-auto flex w-full max-w-md flex-1 flex-col gap-6 p-4"
   >
     <!-- For screen readers only: navigation focuses and announces it, but on a phone the forms
          matter more than a title (second playtest). -->
@@ -87,11 +87,5 @@ const canContinueLocalGame = computed(
       <JoinGame v-if="mode === 'join'" v-model:name="playerName" />
       <GameSetup v-else v-model:name="playerName" />
     </Card>
-    <RouterLink
-      :to="{ name: 'stats' }"
-      class="text-muted-foreground hover:text-foreground flex h-11 items-center justify-center self-center text-sm underline underline-offset-4"
-    >
-      {{ t('home.statsLink') }}
-    </RouterLink>
   </main>
 </template>

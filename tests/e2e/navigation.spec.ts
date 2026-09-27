@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { openFromMenu, startLocalGame } from './helpers'
 
 function homeHeading(page: Page) {
-  return page.getByRole('heading', { level: 1, name: 'Rommi Scorekeeper' })
+  return page.getByRole('heading', { level: 1, name: 'Rommi' })
 }
 
 function backButton(page: Page) {

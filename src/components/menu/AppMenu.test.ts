@@ -42,7 +42,7 @@ describe('AppMenu', () => {
 
     await openMenu()
 
-    const panel = screen.getByRole('dialog', { name: 'Rommi Scorekeeper' })
+    const panel = screen.getByRole('dialog', { name: 'Rommi' })
     expect(panel).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Stats' })).toBeTruthy()

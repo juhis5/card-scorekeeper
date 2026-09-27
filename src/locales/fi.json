@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "Rommi-pisteet",
+    "title": "Rommi",
     "theme": {
       "label": "Tumma tila"
     },
@@ -47,8 +47,7 @@
     "round5": "Kaksi värisuoraa ja yksi kolmen sarja"
   },
   "home": {
-    "heading": "Rommi-pisteet",
-    "statsLink": "Katso tilastosi",
+    "heading": "Rommi",
     "play": {
       "label": "Pelaa",
       "join": "Liity",
@@ -61,7 +60,9 @@
       "replaceConfirm": "Aloitetaanko uusi peli? Tällä laitteella kesken oleva peli menetetään.",
       "replaceStart": "Aloita uusi peli",
       "replaceKeep": "Jatka peliä",
-      "hint": "Muut lisäät pelissä, tai he liittyvät huonekoodilla."
+      "hint": "Muut lisäät pelissä, tai he liittyvät huonekoodilla.",
+      "thisPhoneOnly": "Vain tällä puhelimella",
+      "thisPhoneOnlyHint": "Kaikkien pisteet syötetään tällä puhelimella, eikä kukaan liity. Toimii ilman yhteyttä."
     },
     "join": {
       "roomCodeLabel": "Huonekoodi",
@@ -177,7 +178,8 @@
     },
     "next": {
       "button": "Seuraava kierros",
-      "waiting": "Odotetaan vielä pisteitä: {names}."
+      "waiting": "Odotetaan vielä pisteitä: {names}.",
+      "severalZeros": "Vain yksi pelaaja voi saada kierroksella 0 pistettä. Tarkista kierros {rounds}."
     },
     "finish": {
       "button": "Päätä peli"
