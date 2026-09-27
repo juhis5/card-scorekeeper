@@ -43,6 +43,8 @@ jobs:
           java-version: '21' # matches local (see docs/TOOLCHAIN.md); emulator JAR needs a JDK
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:rules # firebase emulators:exec 'vitest run --config vitest.rules.config.ts'
-      # NOTE: test:e2e (Playwright + emulator + app server) and test:integration are intentionally
-      # NOT in CI — run locally (see docs/BUILD_REPORT.md). test:e2e's live-sync spec excludes
-      # Playwright-WebKit (documented flake); test:integration is a documented emulator cold-boot flake.
+      # Real client SDK (browser build) vs the emulator — see vitest.integration.config.ts.
+      - run: pnpm test:integration
+      # NOTE: test:e2e (Playwright + emulator + app server) is intentionally NOT in CI — run
+      # locally (see docs/BUILD_REPORT.md). Its live-sync spec excludes Playwright-WebKit
+      # (documented flake).
