@@ -7,7 +7,7 @@ describe('parseModelCards', () => {
   it('parses a well-formed cards array', () => {
     const raw = {
       cards: [
-        { rank: '4', suit: 'diamonds', value: 4 },
+        { rank: '4', suit: 'diamonds', value: 5 },
         { rank: 'K', suit: 'spades', value: 10 },
         { rank: 'A', suit: 'hearts', value: 15 },
         { rank: 'Joker', suit: null, value: 25 },
@@ -61,11 +61,11 @@ describe('parseModelCards', () => {
   })
 
   it('rejects an unrecognized suit', () => {
-    expect(parseModelCards({ cards: [{ rank: '4', suit: 'stars', value: 4 }] })).toBeNull()
+    expect(parseModelCards({ cards: [{ rank: '4', suit: 'stars', value: 5 }] })).toBeNull()
   })
 
   it('rejects a non-Joker card with a null suit', () => {
-    expect(parseModelCards({ cards: [{ rank: '4', suit: null, value: 4 }] })).toBeNull()
+    expect(parseModelCards({ cards: [{ rank: '4', suit: null, value: 5 }] })).toBeNull()
   })
 
   it('rejects a Joker with a non-null suit', () => {
@@ -75,7 +75,7 @@ describe('parseModelCards', () => {
   it('rejects the whole batch if any single card is malformed', () => {
     const raw = {
       cards: [
-        { rank: '4', suit: 'diamonds', value: 4 },
+        { rank: '4', suit: 'diamonds', value: 5 },
         { rank: 'not-a-rank', suit: 'clubs', value: 1 },
       ],
     }
@@ -85,7 +85,7 @@ describe('parseModelCards', () => {
 
 describe('parseModelOutput', () => {
   it('parses valid JSON text into cards', () => {
-    const text = JSON.stringify({ cards: [{ rank: '4', suit: 'diamonds', value: 4 }] })
+    const text = JSON.stringify({ cards: [{ rank: '4', suit: 'diamonds', value: 5 }] })
     expect(parseModelOutput(text)).toEqual([{ rank: '4', suit: 'diamonds' }])
   })
 
