@@ -12,7 +12,12 @@ declare module 'vue-router' {
     requiresIdentity?: boolean
     /** i18n key for this route's heading, announced via a polite live region on navigation. */
     announceKey?:
-      'home.heading' | 'room.heading' | 'join.announce' | 'stats.heading' | 'notFound.heading'
+      | 'home.heading'
+      | 'room.heading'
+      | 'join.announce'
+      | 'rules.heading'
+      | 'stats.heading'
+      | 'notFound.heading'
   }
 }
 
@@ -40,6 +45,12 @@ const router = createRouter({
       name: 'join',
       component: () => import('@/views/JoinView.vue'),
       meta: { requiresIdentity: true, announceKey: 'join.announce' },
+    },
+    {
+      path: '/rules',
+      name: 'rules',
+      component: () => import('@/views/RulesView.vue'),
+      meta: { announceKey: 'rules.heading' },
     },
     {
       path: '/stats',

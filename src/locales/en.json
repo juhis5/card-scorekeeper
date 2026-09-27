@@ -294,5 +294,61 @@
     "missing": "There is no room {code}. Check the code.",
     "invalid": "That link doesn't have a room code in it.",
     "toHome": "Back to home"
+  },
+  "rules": {
+    "heading": "Rules",
+    "intro": "A game has five rounds. Each round has its own contract: the melds you must lay down. At the end of a round, the cards left in your hand count as points. The lowest total after five rounds wins.",
+    "rounds": {
+      "heading": "Rounds",
+      "hint": "Meet the contract before laying any cards down."
+    },
+    "melds": {
+      "heading": "Melds",
+      "set": "Set of three: three or more cards of the same rank. Suits may repeat, since the game uses 2–3 decks.",
+      "straight": "Flush: four or more cards in a row, all of one suit.",
+      "aceLow": "An ace can start a flush, counting as 1.",
+      "aceHigh": "Or end one, counting as 14.",
+      "noWrap": "But not both at once: a flush never runs from king through ace to two.",
+      "joker": "A joker stands in for any missing card.",
+      "counts": "counts",
+      "doesNotCount": "doesn't count"
+    },
+    "points": {
+      "heading": "Points",
+      "hint": "Every card left in your hand costs points. A round's points are always a multiple of 5.",
+      "card": "Card",
+      "value": "Points",
+      "low": "2–9",
+      "ten": "10",
+      "face": "Jack, queen, king",
+      "ace": "Ace",
+      "joker": "Joker",
+      "amount": "{points} pts"
+    },
+    "card": {
+      "name": "{rank} of {suit}",
+      "joker": "joker"
+    },
+    "suit": {
+      "hearts": "hearts",
+      "diamonds": "diamonds",
+      "clubs": "clubs",
+      "spades": "spades"
+    },
+    "rank": {
+      "A": "ace",
+      "2": "two",
+      "3": "three",
+      "4": "four",
+      "5": "five",
+      "6": "six",
+      "7": "seven",
+      "8": "eight",
+      "9": "nine",
+      "10": "ten",
+      "J": "jack",
+      "Q": "queen",
+      "K": "king"
+    }
   }
 }

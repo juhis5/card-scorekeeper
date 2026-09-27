@@ -26,6 +26,14 @@ test.describe('Back and Continue game', () => {
     await expect(homeHeading(page)).toBeVisible()
   })
 
+  test('the menu opens the rules, which work without a game', async ({ page }) => {
+    await page.goto('/')
+    await openFromMenu(page, 'Rules')
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Rules' })).toBeVisible()
+    await expect(page.getByRole('img', { name: 'joker' })).toBeVisible()
+  })
+
   test('Back from a page opened directly goes Home instead of leaving the app', async ({
     page,
   }) => {
