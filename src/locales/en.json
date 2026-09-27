@@ -14,7 +14,8 @@
     }
   },
   "nav": {
-    "stats": "Stats"
+    "stats": "Stats",
+    "back": "Back"
   },
   "contract": {
     "round1": "Two sets of three",
@@ -38,7 +39,10 @@
       "removeLabel": "Remove player {number}",
       "addPlayerButton": "Add player",
       "startButton": "Start game",
-      "checkingConnection": "Checking connection…"
+      "checkingConnection": "Checking connection…",
+      "replaceConfirm": "Start a new game? The game in progress on this device will be lost.",
+      "replaceStart": "Start new game",
+      "replaceKeep": "Keep playing"
     },
     "join": {
       "heading": "Join a game",
@@ -56,6 +60,11 @@
       "hostNameRequired": "Enter your name to continue.",
       "otherPlayersRequired": "Add at least one other player.",
       "startFailed": "Couldn't start the game. Try again."
+    },
+    "continue": {
+      "heading": "Game in progress",
+      "room": "Continue room {code}",
+      "local": "Continue the game on this device"
     }
   },
   "room": {

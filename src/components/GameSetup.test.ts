@@ -92,6 +92,7 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 beforeEach(() => {
   setActivePinia(createPinia())
   hostRepository.mockReset()
+  localStorage.clear()
 })
 
 describe('GameSetup name fields', () => {
@@ -155,6 +156,72 @@ describe('GameSetup hosting offline (backend unreachable)', () => {
     expect(router.currentRoute.value.name).toBe('room')
     expect(router.currentRoute.value.params.code).toBe('local')
     expect(game.standings.map((standing) => standing.player.name).sort()).toEqual(['Alice', 'Juho'])
+  })
+})
+
+describe('GameSetup with a local game already in progress', () => {
+  async function startLocalGameInProgress(): Promise<void> {
+    // The real browser storage: the game a new local game would overwrite lives there.
+    await new LocalGameRepository().createGame({
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Earlier host',
+    })
+  }
+
+  async function submitOfflineGame(): Promise<void> {
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Alice')
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+  }
+
+  it('asks before a new local game replaces it, and keeps it if you say so', async () => {
+    await startLocalGameInProgress()
+    hostRepository.mockResolvedValue(offlineMode())
+    const router = renderGameSetup()
+    const game = useGameStore()
+
+    await submitOfflineGame()
+    expect(
+      screen.getByText('Start a new game? The game in progress on this device will be lost.'),
+    ).toBeTruthy()
+    expect(game.gameId).toBeNull()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Keep playing' }))
+    await flushPromises()
+
+    expect(router.currentRoute.value.params.code).toBe('local')
+    expect(game.gameId).toBeNull()
+  })
+
+  it('starts the new game once you confirm', async () => {
+    await startLocalGameInProgress()
+    hostRepository.mockResolvedValue(offlineMode())
+    const router = renderGameSetup()
+    const game = useGameStore()
+
+    await submitOfflineGame()
+    await fireEvent.click(screen.getByRole('button', { name: 'Start new game' }))
+    await flushPromises()
+
+    expect(router.currentRoute.value.params.code).toBe('local')
+    expect(game.standings.map((standing) => standing.player.name).sort()).toEqual(['Alice', 'Juho'])
+  })
+
+  it('never asks when the new game is online, since that one stays on this device', async () => {
+    await startLocalGameInProgress()
+    hostRepository.mockResolvedValue({
+      kind: 'online',
+      repository: makeFakeOnlineRepository('7K4RQ'),
+    })
+    const router = renderGameSetup()
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+
+    expect(screen.queryByText(/will be lost/)).toBeNull()
+    expect(router.currentRoute.value.params.code).toBe('7K4RQ')
   })
 })
 

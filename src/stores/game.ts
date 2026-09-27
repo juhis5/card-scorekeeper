@@ -20,6 +20,7 @@ import {
   winners as winnersFor,
 } from '@/lib/rules'
 import { hasPersistedGame, LocalGameRepository } from '@/lib/local-repository'
+import { forgetRoom, rememberRoom } from '@/lib/last-room'
 import { boardRows } from '@/lib/scoreboard'
 import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
@@ -65,9 +66,12 @@ export const useGameStore = defineStore('game', () => {
     unsubscribe = repo.subscribe(
       (next) => {
         state.value = next
+        // Nothing left to continue: Home stops offering this room.
+        if (next.status === 'finished' && roomCode.value) forgetRoom(roomCode.value)
       },
       (error) => {
         connectionError.value = isPermissionDenied(error) ? 'removed' : 'lost'
+        if (connectionError.value === 'removed' && roomCode.value) forgetRoom(roomCode.value)
       },
     )
   }
@@ -122,6 +126,7 @@ export const useGameStore = defineStore('game', () => {
     roomCode.value = created.roomCode
     isHost.value = true
     myPlayerId.value = created.hostPlayerId
+    if (created.roomCode) rememberRoom(created.roomCode)
     followRoom(repo)
   }
 
@@ -145,6 +150,7 @@ export const useGameStore = defineStore('game', () => {
     isHost.value = false
     const playerId = await repo.addPlayer(player)
     myPlayerId.value = playerId
+    rememberRoom(code)
     // The host rejoining their own room by code is still its host.
     if (isResumable(repo)) isHost.value = (await repo.findSeat())?.isHost ?? false
     followRoom(repo)

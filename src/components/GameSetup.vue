@@ -14,7 +14,7 @@
  * other player" is enforced only once we learn we're local — never blocking an online host from
  * starting solo and waiting for joiners.
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Plus, X } from '@lucide/vue'
@@ -26,6 +26,7 @@ import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
+import { hasUnfinishedPersistedGame } from '@/lib/local-repository'
 import type { HostGameMode } from '@/lib/game-mode'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
 
@@ -47,6 +48,11 @@ const areOtherPlayersInvalid = ref(false)
 const isSubmitting = ref(false)
 const isCheckingConnection = ref(false)
 const submitError = ref('')
+/** A local game waiting for "Start new game": starting it would overwrite the unfinished local
+ * game on this device, so the host is asked first (online games never touch that one). */
+const pendingReplaceMode = ref<HostGameMode | null>(null)
+let hasConfirmedReplace = false
+const keepPlayingButton = useTemplateRef<InstanceType<typeof Button>>('keepPlaying')
 
 const trimmedHostName = computed(() => hostName.value.trim())
 const namedOtherPlayers = computed(() =>
@@ -93,11 +99,38 @@ async function startOrFallBack(mode: HostGameMode): Promise<void> {
     areOtherPlayersInvalid.value = true
     return
   }
+  if (mode.kind === 'offline' && !hasConfirmedReplace && hasUnfinishedPersistedGame()) {
+    pendingReplaceMode.value = mode
+    await nextTick()
+    const element: unknown = keepPlayingButton.value?.$el
+    if (element instanceof HTMLElement) element.focus()
+    return
+  }
   try {
     await startGame(mode)
   } catch (error) {
     if (mode.kind !== 'online') throw error
     await startOrFallBack(localRepository())
+  }
+}
+
+async function keepPlaying(): Promise<void> {
+  pendingReplaceMode.value = null
+  await router.push({ name: 'room', params: { code: LOCAL_GAME_ROUTE_CODE } })
+}
+
+async function replaceLocalGame(): Promise<void> {
+  const mode = pendingReplaceMode.value
+  if (!mode) return
+  pendingReplaceMode.value = null
+  hasConfirmedReplace = true
+  isSubmitting.value = true
+  try {
+    await startOrFallBack(mode)
+  } catch {
+    submitError.value = t('home.errors.startFailed')
+  } finally {
+    isSubmitting.value = false
   }
 }
 
@@ -195,7 +228,35 @@ async function handleSubmit(): Promise<void> {
           {{ t('home.form.checkingConnection') }}
         </p>
         <p v-if="submitError" role="alert" class="text-destructive text-sm">{{ submitError }}</p>
+        <div
+          v-if="pendingReplaceMode"
+          role="group"
+          :aria-label="t('home.form.replaceConfirm')"
+          class="flex w-full flex-col gap-2"
+        >
+          <p class="text-foreground text-sm">{{ t('home.form.replaceConfirm') }}</p>
+          <div class="flex gap-2">
+            <Button
+              ref="keepPlaying"
+              type="button"
+              variant="outline"
+              class="h-11 flex-1"
+              @click="keepPlaying"
+            >
+              {{ t('home.form.replaceKeep') }}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              class="text-destructive border-destructive h-11 flex-1"
+              @click="replaceLocalGame"
+            >
+              {{ t('home.form.replaceStart') }}
+            </Button>
+          </div>
+        </div>
         <Button
+          v-else
           type="submit"
           class="h-11 w-full"
           :disabled="isSubmitting"

@@ -4,12 +4,14 @@ import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChartColumn, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import BackButton from '@/components/BackButton.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import LocaleToggle from '@/components/LocaleToggle.vue'
 import { useServiceWorker } from '@/composables/useServiceWorker'
 
 const route = useRoute()
 const { t } = useI18n()
+const isHome = computed(() => route.name === 'home')
 
 // Announces the active view's heading on every navigation — SPA route changes are otherwise
 // silent to screen readers (see a11y-mobile + routing skills). Focus itself moves to the
@@ -40,20 +42,23 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
 
     <!-- Persistent chrome (see the routing skill): reachable from every route, incl. mid-game,
          since stats are a device-wide record, not tied to any one room. -->
-    <header class="mx-auto flex w-full max-w-md items-center justify-between px-4 pt-2">
+    <!-- At 360px the full header (Back, title, Stats, language, theme) doesn't fit, so the title
+         truncates and Stats is an icon on phones, still named "Stats" for screen readers. -->
+    <header class="mx-auto flex w-full max-w-md items-center gap-1 px-4 pt-2">
+      <BackButton v-if="!isHome" class="-ml-2" />
       <RouterLink
         :to="{ name: 'home' }"
-        class="text-foreground focus-visible:ring-ring flex h-11 items-center rounded-sm text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        class="text-foreground focus-visible:ring-ring flex h-11 min-w-0 flex-1 items-center rounded-sm text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
       >
-        {{ t('app.title') }}
+        <span class="truncate">{{ t('app.title') }}</span>
       </RouterLink>
-      <div class="flex items-center gap-1">
+      <div class="flex shrink-0 items-center gap-1">
         <RouterLink
           :to="{ name: 'stats' }"
-          class="text-primary focus-visible:ring-ring flex h-11 items-center gap-1 rounded-sm px-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+          class="text-primary focus-visible:ring-ring flex h-11 min-w-11 items-center justify-center gap-1 rounded-sm px-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChartColumn aria-hidden="true" class="size-4" />
-          {{ t('nav.stats') }}
+          <span class="sr-only sm:not-sr-only">{{ t('nav.stats') }}</span>
         </RouterLink>
         <LocaleToggle />
         <ThemeToggle />

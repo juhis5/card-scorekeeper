@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useGameStore } from './game'
+import { lastRoom, rememberRoom } from '@/lib/last-room'
 import { LocalGameRepository, STORAGE_KEY } from '@/lib/local-repository'
 import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
@@ -101,6 +102,7 @@ class FakeGameRepository implements GameRepository {
 
 beforeEach(() => {
   setActivePinia(createPinia())
+  localStorage.clear()
 })
 
 describe('useGameStore.start', () => {
@@ -393,6 +395,58 @@ describe('useGameStore.board', () => {
       ['Alice', 10],
       ['Host', 20],
     ])
+  })
+})
+
+describe('useGameStore remembering the online room', () => {
+  it('remembers a room this device creates, and forgets it once the game is finished', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    repository.roomCodeToReturn = 'ABCDE'
+    await game.start(repository, HOST_CONFIG)
+    expect(lastRoom()).toBe('ABCDE')
+
+    await game.finishGame()
+
+    expect(lastRoom()).toBeNull()
+  })
+
+  it('remembers a room this device joins', async () => {
+    const game = useGameStore()
+
+    await game.join(new FakeGameRepository(), 'FGHJK', { name: 'Alice', deviceUuid: 'device-a' })
+
+    expect(lastRoom()).toBe('FGHJK')
+  })
+
+  it('remembers nothing for a local game', async () => {
+    const game = useGameStore()
+
+    await game.start(new FakeGameRepository(), HOST_CONFIG)
+
+    expect(lastRoom()).toBeNull()
+  })
+
+  it('forgets the room when this device loses its seat there', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.join(repository, 'FGHJK', { name: 'Alice', deviceUuid: 'device-a' })
+
+    repository.reportError?.({ code: 'permission-denied' })
+
+    expect(lastRoom()).toBeNull()
+  })
+
+  it('keeps a newer room when an older game finishes', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    repository.roomCodeToReturn = 'ABCDE'
+    await game.start(repository, HOST_CONFIG)
+    rememberRoom('NEWER')
+
+    await game.finishGame()
+
+    expect(lastRoom()).toBe('NEWER')
   })
 })
 
