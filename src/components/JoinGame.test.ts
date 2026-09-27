@@ -21,6 +21,7 @@ function makeFakeOnlineRepository(): GameRepository {
   return {
     createGame: vi.fn(),
     addPlayer: vi.fn().mockResolvedValue('alice-uid'),
+    removePlayer: vi.fn(),
     subscribe: vi.fn((onChange: (state: GameState) => void) => {
       onChange({
         status: 'waiting',

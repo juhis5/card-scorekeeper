@@ -57,6 +57,9 @@ export interface GameRepository {
   /** Emits the current GameState immediately, then again on every subsequent mutation, until unsubscribed. */
   subscribe(onChange: (state: GameState) => void): Unsubscribe
   setRoundScore(input: SetRoundScoreInput): Promise<void>
+  /** Host only: removes a seat and all its scores (a stalled or mistaken player). Rejects for the
+   * host's own seat, which the game can't run without. */
+  removePlayer(playerId: PlayerId): Promise<void>
   /** Moves to the next of the 5 fixed rounds. */
   advanceRound(): Promise<void>
   /** Finalizes the game and returns its result. */

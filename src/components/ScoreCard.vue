@@ -23,12 +23,15 @@ const {
   player,
   round,
   isScored = false,
+  isMissedRound = false,
   canUsePhotoCount = false,
   roomCode = null,
 } = defineProps<{
   player: Player
   round: ContractRoundNumber
   isScored?: boolean
+  /** A round played before this player joined the app, still to be filled in. */
+  isMissedRound?: boolean
   /** Gates the "Snap cards" affordance — only true when this device is online AND this is its
    * own editable card (see RoomView: photo-count is online-only, and each device only ever edits
    * its own seat). */
@@ -36,7 +39,9 @@ const {
   roomCode?: string | null
 }>()
 
-const emit = defineEmits<{ commit: [playerId: string, points: number] }>()
+const emit = defineEmits<{
+  commit: [playerId: string, round: ContractRoundNumber, points: number]
+}>()
 
 const { t, n } = useI18n()
 const points = ref<number | null>(null)
@@ -60,9 +65,10 @@ const photoCountId = computed(() => `photo-count-${player.id}`)
  * online, and `isOnline` is derived from a non-null room code — see stores/game.ts), but this
  * checks both explicitly rather than assuming that invariant holds across a future refactor. */
 const canSnapCards = computed(() => canUsePhotoCount && roomCode !== null)
-const headerLabel = computed(() =>
-  t(isScored ? 'room.score.cardLabelScored' : 'room.score.cardLabel', { name: player.name }),
-)
+const headerLabel = computed(() => {
+  if (isMissedRound) return t('room.score.cardLabelMissed', { name: player.name, round })
+  return t(isScored ? 'room.score.cardLabelScored' : 'room.score.cardLabel', { name: player.name })
+})
 
 async function expand(): Promise<void> {
   if (isExpanded.value) return
@@ -97,7 +103,7 @@ function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
     return
   }
   savedPoints.value = points.value
-  emit('commit', player.id, points.value)
+  emit('commit', player.id, round, points.value)
   void collapse({ restoreFocus })
 }
 
@@ -161,6 +167,9 @@ function handleKeyDown(event: KeyboardEvent): void {
       @click="expand"
     >
       <span class="text-foreground truncate text-base font-medium">{{ player.name }}</span>
+      <span v-if="isMissedRound" class="text-muted-foreground shrink-0 text-sm">
+        {{ t('room.score.missedRoundLabel', { round }) }}
+      </span>
       <span v-if="isScored" class="text-primary flex shrink-0 items-center gap-1 text-sm">
         <Check aria-hidden="true" class="size-4" />
         {{ t('room.score.scoredLabel') }}
@@ -193,6 +202,9 @@ function handleKeyDown(event: KeyboardEvent): void {
       <p v-if="hasError" :id="errorId" role="alert" class="text-destructive text-sm">
         {{ errorMessage }}
       </p>
+
+      <!-- Seat-level actions the parent owns, e.g. the host removing a player. -->
+      <slot name="actions" />
 
       <button
         type="button"

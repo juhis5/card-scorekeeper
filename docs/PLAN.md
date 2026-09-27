@@ -226,6 +226,9 @@ building toward, and step through rounds 1→5 automatically.
   from selected cards — see below). Scores accumulate across the 5 rounds.
 - A running total per player, sorted ascending (leader = lowest).
 - Each player enters their own round score; the host can enter or correct anyone's.
+- A player who joins the app mid-game fills in their scores for the rounds already
+  played (they were at the table, just not in the app). Next and Finish stay disabled
+  until every player has a score for every round so far. The host can remove a seat.
 - The app shows **"Round 3 of 5 — Three sets of threes"** so everyone sees the current
   contract (reminder only, no validation), and declares the winner automatically after
   round 5 is scored.

@@ -163,6 +163,10 @@ export const useGameStore = defineStore('game', () => {
     await requireRepository().setRoundScore(input)
   }
 
+  async function removePlayer(playerId: PlayerId): Promise<void> {
+    await requireRepository().removePlayer(playerId)
+  }
+
   async function advanceRound(): Promise<void> {
     await requireRepository().advanceRound()
   }
@@ -204,6 +208,7 @@ export const useGameStore = defineStore('game', () => {
     resume,
     addPlayer,
     setRoundScore,
+    removePlayer,
     advanceRound,
     finishGame,
     leave,

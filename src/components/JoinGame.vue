@@ -17,6 +17,7 @@ import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { isValidRoomCode, normalizeRoomCode } from '@/lib/room-code'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
+import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -105,6 +106,7 @@ async function handleSubmit(): Promise<void> {
           <Input
             id="join-name"
             v-model="joinerName"
+            :maxlength="MAX_PLAYER_NAME_LENGTH"
             type="text"
             autocomplete="name"
             enterkeyhint="done"

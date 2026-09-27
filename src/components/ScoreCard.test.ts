@@ -105,7 +105,7 @@ describe('ScoreCard', () => {
     await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '10')
     await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
 
-    expect(emitted().commit).toEqual([[ALICE.id, 10]])
+    expect(emitted().commit).toEqual([[ALICE.id, 1, 10]])
     // Card collapses after commit
     expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
   })
@@ -220,6 +220,25 @@ describe('ScoreCard', () => {
   })
 })
 
+describe('ScoreCard for a missed round', () => {
+  it('names the round in its label and shows it on the card', () => {
+    renderCard({ round: 2, isMissedRound: true })
+
+    expect(screen.getByRole('button', { name: "Fill in Alice's missed round 2" })).toBeTruthy()
+    expect(screen.getByText('Round 2')).toBeTruthy()
+  })
+
+  it('saves the score for that round, not the current one', async () => {
+    const { emitted } = renderCard({ round: 2, isMissedRound: true })
+
+    await fireEvent.click(screen.getByRole('button', { name: "Fill in Alice's missed round 2" }))
+    await fireEvent.update(screen.getByLabelText("Alice's round 2 score"), '15')
+    await fireEvent.blur(screen.getByLabelText("Alice's round 2 score"))
+
+    expect(emitted().commit).toEqual([[ALICE.id, 2, 15]])
+  })
+})
+
 describe('ScoreCard, discarding and saving a draft', () => {
   it('discards the typed score when Cancel is pressed', async () => {
     const { emitted } = renderCard()
@@ -268,7 +287,7 @@ describe('ScoreCard, discarding and saving a draft', () => {
     await fireEvent.update(scoreInput(), '25')
     await keyThenRemovalBlur(() => fireEvent.keyUp(scoreInput(), { key: 'Enter' }))
 
-    expect(emitted().commit).toEqual([[ALICE.id, 25]])
+    expect(emitted().commit).toEqual([[ALICE.id, 1, 25]])
   })
 
   it('restores the last saved score when a later edit is cancelled', async () => {
@@ -283,7 +302,7 @@ describe('ScoreCard, discarding and saving a draft', () => {
     await expandCard()
 
     expect(scoreInput().value).toBe('10')
-    expect(emitted().commit).toEqual([[ALICE.id, 10]])
+    expect(emitted().commit).toEqual([[ALICE.id, 1, 10]])
   })
 })
 
@@ -343,7 +362,7 @@ describe('ScoreCard, confirming a photo-count result', () => {
     await selectPhoto()
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
 
-    expect(emitted().commit).toEqual([[ALICE.id, 5]])
+    expect(emitted().commit).toEqual([[ALICE.id, 1, 5]])
     await flushPromises()
     expect(document.activeElement).toBe(headerButton())
   })

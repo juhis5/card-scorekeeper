@@ -38,6 +38,11 @@ service cloud.firestore {
       return roomData(code).hostUid == request.auth.uid;
     }
 
+    /** 1..40 characters: MAX_PLAYER_NAME_LENGTH in src/lib/rules.ts (tests/rules pins the pair). */
+    function isValidPlayerName(name) {
+      return name is string && name.size() >= 1 && name.size() <= 40;
+    }
+
     /** Room-scoped read gate (not just "any authed user"): true only for someone already
      * seated as a player in this room. */
     function isRoomMember(code) {
@@ -86,11 +91,21 @@ service cloud.firestore {
         allow read: if isSignedIn() && isRoomMember(code);
 
         // Joining is always seating yourself — the host never creates another player's doc,
-        // and nobody may claim an ownerUid that isn't their own uid.
+        // and nobody may claim an ownerUid that isn't their own uid. The shape is exact: this doc
+        // is the membership key every other rule trusts, and a seat missing joinOrder would be
+        // invisible to the app's orderBy('joinOrder') subscription while still counting as a
+        // member.
         allow create: if isSignedIn()
           && playerUid == request.auth.uid
           && request.resource.data.ownerUid == request.auth.uid
-          && roomNotExpired(code);
+          && roomNotExpired(code)
+          && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
+          && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
+          && isValidPlayerName(request.resource.data.name)
+          && request.resource.data.deviceUuid is string
+          && request.resource.data.deviceUuid.size() <= 64
+          && request.resource.data.totalScore == 0
+          && request.resource.data.joinOrder is int;
 
         // A player corrects their own row; the host may correct anyone's in their room. Field-
         // restricted to name/totalScore only — deviceUuid is the slice-6 stats trust anchor
@@ -101,9 +116,17 @@ service cloud.firestore {
           && roomNotExpired(code)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'totalScore'])
           && request.resource.data.ownerUid == resource.data.ownerUid
-          && request.resource.data.deviceUuid == resource.data.deviceUuid;
+          && request.resource.data.deviceUuid == resource.data.deviceUuid
+          && isValidPlayerName(request.resource.data.name)
+          && request.resource.data.totalScore is int
+          && request.resource.data.totalScore >= 0;
 
-        allow delete: if false;
+        // The host removes a stalled or mistaken seat (with its scores, below). Never their own:
+        // the game can't run without the host.
+        allow delete: if isSignedIn()
+          && isHost(code)
+          && roomNotExpired(code)
+          && playerUid != request.auth.uid;
       }
 
       match /roundScores/{scoreId} {
@@ -133,7 +156,8 @@ service cloud.firestore {
           && request.resource.data.points % 5 == 0
           && scoreId == request.resource.data.ownerUid + '_' + string(request.resource.data.round);
 
-        allow delete: if false;
+        // Only as part of the host removing a seat (FirestoreGameRepository.removePlayer).
+        allow delete: if isSignedIn() && isHost(code) && roomNotExpired(code);
       }
     }
 

@@ -96,7 +96,8 @@ export default defineConfig({
       // manual real-Safari check, and out of an e2e slice's scope to chase further (would mean
       // touching src/lib/firebase.ts, app source). The plain e2e/vue.spec.ts sample test (no
       // Firestore involved) is unaffected and still runs on webkit.
-      testIgnore: '**/live-sync.spec.ts',
+      // host-powers.spec.ts is the same two-client live-sync pattern, so the same exclusion applies.
+      testIgnore: ['**/live-sync.spec.ts', '**/host-powers.spec.ts'],
     },
 
     /* Test against mobile viewports. */
