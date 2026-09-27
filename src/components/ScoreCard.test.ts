@@ -34,7 +34,11 @@ function renderCard(props: Partial<InstanceType<typeof ScoreCard>['$props']> = {
 }
 
 async function expandCard(): Promise<void> {
-  await fireEvent.click(screen.getByRole('button', { name: /tap to (enter|edit)/i }))
+  await fireEvent.click(screen.getByRole('button', { name: /^(enter|edit) .+'s score/i }))
+}
+
+function headerButton(): HTMLElement {
+  return screen.getByRole('button', { name: /^(enter|edit) alice's score/i })
 }
 
 async function selectPhoto(): Promise<void> {
@@ -123,6 +127,55 @@ describe('ScoreCard', () => {
     expect(screen.queryByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeNull()
   })
 
+  it('returns focus to the card header when Escape collapses it', async () => {
+    const { container } = renderCard()
+
+    await expandCard()
+    await fireEvent.keyDown(container.firstElementChild!, { key: 'Escape' })
+    await flushPromises()
+
+    expect(document.activeElement).toBe(headerButton())
+  })
+
+  it('returns focus to the card header when Cancel collapses it', async () => {
+    renderCard()
+
+    await expandCard()
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await flushPromises()
+
+    expect(document.activeElement).toBe(headerButton())
+  })
+
+  it('returns focus to the card header after committing with Enter', async () => {
+    renderCard()
+
+    await expandCard()
+    const input = screen.getByLabelText("Alice's round 1 score")
+    input.focus()
+    await fireEvent.update(input, '10')
+    await fireEvent.keyUp(input, { key: 'Enter' })
+    await flushPromises()
+
+    expect(document.activeElement).toBe(headerButton())
+  })
+
+  it('does not pull focus back when a blur commit moves focus elsewhere', async () => {
+    renderCard()
+    const elsewhere = document.createElement('button')
+    document.body.appendChild(elsewhere)
+
+    await expandCard()
+    const input = screen.getByLabelText("Alice's round 1 score")
+    input.focus()
+    await fireEvent.update(input, '10')
+    elsewhere.focus()
+    await flushPromises()
+
+    expect(document.activeElement).toBe(elsewhere)
+    elsewhere.remove()
+  })
+
   it('cancels expansion when Cancel is clicked', async () => {
     renderCard()
 
@@ -178,6 +231,8 @@ describe('ScoreCard, confirming a photo-count result', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
 
     expect(emitted().commit).toEqual([[ALICE.id, 5]])
+    await flushPromises()
+    expect(document.activeElement).toBe(headerButton())
   })
 
   it('never commits when the photo read fails', async () => {

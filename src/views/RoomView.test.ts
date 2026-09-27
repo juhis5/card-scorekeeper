@@ -319,10 +319,10 @@ describe('RoomView score entry order', () => {
 
     await renderRoom()
     const getCardNames = () =>
-      screen.getAllByRole('button', { name: /tap to (enter|edit)/i }).map((button) => {
+      screen.getAllByRole('button', { name: /^(enter|edit) .+'s score/i }).map((button) => {
         const label = button.getAttribute('aria-label') ?? ''
-        // Extract player name from "Tap to enter <name>'s score" or "Tap to edit <name>'s score (scored)"
-        const match = label.match(/(?:enter|edit) (.+?)'s score/)
+        // Extract player name from "Enter <name>'s score" or "Edit <name>'s score (scored)"
+        const match = label.match(/(?:Enter|Edit) (.+?)'s score/)
         return match?.[1] ?? label
       })
     const seatOrder = getCardNames()

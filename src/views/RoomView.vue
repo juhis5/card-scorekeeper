@@ -209,7 +209,8 @@ onMounted(() => {
         <h2 id="score-entry-heading" class="text-lg font-semibold">
           {{ t('room.score.sectionHeading', { round: n(currentRound) }) }}
         </h2>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <!-- role="list": Tailwind's list reset makes Safari/VoiceOver drop <ul> semantics. -->
+        <ul role="list" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ScoreCard
             v-for="standing in entryStandings"
             :key="`${standing.player.id}-${currentRound}`"
@@ -220,7 +221,7 @@ onMounted(() => {
             :room-code="roomCode"
             @commit="handleScoreCommit"
           />
-        </div>
+        </ul>
       </section>
 
       <div aria-live="polite" class="sr-only">{{ announcement }}</div>

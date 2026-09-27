@@ -80,9 +80,9 @@
       "sectionHeading": "Kierroksen {round} pisteet",
       "inputLabel": "{name}: kierroksen {round} pisteet",
       "scoredLabel": "Syötetty",
-      "invalidError": "Anna luku, joka on kerrannainen 5 (0, 5, 10, 15…).",
-      "cardLabel": "Napauta syöttääksesi {name}:n pisteet",
-      "cardLabelScored": "Napauta muuttaaksesi {name}:n pisteitä (syötetty)",
+      "invalidError": "Anna viiden kerrannainen (0, 5, 10, 15…).",
+      "cardLabel": "Syötä pisteet: {name}",
+      "cardLabelScored": "Muokkaa pisteitä: {name} (syötetty)",
       "cancel": "Peruuta"
     },
     "photoCount": {
