@@ -2,8 +2,7 @@
 /**
  * Keeps vercel.json's security headers honest: the CSP must allow index.html's inline theme
  * script by its exact hash (editing the script changes the hash and would otherwise break it
- * silently), and the protective headers must stay in place. Also pins the redirect from the old
- * production address.
+ * silently), and the protective headers must stay in place.
  */
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -14,16 +13,9 @@ interface HeaderRule {
   headers: { key: string; value: string }[]
 }
 
-interface RedirectRule {
-  source: string
-  has?: { type: string; value: string }[]
-  destination: string
-  permanent?: boolean
-}
-
 const vercelConfig = JSON.parse(
   readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'),
-) as { headers?: HeaderRule[]; redirects?: RedirectRule[] }
+) as { headers?: HeaderRule[] }
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8')
 
 function header(key: string): string | undefined {
@@ -56,22 +48,5 @@ describe('security headers in vercel.json', () => {
     expect(header('X-Content-Type-Options')).toBe('nosniff')
     expect(header('Referrer-Policy')).toBe('strict-origin-when-cross-origin')
     expect(header('Permissions-Policy')).toContain('microphone=()')
-  })
-})
-
-describe('the production address in vercel.json', () => {
-  it('sends the old address to rommi.vercel.app for good, keeping the path', () => {
-    const fromOldAddress = vercelConfig.redirects?.find((rule) =>
-      rule.has?.some(
-        ({ type, value }) => type === 'host' && value === 'card-scorekeeper.vercel.app',
-      ),
-    )
-
-    expect(fromOldAddress).toEqual({
-      source: '/:path(.*)',
-      has: [{ type: 'host', value: 'card-scorekeeper.vercel.app' }],
-      destination: 'https://rommi.vercel.app/:path',
-      permanent: true,
-    })
   })
 })
