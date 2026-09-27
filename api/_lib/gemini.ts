@@ -3,14 +3,21 @@
  * handler can be tested with a fake instead of a real API key/network call (see the tdd skill:
  * "mock the Gemini SDK — no live calls/creds").
  *
- * Model choice: `gemini-2.5-flash`, not a newer 3.x Flash generation — verified July 2026 that
- * Google's Gemini 3.x Flash models ignore/reject `temperature`/`top_p`/`top_k` entirely, which
- * would break the deterministic `temperature: 0` extraction this scored game relies on.
- * Re-verify at ai.google.dev/gemini-api/docs/models before ever bumping this.
+ * Model: `GEMINI_MODEL` (see production-deps.ts), defaulting to Google's recommendation for new
+ * projects. 2.5 Flash is limited to accounts that already used it, so a new key would be refused.
+ * Check ai.google.dev/gemini-api/docs/models before changing the default. Temperature is left at
+ * the model default, as Google advises for 3.x; what keeps a score honest is the server-side
+ * recompute (extraction.ts) and the player's confirm step, not sampling settings.
  */
-import { GoogleGenAI, Type, type Schema } from '@google/genai'
+import { GoogleGenAI, ThinkingLevel, Type, type Schema } from '@google/genai'
+import { MAX_DETECTED_CARDS } from './extraction.js'
 
-export const GEMINI_MODEL = 'gemini-2.5-flash'
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash'
+
+/** Below the client's 20 s budget, which also covers the upload and a cold start. */
+const GEMINI_TIMEOUT_MS = 15_000
+/** A card list is short; the cap stops a looping response from running up output tokens. */
+const MAX_OUTPUT_TOKENS = 2048
 
 /** The exact rank tokens `extraction.ts`'s `parseModelCards` accepts — kept as the one source of
  * truth for both the schema `enum` below and the prompt's token contract, so the two can't drift
@@ -46,6 +53,7 @@ const RESPONSE_SCHEMA: Schema = {
   properties: {
     cards: {
       type: Type.ARRAY,
+      maxItems: String(MAX_DETECTED_CARDS),
       items: {
         type: Type.OBJECT,
         properties: {
@@ -83,17 +91,20 @@ export interface GeminiClient {
   extractCards(image: string, mimeType: string): Promise<string>
 }
 
-export function createGeminiClient(apiKey: string): GeminiClient {
+export function createGeminiClient(apiKey: string, model: string): GeminiClient {
   const ai = new GoogleGenAI({ apiKey })
   return {
     async extractCards(image: string, mimeType: string): Promise<string> {
       const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
+        model,
         contents: [{ inlineData: { mimeType, data: image } }, PROMPT],
         config: {
-          temperature: 0,
           responseMimeType: 'application/json',
           responseSchema: RESPONSE_SCHEMA,
+          // Reading cards is recognition, not reasoning: low thinking keeps it fast.
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          maxOutputTokens: MAX_OUTPUT_TOKENS,
+          abortSignal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
         },
       })
       return response.text ?? ''

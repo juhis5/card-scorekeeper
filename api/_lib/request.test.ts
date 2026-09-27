@@ -4,12 +4,12 @@ import { parseBearerToken, parseCountRequestBody } from './request'
 
 describe('parseCountRequestBody', () => {
   it('parses a well-formed body', () => {
-    const body = { roomCode: 'ABCD', image: 'aGVsbG8=', mimeType: 'image/jpeg' }
+    const body = { roomCode: 'ABCDE', image: 'aGVsbG8=', mimeType: 'image/jpeg' }
     expect(parseCountRequestBody(body)).toEqual(body)
   })
 
   it('parses a JSON-string body the same way', () => {
-    const body = { roomCode: 'ABCD', image: 'aGVsbG8=', mimeType: 'image/jpeg' }
+    const body = { roomCode: 'ABCDE', image: 'aGVsbG8=', mimeType: 'image/jpeg' }
     expect(parseCountRequestBody(JSON.stringify(body))).toEqual(body)
   })
 
@@ -28,12 +28,37 @@ describe('parseCountRequestBody', () => {
   })
 
   it('rejects a missing image', () => {
-    expect(parseCountRequestBody({ roomCode: 'ABCD', mimeType: 'image/jpeg' })).toBeNull()
+    expect(parseCountRequestBody({ roomCode: 'ABCDE', mimeType: 'image/jpeg' })).toBeNull()
   })
 
   it('rejects a mimeType that is not an image type', () => {
     expect(
-      parseCountRequestBody({ roomCode: 'ABCD', image: 'aGVsbG8=', mimeType: 'text/plain' }),
+      parseCountRequestBody({ roomCode: 'ABCDE', image: 'aGVsbG8=', mimeType: 'text/plain' }),
+    ).toBeNull()
+  })
+
+  it('rejects a roomCode that is not a room code, so it can never pick another Firestore path', () => {
+    for (const roomCode of ['ABCDE/players/victim', 'ABCD', 'abcde', 'ABCD0']) {
+      expect(
+        parseCountRequestBody({ roomCode, image: 'aGVsbG8=', mimeType: 'image/jpeg' }),
+      ).toBeNull()
+    }
+  })
+
+  it('accepts only the photo formats phones produce', () => {
+    for (const mimeType of ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']) {
+      expect(
+        parseCountRequestBody({ roomCode: 'ABCDE', image: 'aGVsbG8=', mimeType }),
+      ).not.toBeNull()
+    }
+    expect(
+      parseCountRequestBody({ roomCode: 'ABCDE', image: 'aGVsbG8=', mimeType: 'image/svg+xml' }),
+    ).toBeNull()
+  })
+
+  it('rejects an image that is not base64', () => {
+    expect(
+      parseCountRequestBody({ roomCode: 'ABCDE', image: 'not base64!', mimeType: 'image/jpeg' }),
     ).toBeNull()
   })
 

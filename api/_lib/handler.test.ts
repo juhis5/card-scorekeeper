@@ -31,7 +31,7 @@ function createDeps(overrides: Partial<CountHandlerDeps> = {}): CountHandlerDeps
 /** A well-formed request body, with room to override any single field per test. */
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
-    roomCode: 'ABCD',
+    roomCode: 'ABCDE',
     image: Buffer.from('a tiny fake image').toString('base64'),
     mimeType: 'image/jpeg',
     ...overrides,
@@ -54,7 +54,7 @@ describe('handleCountRequest', () => {
 
     expect(result.status).toBe(200)
     expect(result.body).toEqual({ cards: [{ rank: '4', suit: 'diamonds', value: 5 }], total: 5 })
-    expect(deps.getRoomSnapshot).toHaveBeenCalledWith('ABCD', 'player-1')
+    expect(deps.getRoomSnapshot).toHaveBeenCalledWith('ABCDE', 'player-1')
   })
 
   it('rejects a non-POST method with 405', async () => {
@@ -73,7 +73,11 @@ describe('handleCountRequest', () => {
   })
 
   it('rejects a request whose ID token the Admin SDK rejects with 401', async () => {
-    const deps = createDeps({ verifyIdToken: vi.fn().mockRejectedValue(new Error('bad token')) })
+    const deps = createDeps({
+      verifyIdToken: vi
+        .fn()
+        .mockRejectedValue(Object.assign(new Error('bad token'), { code: 'auth/argument-error' })),
+    })
     const result = await handleCountRequest(validRequest(), deps)
     expect(result.status).toBe(401)
   })
@@ -97,7 +101,7 @@ describe('handleCountRequest', () => {
 
   it('rejects once the per-room rate limit is exhausted with 429', async () => {
     const store = new InMemoryRateLimitStore()
-    await store.set('room:ABCD', { count: 30, windowStartMs: 1000 })
+    await store.set('room:ABCDE', { count: 30, windowStartMs: 1000 })
     const deps = createDeps({ rateLimitStore: store })
 
     const result = await handleCountRequest(validRequest(), deps)
@@ -113,6 +117,58 @@ describe('handleCountRequest', () => {
     const result = await handleCountRequest(validRequest(), deps)
     expect(result.status).toBe(429)
     expect(result.body).toEqual({ error: 'global_rate_limited' })
+  })
+
+  it('rejects an oversized image before any network call, so it costs no quota or rate limit', async () => {
+    const deps = createDeps()
+    const oversizedImage = Buffer.alloc(MAX_IMAGE_BYTES + 1, 1).toString('base64')
+
+    const result = await handleCountRequest(
+      validRequest({ body: validBody({ image: oversizedImage }) }),
+      deps,
+    )
+
+    expect(result.status).toBe(413)
+    expect(deps.verifyIdToken).not.toHaveBeenCalled()
+    expect(deps.getRoomSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('reports a Gemini call that hits its deadline as a 504 timeout', async () => {
+    const deps = createDeps({
+      geminiClient: {
+        extractCards: vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+      },
+    })
+
+    const result = await handleCountRequest(validRequest(), deps)
+
+    expect(result).toEqual({ status: 504, body: { error: 'model_timeout' } })
+  })
+
+  it('reports an exhausted Gemini quota as 503, distinct from other upstream failures', async () => {
+    const deps = createDeps({
+      geminiClient: {
+        extractCards: vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error('RESOURCE_EXHAUSTED'), { status: 429 })),
+      },
+    })
+
+    const result = await handleCountRequest(validRequest(), deps)
+
+    expect(result).toEqual({ status: 503, body: { error: 'model_busy' } })
+  })
+
+  it('lets a server-side failure while verifying the token surface as an error, not a 401', async () => {
+    const deps = createDeps({
+      verifyIdToken: vi.fn().mockRejectedValue(new Error('FIREBASE_SERVICE_ACCOUNT is not set')),
+    })
+
+    await expect(handleCountRequest(validRequest(), deps)).rejects.toThrow(
+      'FIREBASE_SERVICE_ACCOUNT is not set',
+    )
   })
 
   it('rejects an oversized image with 413', async () => {

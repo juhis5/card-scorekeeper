@@ -38,6 +38,7 @@ export type PhotoCountFailureReason =
   | 'rate-limited'
   | 'timeout'
   | 'network'
+  | 'unavailable'
   | 'image-processing'
   | 'invalid-response'
   | 'server-error'
@@ -72,11 +73,21 @@ async function parseSuccessBody(response: Response): Promise<PhotoCountResult> {
   return { ok: true, cards, total }
 }
 
+/** Mirrors the statuses api/_lib/handler.ts returns, so the sheet can say what went wrong and
+ * offer a retry only where one can help. */
+const REASON_BY_STATUS: Readonly<Record<number, PhotoCountFailureReason>> = {
+  401: 'unauthenticated',
+  403: 'forbidden',
+  413: 'image-processing',
+  422: 'invalid-response',
+  429: 'rate-limited',
+  502: 'unavailable',
+  503: 'unavailable',
+  504: 'timeout',
+}
+
 function reasonForStatus(status: number): PhotoCountFailureReason {
-  if (status === 401) return 'unauthenticated'
-  if (status === 403) return 'forbidden'
-  if (status === 429) return 'rate-limited'
-  return 'server-error'
+  return REASON_BY_STATUS[status] ?? 'server-error'
 }
 
 export interface UsePhotoCountDeps {

@@ -40,13 +40,17 @@ function makeFakeBitmap(width: number, height: number) {
 function makeFakeCanvas(blob: Blob | null): {
   canvas: DrawableCanvas
   drawImage: ReturnType<typeof vi.fn>
+  context: { imageSmoothingQuality?: ImageSmoothingQuality }
 } {
   const drawImage = vi.fn()
+  const context: { drawImage: typeof drawImage; imageSmoothingQuality?: ImageSmoothingQuality } = {
+    drawImage,
+  }
   const canvas: DrawableCanvas = {
-    getContext: () => ({ drawImage }) as unknown as CanvasRenderingContext2D,
+    getContext: () => context as unknown as CanvasRenderingContext2D,
     toBlob: (callback) => callback(blob),
   }
-  return { canvas, drawImage }
+  return { canvas, drawImage, context }
 }
 
 describe('useImageDownscale().downscale', () => {
@@ -69,6 +73,23 @@ describe('useImageDownscale().downscale', () => {
     expect(drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 1600, 1200)
     expect(blobToBase64).toHaveBeenCalledWith(fakeBlob)
     expect(result).toEqual({ base64: 'ZmFrZQ==', mimeType: 'image/jpeg' })
+  })
+
+  it('draws with high-quality smoothing so small corner indices stay legible', async () => {
+    const { canvas, drawImage, context } = makeFakeCanvas({ size: 3 } as Blob)
+    let qualityWhenDrawn: ImageSmoothingQuality | undefined
+    drawImage.mockImplementation(() => {
+      qualityWhenDrawn = context.imageSmoothingQuality
+    })
+
+    const { downscale } = useImageDownscale({
+      loadBitmap: async () => makeFakeBitmap(4000, 3000),
+      createCanvas: () => canvas,
+      blobToBase64: async () => 'ZmFrZQ==',
+    })
+    await downscale(new Blob())
+
+    expect(qualityWhenDrawn).toBe('high')
   })
 
   it('never upscales a photo already under the cap', async () => {

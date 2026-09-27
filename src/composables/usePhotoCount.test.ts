@@ -130,7 +130,11 @@ describe('usePhotoCount().countCards, HTTP failure statuses', () => {
     [401, 'unauthenticated'],
     [403, 'forbidden'],
     [429, 'rate-limited'],
-    [502, 'server-error'],
+    [413, 'image-processing'],
+    [422, 'invalid-response'],
+    [502, 'unavailable'],
+    [503, 'unavailable'],
+    [504, 'timeout'],
     [500, 'server-error'],
   ] as const)('maps HTTP %d to reason %s', async (status, reason) => {
     const { countCards } = usePhotoCount({

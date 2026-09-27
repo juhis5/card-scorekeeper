@@ -8,14 +8,14 @@
 import { cert, getApps, initializeApp, type App, type ServiceAccount } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, type Firestore } from 'firebase-admin/firestore'
-import { toRoomSnapshot, type RoomSnapshot } from './gate'
+import { toRoomSnapshot, type RoomSnapshot } from './gate.js'
 
 let cachedApp: App | undefined
 
 /** Lazily initializes the Admin app from `FIREBASE_SERVICE_ACCOUNT` (a JSON service-account key,
  * function-env only — never committed, never a `VITE_` var). Reuses an already-initialized app
  * (e.g. a warm Lambda instance) instead of re-initializing, which `initializeApp` would throw on. */
-function getAdminApp(): App {
+export function getAdminApp(): App {
   if (cachedApp) return cachedApp
   const existing = getApps()[0]
   if (existing) {

@@ -8,9 +8,9 @@
  * resolves cleanly here — the recompute is *the same code* the manual-entry path and the rest of
  * the app use, not a copy that could drift out of parity.
  */
-import { cardValue, roundTotal } from '../../src/lib/rules'
-import type { Card, Rank, Suit } from '../../src/lib/types'
-import type { CountResponseBody } from './types'
+import { cardValue, roundTotal } from '../../src/lib/rules.js'
+import type { Card, Rank, Suit } from '../../src/lib/types.js'
+import type { CountResponseBody } from './types.js'
 
 const VALID_RANKS: ReadonlySet<string> = new Set([
   '2',
@@ -30,6 +30,10 @@ const VALID_RANKS: ReadonlySet<string> = new Set([
 ])
 
 const VALID_SUITS: ReadonlySet<string> = new Set(['clubs', 'diamonds', 'hearts', 'spades'])
+
+/** More than three decks' worth of leftovers could never be one hand; a longer list means the
+ * model is looping, so it's rejected rather than scored. */
+export const MAX_DETECTED_CARDS = 60
 
 function toCard(raw: unknown): Card | null {
   if (typeof raw !== 'object' || raw === null) return null
@@ -56,7 +60,7 @@ function toCard(raw: unknown): Card | null {
 export function parseModelCards(raw: unknown): Card[] | null {
   if (typeof raw !== 'object' || raw === null) return null
   const { cards } = raw as Record<string, unknown>
-  if (!Array.isArray(cards) || cards.length === 0) return null
+  if (!Array.isArray(cards) || cards.length === 0 || cards.length > MAX_DETECTED_CARDS) return null
 
   const parsed: Card[] = []
   for (const rawCard of cards) {

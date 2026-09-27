@@ -408,3 +408,24 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   - Security headers in `vercel.json`; the CSP is Report-Only until a preview deploy is checked.
   - Deferred to deploy time: App Check, and a room TTL. Online stats are keyed by room code, which
     is safe only while rooms are never deleted; a TTL would need a per-game id first.
+- 2026-09-27 — Review round 5, photo count deployable:
+  - **Photo count ships on, with per-instance rate limits** (owner's call). The per-room and
+    global caps live in memory, so each Vercel instance and cold start gets a fresh budget; the
+    real ceiling is the no-billing Gemini key's free-tier quota. Accepted risk: a seated player can
+    use up the day's quota for everyone, and photo count then answers "busy" until it resets.
+    Upgrade path: an Upstash/Redis `RateLimitStore`.
+  - **Model from `GEMINI_MODEL`**, default `gemini-3.8-flash` (Google's current Flash for new
+    projects; 2.5 Flash is limited to existing users). Thinking level low, capped output, 15 s
+    abort, `maxDuration: 30`; temperature left at the Gemini 3 default.
+  - `api/` runs as native ESM on Vercel, so relative imports carry `.js` (also in the `src/lib`
+    files it imports). `tsconfig.api.json` checks it and `pnpm test:api-load` loads the compiled
+    function in CI; before this the deployed function would have failed to load.
+  - Requests are checked before any I/O (room-code format, image type, base64, size). Only
+    `auth/*` token errors are a 401; other Admin SDK failures are logged 500s. Gemini failures
+    map to 504 (timeout), 503 (quota) or 502, and more than 60 detected cards is a 422.
+  - The sheet gives each failure its own message and offers "Try again" only when a retry can
+    work. The total is its own draft and must be a valid round score before it can be used.
+    Card inputs are named "Card 2 of 4: 7 of hearts" (fi: "Kortti 2/4: hertta 7"), so copies
+    from a second deck stay distinct. The picker no longer forces the camera.
+  - The Gemini key belongs in a separate Google Cloud project, restricted to the Generative
+    Language API; never the Firebase browser key.

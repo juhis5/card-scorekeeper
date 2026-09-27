@@ -13,11 +13,15 @@ const {
   label,
   describedBy,
   isInvalid = false,
+  isLabelHidden = false,
 } = defineProps<{
   id: string
   label: string
   describedBy?: string
   isInvalid?: boolean
+  /** Keeps the label for screen readers only, for rows where something visible already says
+   * what the field is (the photo-count card list). */
+  isLabelHidden?: boolean
 }>()
 
 /** `commit` fires on Enter. `blur` passes the focus event so the parent decides whether leaving
@@ -37,7 +41,7 @@ const rawValue = computed<string | number>({
 
 <template>
   <div class="flex flex-col gap-1">
-    <Label :for="id">{{ label }}</Label>
+    <Label :for="id" :class="{ 'sr-only': isLabelHidden }">{{ label }}</Label>
     <Input
       :id="id"
       v-model="rawValue"

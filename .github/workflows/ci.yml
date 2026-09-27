@@ -28,6 +28,7 @@ jobs:
       - run: pnpm format:check
       - run: pnpm test:run
       - run: pnpm test:api # /api/count — fully mocked (Admin SDK + Gemini), no emulator/creds
+      - run: pnpm test:api-load # compiles /api like Vercel and imports it in Node's ESM loader
       - run: pnpm build # runs vue-tsc (typecheck) + build
 
   # Firestore rules are the security boundary — run the emulator rules suite in CI so a rules

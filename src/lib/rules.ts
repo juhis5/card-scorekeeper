@@ -5,7 +5,7 @@
  * The game is played with 2 (sometimes 3) decks shuffled together, so a hand can hold the same
  * card more than once. Nothing here assumes one copy per card — a hand is scored per physical card.
  */
-import type { Card, Contract, ContractRoundNumber, Player, RoundScore, Standing } from './types'
+import type { Card, Contract, ContractRoundNumber, Player, RoundScore, Standing } from './types.js'
 
 export const LOW_NUMBER_CARD_VALUE = 5
 export const TEN_VALUE = 10
