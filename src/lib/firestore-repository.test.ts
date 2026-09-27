@@ -241,6 +241,57 @@ describe('FirestoreGameRepository.removePlayer', () => {
   })
 })
 
+describe('FirestoreGameRepository.finishGame — order', () => {
+  function installFinishedRoom(): void {
+    getDocsMock.mockImplementation((ref: { path: string }) => {
+      if (ref.path === `room/${ROOM_CODE}/players`) {
+        return Promise.resolve({
+          docs: [
+            playerDoc(HOST_UID, 'Host', 'device-host-local'),
+            playerDoc(ALICE_UID, 'Alice', 'device-alice-local'),
+          ],
+        })
+      }
+      if (ref.path === `room/${ROOM_CODE}/roundScores`) {
+        return Promise.resolve({
+          docs: [1, 2, 3, 4, 5].flatMap((round) => [
+            roundScoreDoc(HOST_UID, round, 20),
+            roundScoreDoc(ALICE_UID, round, 10),
+          ]),
+        })
+      }
+      throw new Error(`unexpected getDocs path: ${ref.path}`)
+    })
+  }
+
+  function makeRepo() {
+    return new FirestoreGameRepository({ db: {} as never, auth: {} as never, roomCode: ROOM_CODE })
+  }
+
+  it('writes the stats before marking the room finished', async () => {
+    // Everyone sees the winner as soon as the room is finished, and may open Stats right away.
+    installFinishedRoom()
+
+    await makeRepo().finishGame()
+
+    const [statsWriteOrder] = writeGameResultMock.mock.invocationCallOrder
+    const [roomUpdateOrder] = updateDocMock.mock.invocationCallOrder
+    expect(statsWriteOrder).toBeLessThan(roomUpdateOrder ?? 0)
+  })
+
+  it('leaves the room unfinished when the stats write fails, so Finish can be retried', async () => {
+    installFinishedRoom()
+    writeGameResultMock.mockRejectedValueOnce(new Error('offline'))
+
+    const error = await makeRepo()
+      .finishGame()
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(Error)
+    expect(updateDocMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('FirestoreGameRepository.finishGame — stats-building', () => {
   it("writes game_player rows keyed by each participant's own auth uid, not their localStorage device_uuid", async () => {
     getDocsMock.mockImplementation((ref: { path: string }) => {

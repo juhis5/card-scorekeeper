@@ -22,6 +22,8 @@ export default defineConfigWithVueTs(
     '**/coverage/**',
     '.claude/worktrees/**',
     '.vercel/**',
+    'playwright-report/**',
+    'test-results/**',
   ]),
 
   ...pluginVue.configs['flat/essential'],
