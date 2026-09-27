@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter, type Router } from 'vue-router'
 import { fireEvent, render, screen } from '@testing-library/vue'
@@ -16,10 +16,17 @@ import type {
   GameConfig,
   GameRepository,
   PlayerId,
+  Seat,
   SetRoundScoreInput,
   Unsubscribe,
 } from '@/lib/repository'
 import type { ContractRoundNumber, GameResult, GameState } from '@/lib/types'
+
+// RoomView resumes an online room after a reload through this seam; tests hand it a fake room.
+const { resumeRepository } = vi.hoisted(() => ({ resumeRepository: vi.fn() }))
+vi.mock('@/composables/useGameConnectivity', () => ({
+  useGameConnectivity: () => ({ resumeRepository }),
+}))
 
 /** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
 function makeMemoryStorage(): KeyValueStorage {
@@ -104,10 +111,27 @@ class FakeOnlineRepository implements GameRepository {
     return playerId
   }
 
-  subscribe(onChange: (state: GameState) => void): Unsubscribe {
+  private readonly errorListeners = new Set<(error: unknown) => void>()
+  /** What findSeat() reports for the device asking, as after a reload. */
+  seat: Seat | null = null
+
+  subscribe(onChange: (state: GameState) => void, onError?: (error: unknown) => void): Unsubscribe {
     this.listeners.add(onChange)
+    if (onError) this.errorListeners.add(onError)
     onChange(this.state)
-    return () => this.listeners.delete(onChange)
+    return () => {
+      this.listeners.delete(onChange)
+      if (onError) this.errorListeners.delete(onError)
+    }
+  }
+
+  async findSeat(): Promise<Seat | null> {
+    return this.seat
+  }
+
+  /** Stops every device's live connection with `error`, as a dropped or refused listener would. */
+  failConnection(error: unknown): void {
+    this.errorListeners.forEach((listener) => listener(error))
   }
 
   async setRoundScore(input: SetRoundScoreInput): Promise<void> {
@@ -203,6 +227,8 @@ async function advanceOrFinish(round: number): Promise<void> {
 }
 
 beforeEach(() => {
+  resumeRepository.mockReset()
+  resumeRepository.mockResolvedValue(null)
   setActivePinia(createPinia())
   // RoomView's resume() reads real browser localStorage by default (see the "resume after
   // reload" describe block below, which seeds it directly with the real `LocalGameRepository`
@@ -344,10 +370,11 @@ describe('RoomView resume after reload (slice 5 offline robustness)', () => {
     await renderRoomAt('7K4RQ')
     await flushPromises()
 
-    // No online reconnect is wired up for this test — the store legitimately has nothing yet —
-    // but the point being proven is what it does NOT do: it must never fall back to Alice's
-    // stale local game just because one happens to be sitting in storage.
-    expect(screen.getByRole('heading', { name: 'No local game in progress' })).toBeTruthy()
+    // This device has no seat in 7K4RQ, so it's offered a rejoin — never Alice's stale local
+    // game just because one happens to be sitting in storage.
+    expect(
+      screen.getByRole('heading', { name: "This room isn't open on this device" }),
+    ).toBeTruthy()
     expect(screen.queryByText('Alice')).toBeNull()
   })
 })
@@ -510,7 +537,11 @@ describe('RoomView offline banner', () => {
 
     await renderRoom()
 
-    expect(screen.getByText("You're offline — playing a local game on this device.")).toBeTruthy()
+    expect(
+      screen.getByText(
+        "Playing a local game on this device. Others can't join, and photo count is off.",
+      ),
+    ).toBeTruthy()
     expect(screen.queryByText(/Room code:/)).toBeNull()
   })
 })
@@ -556,7 +587,11 @@ describe('RoomView online mode', () => {
     await renderAs(hostPinia)
 
     expect(screen.getByText(`Room code: ${ROOM_CODE}`)).toBeTruthy()
-    expect(screen.queryByText("You're offline — playing a local game on this device.")).toBeNull()
+    expect(
+      screen.queryByText(
+        "Playing a local game on this device. Others can't join, and photo count is off.",
+      ),
+    ).toBeNull()
   })
 
   it("shows only this device's own player as an editable score card for a joiner", async () => {
@@ -640,6 +675,104 @@ describe('RoomView online mode', () => {
     await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
 
     expect(screen.queryByRole('button', { name: /^Remove/ })).toBeNull()
+  })
+})
+
+describe('RoomView after a reload of an online room', () => {
+  const ROOM_CODE = '7K4RQ'
+
+  async function renderAt(pinia: ReturnType<typeof createPinia>) {
+    const router = makeTestRouter()
+    await router.push(`/room/${ROOM_CODE}`)
+    const view = render(RoomView, {
+      global: { plugins: [pinia, router, i18n], stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+    return view
+  }
+
+  /** The host created the room on one page load; the reloaded page starts with an empty store. */
+  async function roomCreatedBeforeReload(): Promise<FakeOnlineRepository> {
+    const room = new FakeOnlineRepository(ROOM_CODE)
+    setActivePinia(createPinia())
+    await useGameStore().start(room, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    return room
+  }
+
+  it('puts the host back in their room with host controls', async () => {
+    const room = await roomCreatedBeforeReload()
+    room.seat = { playerId: 'host-uid', isHost: true }
+    resumeRepository.mockResolvedValue(room)
+    const reloaded = createPinia()
+    setActivePinia(reloaded)
+
+    await renderAt(reloaded)
+
+    expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Next round' })).toBeTruthy()
+  })
+
+  it('offers to join again when this device has no seat in the room', async () => {
+    const room = await roomCreatedBeforeReload()
+    room.seat = null
+    resumeRepository.mockResolvedValue(room)
+    const reloaded = createPinia()
+    setActivePinia(reloaded)
+
+    await renderAt(reloaded)
+
+    expect(
+      screen.getByRole('heading', { name: "This room isn't open on this device" }),
+    ).toBeTruthy()
+    expect(screen.getByText('Join room 7K4RQ')).toBeTruthy()
+  })
+
+  it('shows that the room is opening while its seat is looked up', async () => {
+    resumeRepository.mockReturnValue(new Promise(() => undefined))
+    const reloaded = createPinia()
+    setActivePinia(reloaded)
+
+    await renderAt(reloaded)
+
+    expect(screen.getByRole('heading', { name: 'Opening room 7K4RQ…' })).toBeTruthy()
+  })
+})
+
+describe('RoomView when the live connection stops', () => {
+  const ROOM_CODE = '7K4RQ'
+
+  async function joinedRoom(): Promise<FakeOnlineRepository> {
+    const room = new FakeOnlineRepository(ROOM_CODE)
+    setActivePinia(createPinia())
+    await useGameStore().start(room, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    const router = makeTestRouter()
+    await router.push(`/room/${ROOM_CODE}`)
+    render(RoomView, {
+      global: { plugins: [router, i18n], stubs: { RouterLink: RouterLinkStub } },
+    })
+    return room
+  }
+
+  it('says the connection was lost and how to reconnect', async () => {
+    const room = await joinedRoom()
+
+    room.failConnection(Object.assign(new Error('offline'), { code: 'unavailable' }))
+    await flushPromises()
+
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Lost the live connection to this room. Reload the page to reconnect.',
+    )
+  })
+
+  it('says this device is no longer in the room when the rules refuse it', async () => {
+    const room = await joinedRoom()
+
+    room.failConnection(Object.assign(new Error('denied'), { code: 'permission-denied' }))
+    await flushPromises()
+
+    expect(screen.getByRole('alert').textContent).toContain(
+      "You're no longer in this room. The host may have removed you, or the room has closed.",
+    )
   })
 })
 
@@ -751,7 +884,11 @@ describe('RoomView reconnecting indicator (slice 5 offline robustness)', () => {
       screen.getByText('Reconnecting… your scores are safe and will sync automatically.'),
     ).toBeTruthy()
     // Distinct from the never-connected → local-game banner: this is a live online room.
-    expect(screen.queryByText("You're offline — playing a local game on this device.")).toBeNull()
+    expect(
+      screen.queryByText(
+        "Playing a local game on this device. Others can't join, and photo count is off.",
+      ),
+    ).toBeNull()
     expect(screen.getByText(`Room code: ${ROOM_CODE}`)).toBeTruthy()
   })
 
@@ -784,7 +921,11 @@ describe('RoomView reconnecting indicator (slice 5 offline robustness)', () => {
     await renderRoom()
     await flushPromises()
 
-    expect(screen.getByText("You're offline — playing a local game on this device.")).toBeTruthy()
+    expect(
+      screen.getByText(
+        "Playing a local game on this device. Others can't join, and photo count is off.",
+      ),
+    ).toBeTruthy()
     expect(
       screen.queryByText('Reconnecting… your scores are safe and will sync automatically.'),
     ).toBeNull()

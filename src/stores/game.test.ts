@@ -8,6 +8,8 @@ import type {
   CreatedGame,
   GameConfig,
   GameRepository,
+  ResumableGameRepository,
+  Seat,
   SetRoundScoreInput,
   Unsubscribe,
 } from '@/lib/repository'
@@ -56,8 +58,12 @@ class FakeGameRepository implements GameRepository {
     return player.id
   }
 
-  subscribe(onChange: (state: GameState) => void): Unsubscribe {
+  /** The error callback the store passed to subscribe(), so a test can fail the live connection. */
+  reportError: ((error: unknown) => void) | undefined
+
+  subscribe(onChange: (state: GameState) => void, onError?: (error: unknown) => void): Unsubscribe {
     this.callOrder.push('subscribe')
+    this.reportError = onError
     this.listeners.add(onChange)
     onChange(this.state)
     return () => this.listeners.delete(onChange)
@@ -505,6 +511,97 @@ describe('useGameStore.resume', () => {
     const resumed = game.resume({ storage })
 
     expect(resumed).toBe(false)
+  })
+})
+
+/** An online repository that can find this device's seat again, as after a reload. */
+class FakeResumableRepository extends FakeGameRepository implements ResumableGameRepository {
+  seat: Seat | null = { playerId: 'player-alice', isHost: false }
+
+  async findSeat(): Promise<Seat | null> {
+    return this.seat
+  }
+}
+
+describe('useGameStore.resumeOnline', () => {
+  it("resumes this device's seat in an online room and follows its live state", async () => {
+    const game = useGameStore()
+    const repository = new FakeResumableRepository()
+    repository.seat = { playerId: 'host-uid', isHost: true }
+
+    const resumed = await game.resumeOnline(repository, 'ABCDE')
+
+    expect(resumed).toBe(true)
+    expect(game.roomCode).toBe('ABCDE')
+    expect(game.isHost).toBe(true)
+    expect(game.myPlayerId).toBe('host-uid')
+    expect(repository.callOrder).toContain('subscribe')
+  })
+
+  it('does nothing when this device has no seat in the room', async () => {
+    const game = useGameStore()
+    const repository = new FakeResumableRepository()
+    repository.seat = null
+
+    const resumed = await game.resumeOnline(repository, 'ABCDE')
+
+    expect(resumed).toBe(false)
+    expect(game.roomCode).toBeNull()
+    expect(repository.callOrder).not.toContain('subscribe')
+  })
+
+  it('never replaces a game that is already running', async () => {
+    const game = useGameStore()
+    await game.start(new FakeGameRepository(), HOST_CONFIG)
+
+    const resumed = await game.resumeOnline(new FakeResumableRepository(), 'ABCDE')
+
+    expect(resumed).toBe(false)
+  })
+})
+
+describe('useGameStore.join, host status', () => {
+  it('treats the host rejoining their own room by code as the host', async () => {
+    const game = useGameStore()
+    const repository = new FakeResumableRepository()
+    repository.seat = { playerId: 'player-Host', isHost: true }
+
+    await game.join(repository, 'ABCDE', { name: 'Host', deviceUuid: 'device-host' })
+
+    expect(game.isHost).toBe(true)
+  })
+})
+
+describe('useGameStore connection errors', () => {
+  it('marks the live connection lost when the room stops updating', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.join(repository, 'ABCDE', { name: 'Alice', deviceUuid: 'device-a' })
+
+    repository.reportError?.(Object.assign(new Error('offline'), { code: 'unavailable' }))
+
+    expect(game.connectionError).toBe('lost')
+  })
+
+  it('marks this device as out of the room when the rules stop letting it read', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.join(repository, 'ABCDE', { name: 'Alice', deviceUuid: 'device-a' })
+
+    repository.reportError?.(Object.assign(new Error('denied'), { code: 'permission-denied' }))
+
+    expect(game.connectionError).toBe('removed')
+  })
+
+  it('clears the error when leaving the room', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.join(repository, 'ABCDE', { name: 'Alice', deviceUuid: 'device-a' })
+    repository.reportError?.(new Error('offline'))
+
+    game.leave()
+
+    expect(game.connectionError).toBeNull()
   })
 })
 

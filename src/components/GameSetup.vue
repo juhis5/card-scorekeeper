@@ -38,7 +38,7 @@ const { t } = useI18n()
 const router = useRouter()
 const identity = useIdentityStore()
 const game = useGameStore()
-const { hostRepository } = useGameConnectivity()
+const { hostRepository, localRepository } = useGameConnectivity()
 
 const hostName = ref(identity.displayName)
 const otherPlayers = ref<OtherPlayerField[]>([{ id: crypto.randomUUID(), name: '' }])
@@ -86,6 +86,21 @@ async function startGame(mode: HostGameMode): Promise<void> {
   await router.push({ name: 'room', params: { code: roomCodeParam } })
 }
 
+/** Starts the chosen game. If the online room can't be created (the check passed, then the write
+ * failed or timed out), play locally instead, exactly like an unreachable backend. */
+async function startOrFallBack(mode: HostGameMode): Promise<void> {
+  if (isMissingRequiredOtherPlayers(mode)) {
+    areOtherPlayersInvalid.value = true
+    return
+  }
+  try {
+    await startGame(mode)
+  } catch (error) {
+    if (mode.kind !== 'online') throw error
+    await startOrFallBack(localRepository())
+  }
+}
+
 async function handleSubmit(): Promise<void> {
   attemptedSubmit.value = true
   areOtherPlayersInvalid.value = false
@@ -97,13 +112,7 @@ async function handleSubmit(): Promise<void> {
   try {
     const mode = await hostRepository()
     isCheckingConnection.value = false
-
-    if (isMissingRequiredOtherPlayers(mode)) {
-      areOtherPlayersInvalid.value = true
-      return
-    }
-
-    await startGame(mode)
+    await startOrFallBack(mode)
   } catch {
     submitError.value = t('home.errors.startFailed')
   } finally {

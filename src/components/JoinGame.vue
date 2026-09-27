@@ -8,7 +8,7 @@
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,14 +18,17 @@ import { isValidRoomCode, normalizeRoomCode } from '@/lib/room-code'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
+import { isPermanentWriteError } from '@/lib/write-errors'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const identity = useIdentityStore()
 const game = useGameStore()
 const { joinRepository } = useGameConnectivity()
 
-const roomCodeInput = ref('')
+// A room page's "Join room ABCDE" link passes the code along, so the player only adds a name.
+const roomCodeInput = ref(typeof route.query.code === 'string' ? route.query.code : '')
 const joinerName = ref(identity.displayName)
 const attemptedSubmit = ref(false)
 const isSubmitting = ref(false)
@@ -62,10 +65,12 @@ async function handleSubmit(): Promise<void> {
       deviceUuid: identity.deviceUuid,
     })
     await router.push({ name: 'room', params: { code: normalizedCode.value } })
-  } catch {
-    // Covers an invalid/expired code (Firestore rules reject the write) and any other join
-    // failure alike — never a raw error, always a retryable, human message (see error-ux).
-    submitError.value = t('home.join.errors.joinFailed')
+  } catch (error) {
+    // The rules refusing the seat means a wrong or expired code; anything else (a timeout, a
+    // dropped connection) means we couldn't reach the game. Never a raw error (see error-ux).
+    submitError.value = isPermanentWriteError(error)
+      ? t('home.join.errors.joinFailed')
+      : t('home.join.errors.unreachable')
   } finally {
     isSubmitting.value = false
     isCheckingConnection.value = false

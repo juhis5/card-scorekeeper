@@ -26,9 +26,12 @@ import type {
   GameId,
   GameRepository,
   PlayerId,
+  ResumableGameRepository,
   SetRoundScoreInput,
   Unsubscribe,
 } from '@/lib/repository'
+import { isResumable } from '@/lib/repository'
+import { isPermissionDenied } from '@/lib/write-errors'
 import type { GameResult, GameState, Player } from '@/lib/types'
 
 function initialGameState(): GameState {
@@ -51,6 +54,21 @@ export const useGameStore = defineStore('game', () => {
   // slice 4 passes a FirestoreGameRepository. The store never imports a concrete repository.
   let repository: GameRepository | null = null
   let unsubscribe: Unsubscribe | null = null
+  /** Why the live room stopped updating: 'removed' when the rules stopped letting this device
+   * read (its seat was removed, or the room closed), 'lost' for anything else. */
+  const connectionError = ref<'removed' | 'lost' | null>(null)
+
+  function followRoom(repo: GameRepository): void {
+    connectionError.value = null
+    unsubscribe = repo.subscribe(
+      (next) => {
+        state.value = next
+      },
+      (error) => {
+        connectionError.value = isPermissionDenied(error) ? 'removed' : 'lost'
+      },
+    )
+  }
 
   const status = computed(() => state.value.status)
   const currentRound = computed(() => state.value.currentRound)
@@ -94,9 +112,7 @@ export const useGameStore = defineStore('game', () => {
     roomCode.value = created.roomCode
     isHost.value = true
     myPlayerId.value = created.hostPlayerId
-    unsubscribe = repo.subscribe((next) => {
-      state.value = next
-    })
+    followRoom(repo)
   }
 
   /**
@@ -119,10 +135,28 @@ export const useGameStore = defineStore('game', () => {
     isHost.value = false
     const playerId = await repo.addPlayer(player)
     myPlayerId.value = playerId
-    unsubscribe = repo.subscribe((next) => {
-      state.value = next
-    })
+    // The host rejoining their own room by code is still its host.
+    if (isResumable(repo)) isHost.value = (await repo.findSeat())?.isHost ?? false
+    followRoom(repo)
     return playerId
+  }
+
+  /**
+   * Resumes this device's seat in an online room after a reload: the room code comes from the
+   * URL, the seat and host status from the room itself. Returns false, leaving the store idle,
+   * when a game is already running or this device has no seat there.
+   */
+  async function resumeOnline(repo: ResumableGameRepository, code: string): Promise<boolean> {
+    if (repository) return false
+    const seat = await repo.findSeat()
+    if (!seat || repository) return false
+    repository = repo
+    gameId.value = code
+    roomCode.value = code
+    isHost.value = seat.isHost
+    myPlayerId.value = seat.playerId
+    followRoom(repo)
+    return true
   }
 
   /**
@@ -149,9 +183,7 @@ export const useGameStore = defineStore('game', () => {
     roomCode.value = null
     isHost.value = true
     myPlayerId.value = resumed.hostPlayerId
-    unsubscribe = repo.subscribe((next) => {
-      state.value = next
-    })
+    followRoom(repo)
     return true
   }
 
@@ -186,6 +218,7 @@ export const useGameStore = defineStore('game', () => {
     repository = null
     isHost.value = false
     myPlayerId.value = null
+    connectionError.value = null
     state.value = initialGameState()
   }
 
@@ -197,6 +230,7 @@ export const useGameStore = defineStore('game', () => {
     isHost,
     myPlayerId,
     isOnline,
+    connectionError,
     status,
     currentRound,
     currentContract,
@@ -209,6 +243,7 @@ export const useGameStore = defineStore('game', () => {
     addPlayer,
     setRoundScore,
     removePlayer,
+    resumeOnline,
     advanceRound,
     finishGame,
     leave,

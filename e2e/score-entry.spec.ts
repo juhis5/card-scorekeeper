@@ -36,7 +36,9 @@ async function startLocalGame(page: Page): Promise<void> {
   await form.getByLabel('Player 1 name').fill('Maiju')
   await form.getByRole('button', { name: 'Start game' }).click()
   await expect(
-    page.getByText("You're offline — playing a local game on this device."),
+    page.getByText(
+      "Playing a local game on this device. Others can't join, and photo count is off.",
+    ),
   ).toBeVisible()
 }
 

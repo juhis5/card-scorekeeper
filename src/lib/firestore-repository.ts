@@ -37,6 +37,7 @@ import {
   winners as leadingPlayers,
 } from './rules'
 import { bestAndWorstRound } from './stats'
+import { withTimeout } from './timeout'
 import { isPermissionDenied } from './write-errors'
 import type {
   ContractRoundNumber,
@@ -51,8 +52,9 @@ import type {
   AddPlayerInput,
   CreatedGame,
   GameConfig,
-  GameRepository,
   PlayerId,
+  ResumableGameRepository,
+  Seat,
   SetRoundScoreInput,
   Unsubscribe,
 } from './repository'
@@ -109,13 +111,20 @@ export interface FirestoreGameRepositoryDeps {
   now?: () => number
   /** Injected for deterministic tests. Defaults to the real `generateRoomCode`. */
   generateRoomCode?: () => string
+  /** How long creating a room or taking a seat may wait for the server. Defaults to 10 s. */
+  writeTimeoutMs?: number
 }
 
-export class FirestoreGameRepository implements GameRepository {
+/** Firestore writes wait for the server indefinitely while offline, so the two writes the user
+ * waits on before entering a room (create, join) get a bound; the caller then falls back. */
+const DEFAULT_WRITE_TIMEOUT_MS = 10_000
+
+export class FirestoreGameRepository implements ResumableGameRepository {
   private readonly db: Firestore
   private readonly auth: Auth
   private readonly now: () => number
   private readonly generateRoomCode: () => string
+  private readonly writeTimeoutMs: number
   private roomCode: string | null
   private readonly unsubscribes = new Set<Unsubscribe>()
 
@@ -124,6 +133,7 @@ export class FirestoreGameRepository implements GameRepository {
     this.auth = deps.auth
     this.now = deps.now ?? (() => Date.now())
     this.generateRoomCode = deps.generateRoomCode ?? (() => defaultGenerateRoomCode())
+    this.writeTimeoutMs = deps.writeTimeoutMs ?? DEFAULT_WRITE_TIMEOUT_MS
     this.roomCode = deps.roomCode ?? null
   }
 
@@ -135,25 +145,31 @@ export class FirestoreGameRepository implements GameRepository {
       const roomCode = this.generateRoomCode()
       const nowMs = this.now()
       try {
-        await setDoc(doc(this.db, `room/${roomCode}`), {
-          code: roomCode,
-          status: 'waiting',
-          currentRound: 1,
-          hostUid,
-          createdAt: Timestamp.fromMillis(nowMs),
-          expiresAt: Timestamp.fromMillis(nowMs + ROOM_TTL_MS),
-        })
+        await withTimeout(
+          setDoc(doc(this.db, `room/${roomCode}`), {
+            code: roomCode,
+            status: 'waiting',
+            currentRound: 1,
+            hostUid,
+            createdAt: Timestamp.fromMillis(nowMs),
+            expiresAt: Timestamp.fromMillis(nowMs + ROOM_TTL_MS),
+          }),
+          this.writeTimeoutMs,
+        )
         // Sequential, not batched: the player-create rule's roomNotExpired() reads the room
         // doc via get(), which does not see a sibling write in the same batch/transaction — so
         // the room doc must already be committed before this write is sent (see
         // docs/DECISIONS.md's trust-model entry and firestore.rules).
-        await setDoc(doc(this.db, `room/${roomCode}/players/${hostUid}`), {
-          name: config.hostDisplayName,
-          ownerUid: hostUid,
-          deviceUuid: config.hostDeviceUuid,
-          totalScore: 0,
-          joinOrder: 0,
-        })
+        await withTimeout(
+          setDoc(doc(this.db, `room/${roomCode}/players/${hostUid}`), {
+            name: config.hostDisplayName,
+            ownerUid: hostUid,
+            deviceUuid: config.hostDeviceUuid,
+            totalScore: 0,
+            joinOrder: 0,
+          }),
+          this.writeTimeoutMs,
+        )
         this.roomCode = roomCode
         return { gameId: roomCode, roomCode, hostPlayerId: hostUid }
       } catch (error) {
@@ -172,18 +188,47 @@ export class FirestoreGameRepository implements GameRepository {
     await ensureSignedIn(this.auth)
     const uid = this.requireUid()
     const roomCode = this.requireRoomCode()
-    await setDoc(doc(this.db, `room/${roomCode}/players/${uid}`), {
-      name: input.name,
-      ownerUid: uid,
-      deviceUuid: input.deviceUuid,
-      totalScore: 0,
-      joinOrder: this.now(),
-    })
+    // Rejoining after a reload: keep the seat. Rewriting it would change joinOrder, which the
+    // rules refuse, and would reorder the player.
+    if (await this.isSeated(uid)) return uid
+    await withTimeout(
+      setDoc(doc(this.db, `room/${roomCode}/players/${uid}`), {
+        name: input.name,
+        ownerUid: uid,
+        deviceUuid: input.deviceUuid,
+        totalScore: 0,
+        joinOrder: this.now(),
+      }),
+      this.writeTimeoutMs,
+    )
     return uid
   }
 
-  subscribe(onChange: (state: GameState) => void): Unsubscribe {
+  async findSeat(): Promise<Seat | null> {
+    await ensureSignedIn(this.auth)
+    const uid = this.requireUid()
     const roomCode = this.requireRoomCode()
+    const room = await getDoc(doc(this.db, `room/${roomCode}`))
+    const roomData = room.data() as RoomDocData | undefined
+    if (!roomData || !(await this.isSeated(uid))) return null
+    return { playerId: uid, isHost: roomData.hostUid === uid }
+  }
+
+  /** The rules only let members read seats, so a non-member reading their own seat is refused:
+   * that means "not seated", not an error. */
+  private async isSeated(uid: string): Promise<boolean> {
+    try {
+      const seat = await getDoc(doc(this.db, `room/${this.requireRoomCode()}/players/${uid}`))
+      return seat.exists()
+    } catch (error) {
+      if (isPermissionDenied(error)) return false
+      throw error
+    }
+  }
+
+  subscribe(onChange: (state: GameState) => void, onError?: (error: unknown) => void): Unsubscribe {
+    const roomCode = this.requireRoomCode()
+    const reportError = (error: unknown) => onError?.(error)
 
     let room: { status: GameStatus; currentRound: ContractRoundNumber } | null = null
     let players: Player[] = []
@@ -196,12 +241,16 @@ export class FirestoreGameRepository implements GameRepository {
       onChange({ status: room.status, currentRound: room.currentRound, players, roundScores })
     }
 
-    const roomUnsub = onSnapshot(doc(this.db, `room/${roomCode}`), (snapshot) => {
-      const data = snapshot.data() as RoomDocData | undefined
-      if (!data) return
-      room = { status: data.status, currentRound: data.currentRound }
-      emit()
-    })
+    const roomUnsub = onSnapshot(
+      doc(this.db, `room/${roomCode}`),
+      (snapshot) => {
+        const data = snapshot.data() as RoomDocData | undefined
+        if (!data) return
+        room = { status: data.status, currentRound: data.currentRound }
+        emit()
+      },
+      reportError,
+    )
 
     const playersUnsub = onSnapshot(
       query(collection(this.db, `room/${roomCode}/players`), orderBy('joinOrder')),
@@ -209,6 +258,7 @@ export class FirestoreGameRepository implements GameRepository {
         players = snapshot.docs.map(toPlayer)
         emit()
       },
+      reportError,
     )
 
     const roundScoresUnsub = onSnapshot(
@@ -217,6 +267,7 @@ export class FirestoreGameRepository implements GameRepository {
         roundScores = snapshot.docs.map(toRoundScore)
         emit()
       },
+      reportError,
     )
 
     const unsubscribe: Unsubscribe = () => {

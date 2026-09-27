@@ -69,7 +69,7 @@
       "reconnecting": "Reconnecting… your scores are safe and will sync automatically."
     },
     "offline": {
-      "banner": "You're offline — playing a local game on this device."
+      "banner": "Playing a local game on this device. Others can't join, and photo count is off."
     },
     "table": {
       "player": "Player",
@@ -138,6 +138,16 @@
       "keepLabel": "Keep {name}",
       "confirm": "Remove",
       "confirmLabel": "Yes, remove {name}"
+    },
+    "opening": "Opening room {code}…",
+    "notSeated": {
+      "heading": "This room isn't open on this device",
+      "body": "Join it again with the room code.",
+      "join": "Join room {code}"
+    },
+    "connection": {
+      "removed": "You're no longer in this room. The host may have removed you, or the room has closed.",
+      "lost": "Lost the live connection to this room. Reload the page to reconnect."
     }
   },
   "notFound": {

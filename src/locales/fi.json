@@ -69,7 +69,7 @@
       "reconnecting": "Yhteyttä muodostetaan uudelleen… pisteesi ovat tallessa ja synkronoituvat automaattisesti."
     },
     "offline": {
-      "banner": "Olet offline-tilassa — pelaat paikallista peliä tällä laitteella."
+      "banner": "Pelaat paikallista peliä tällä laitteella. Muut eivät voi liittyä, eikä korttien kuvaus ole käytössä."
     },
     "table": {
       "player": "Pelaaja",
@@ -138,6 +138,16 @@
       "keepLabel": "Älä poista pelaajaa {name}",
       "confirm": "Poista",
       "confirmLabel": "Kyllä, poista pelaaja {name}"
+    },
+    "opening": "Avataan huonetta {code}…",
+    "notSeated": {
+      "heading": "Tämä huone ei ole auki tällä laitteella",
+      "body": "Liity uudelleen huoneen koodilla.",
+      "join": "Liity huoneeseen {code}"
+    },
+    "connection": {
+      "removed": "Et ole enää tässä huoneessa. Isäntä on ehkä poistanut sinut, tai huone on suljettu.",
+      "lost": "Yhteys huoneeseen katkesi. Lataa sivu uudelleen yhdistääksesi."
     }
   },
   "notFound": {

@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const ensureSignedInMock = vi.fn()
 const writeGameResultMock = vi.fn()
 const flushPendingResultsMock = vi.fn()
+const readPendingResultsMock = vi.fn()
+const getFirebaseAuthMock = vi.fn(() => 'auth-instance')
 
 vi.mock('./firebase', () => ({
-  getFirebaseAuth: () => 'auth-instance',
+  getFirebaseAuth: () => getFirebaseAuthMock(),
   getDb: () => 'db-instance',
   ensureSignedIn: (...args: unknown[]) => ensureSignedInMock(...args),
 }))
@@ -16,15 +18,26 @@ vi.mock('./firestore-stats', () => ({
 
 vi.mock('./pending-results', () => ({
   flushPendingResults: (...args: unknown[]) => flushPendingResultsMock(...args),
+  readPendingResults: (...args: unknown[]) => readPendingResultsMock(...args),
 }))
 
 const { flushPendingResultsOnLaunch } = await import('./reconnect-flush')
 
 beforeEach(() => {
   vi.clearAllMocks()
+  readPendingResultsMock.mockReturnValue([{ result: { gameId: 'queued' }, players: [] }])
 })
 
 describe('flushPendingResultsOnLaunch', () => {
+  it('never touches Firebase when nothing is queued', async () => {
+    readPendingResultsMock.mockReturnValue([])
+
+    await flushPendingResultsOnLaunch()
+
+    expect(getFirebaseAuthMock).not.toHaveBeenCalled()
+    expect(flushPendingResultsMock).not.toHaveBeenCalled()
+  })
+
   it('flushes the queue using a writer that signs in and then writes the game result', async () => {
     ensureSignedInMock.mockResolvedValue('uid-1')
     writeGameResultMock.mockResolvedValue(undefined)

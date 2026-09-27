@@ -36,35 +36,46 @@ import { probeBackendReachable } from '@/lib/connectivity'
 import { createHostRepository, createJoinRepository } from '@/lib/game-mode'
 import type { HostGameMode, JoinGameMode } from '@/lib/game-mode'
 import { LocalGameRepository } from '@/lib/local-repository'
+import type { ResumableGameRepository } from '@/lib/repository'
 
 async function loadFirebase() {
-  const [{ getFirebaseAuth, getDb, ensureSignedIn }, { FirestoreGameRepository }] =
+  const [{ getFirebaseAuth, getDb, checkBackendReachable }, { FirestoreGameRepository }] =
     await Promise.all([import('@/lib/firebase'), import('@/lib/firestore-repository')])
   // Calling the getters here (not passing them through unevaluated) means a bad config's
   // synchronous throw happens inside this async function — i.e. as a rejection of the promise
   // both callers below already wrap in try/catch — rather than leaking a raw exception.
-  return { auth: getFirebaseAuth(), db: getDb(), ensureSignedIn, FirestoreGameRepository }
+  const auth = getFirebaseAuth()
+  const db = getDb()
+  return {
+    auth,
+    db,
+    checkBackend: () => checkBackendReachable(auth, db),
+    FirestoreGameRepository,
+  }
 }
 
 export function useGameConnectivity() {
+  /** A local single-device game: the fallback whenever an online room can't be had. */
+  function localRepository(): HostGameMode {
+    return { kind: 'offline', repository: new LocalGameRepository() }
+  }
+
   /** Host path: reachable → a fresh Firestore room; unreachable OR any online-setup failure → a
    * local single-device game (see the file-level "golden-rule fix" comment above). */
   async function hostRepository(): Promise<HostGameMode> {
     try {
-      const { auth, db, ensureSignedIn, FirestoreGameRepository } = await loadFirebase()
+      const { auth, db, checkBackend, FirestoreGameRepository } = await loadFirebase()
       return await createHostRepository({
-        // Anonymous sign-in doubles as the lightweight "can we reach the backend" check —
-        // resolving means Firebase Auth answered, rejecting/hanging means unreachable (see
-        // connectivity.ts).
-        probeBackendReachable: () =>
-          probeBackendReachable({ checkBackend: () => ensureSignedIn(auth) }),
+        // Signs in and reads from the Firestore server (see checkBackendReachable), inside the
+        // probe's timeout: resolving means reachable, rejecting or hanging means unreachable.
+        probeBackendReachable: () => probeBackendReachable({ checkBackend }),
         createOnlineRepository: () => new FirestoreGameRepository({ db, auth }),
         createLocalRepository: () => new LocalGameRepository(),
       })
     } catch {
       // loadFirebase() itself failed — never reached the probe at all. Degrade exactly like an
       // unreachable backend: the host must never see "Start game" fail outright.
-      return { kind: 'offline', repository: new LocalGameRepository() }
+      return localRepository()
     }
   }
 
@@ -72,10 +83,9 @@ export function useGameConnectivity() {
    * loadFirebase() itself failing) collapses to the same friendly "unreachable" outcome. */
   async function joinRepository(roomCode: string): Promise<JoinGameMode> {
     try {
-      const { auth, db, ensureSignedIn, FirestoreGameRepository } = await loadFirebase()
+      const { auth, db, checkBackend, FirestoreGameRepository } = await loadFirebase()
       return await createJoinRepository({
-        probeBackendReachable: () =>
-          probeBackendReachable({ checkBackend: () => ensureSignedIn(auth) }),
+        probeBackendReachable: () => probeBackendReachable({ checkBackend }),
         createOnlineRepository: () => new FirestoreGameRepository({ db, auth, roomCode }),
       })
     } catch {
@@ -83,5 +93,17 @@ export function useGameConnectivity() {
     }
   }
 
-  return { hostRepository, joinRepository }
+  /** Resume path: the room from the URL after a reload. No probe first: finding the seat reads
+   * through Firestore's local cache when the connection is down, which is what a mid-game reload
+   * needs. `null` when Firebase itself can't load. */
+  async function resumeRepository(roomCode: string): Promise<ResumableGameRepository | null> {
+    try {
+      const { auth, db, FirestoreGameRepository } = await loadFirebase()
+      return new FirestoreGameRepository({ db, auth, roomCode })
+    } catch {
+      return null
+    }
+  }
+
+  return { hostRepository, joinRepository, localRepository, resumeRepository }
 }

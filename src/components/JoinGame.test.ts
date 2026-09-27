@@ -67,6 +67,14 @@ beforeEach(() => {
 })
 
 describe('JoinGame validation', () => {
+  it("prefills the room code from the link a room page offers ('Join room 7K4RQ')", async () => {
+    const router = makeTestRouter()
+    await router.push('/?code=7K4RQ')
+    render(JoinGame, { global: { plugins: [i18n, router] } })
+
+    expect((screen.getByLabelText('Room code') as HTMLInputElement).value).toBe('7K4RQ')
+  })
+
   it('rejects a malformed room code before ever calling the backend', async () => {
     renderJoinGame()
 
@@ -129,7 +137,9 @@ describe('JoinGame failure handling', () => {
 
   it('maps an invalid/expired room code to a friendly error, never a raw one', async () => {
     const repo = makeFakeOnlineRepository()
-    repo.addPlayer = vi.fn().mockRejectedValue(new Error('permission-denied'))
+    repo.addPlayer = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }))
     joinRepository.mockResolvedValue({ kind: 'online', repository: repo })
     const router = renderJoinGame()
 
@@ -140,9 +150,26 @@ describe('JoinGame failure handling', () => {
     expect(router.currentRoute.value.name).toBe('home')
   })
 
+  it('says the game is unreachable, not that the code is wrong, when joining times out', async () => {
+    const repo = makeFakeOnlineRepository()
+    repo.addPlayer = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('timed out'), { code: 'deadline-exceeded' }))
+    joinRepository.mockResolvedValue({ kind: 'online', repository: repo })
+    renderJoinGame()
+
+    await fillAndSubmit('7K4RQ', 'Alice')
+
+    expect(
+      screen.getByText("Couldn't reach the game — check your connection and try again."),
+    ).toBeTruthy()
+  })
+
   it('lets the user retry after a failed join', async () => {
     const failingRepo = makeFakeOnlineRepository()
-    failingRepo.addPlayer = vi.fn().mockRejectedValue(new Error('boom'))
+    failingRepo.addPlayer = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }))
     joinRepository.mockResolvedValueOnce({ kind: 'online', repository: failingRepo })
     renderJoinGame()
 

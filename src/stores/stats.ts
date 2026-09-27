@@ -26,7 +26,7 @@
  * Graceful degrade (mirrors `useGameConnectivity`): Firebase/Firestore load via a dynamic
  * `import()` so visiting the Stats screen never taxes the initial bundle, and
  * `probeBackendReachable` (the same reachability probe `useGameConnectivity` uses, checking
- * `ensureSignedIn` with a bounded timeout) gates the read — offline, a broken `VITE_FIREBASE_*`
+ * `checkBackendReachable` with a bounded timeout) gates the read — offline, a broken `VITE_FIREBASE_*`
  * config, or any failure along the way lands on the `error` status, never a throw/crash.
  * error-ux's four states have no separate "offline" bucket, so `error` covers both here; the
  * view's retry action is just calling `load()` again.
@@ -115,16 +115,20 @@ export const useStatsStore = defineStore('stats', () => {
   async function load(): Promise<void> {
     status.value = 'loading'
     try {
-      const [{ getDb, ensureSignedIn }, { collection, query, where, getDocs, documentId }] =
-        await Promise.all([import('@/lib/firebase'), import('firebase/firestore')])
+      const [
+        { getDb, getFirebaseAuth, ensureSignedIn, checkBackendReachable },
+        { collection, query, where, getDocs, documentId },
+      ] = await Promise.all([import('@/lib/firebase'), import('firebase/firestore')])
 
-      const reachable = await probeBackendReachable({ checkBackend: () => ensureSignedIn() })
+      const db = getDb()
+      const reachable = await probeBackendReachable({
+        checkBackend: () => checkBackendReachable(getFirebaseAuth(), db),
+      })
       if (!reachable) {
         status.value = 'error'
         return
       }
 
-      const db = getDb()
       const uid = await ensureSignedIn()
 
       const ownSnapshot = await getDocs(
