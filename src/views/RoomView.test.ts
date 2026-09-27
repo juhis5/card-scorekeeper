@@ -184,7 +184,9 @@ function renderRoom() {
 
 async function enterScore(name: string, round: number, points: number): Promise<void> {
   // ScoreCard starts collapsed — click the card header to expand it
-  const cardButton = screen.getByRole('button', { name: new RegExp(`${name}`, 'i') })
+  const cardButton = screen.getByRole('button', {
+    name: new RegExp(`^(Enter|Edit) ${name}'s score`),
+  })
   if (!screen.queryByLabelText(`${name}'s round ${round} score`)) {
     await fireEvent.click(cardButton)
   }
@@ -585,8 +587,7 @@ describe('RoomView online mode', () => {
   it('lets the host advance once every seated player has scored, even though each device can only edit its own row', async () => {
     const { hostPinia, joinerGame, aliceId } = await setUpOnlineRoom()
 
-    // Alice enters her own score from her own device/store — never through the host's RoomView,
-    // which (correctly) can't render an editable row for anyone but the host.
+    // Alice enters her own score from her own device/store.
     await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 5 })
 
     setActivePinia(hostPinia)
@@ -595,6 +596,131 @@ describe('RoomView online mode', () => {
 
     const nextButton = screen.getByRole('button', { name: 'Next round' }) as HTMLButtonElement
     expect(nextButton.disabled).toBe(false)
+  })
+
+  it("lets the host enter another player's score", async () => {
+    const { hostPinia, hostGame, aliceId } = await setUpOnlineRoom()
+    setActivePinia(hostPinia)
+    await renderAs(hostPinia)
+
+    await enterScore('Alice', 1, 10)
+
+    expect(hostGame.roundScores).toContainEqual({ playerId: aliceId, round: 1, points: 10 })
+  })
+
+  it('lets the host remove another player after confirming', async () => {
+    const { hostPinia, hostGame } = await setUpOnlineRoom()
+    setActivePinia(hostPinia)
+    await renderAs(hostPinia)
+
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Remove Alice' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Yes, remove Alice' }))
+    await flushPromises()
+
+    expect(hostGame.standings.map((standing) => standing.player.name)).toEqual(['Host'])
+    expect(screen.getByText('Alice was removed from the game.')).toBeTruthy()
+  })
+
+  it("never offers removing the host's own seat", async () => {
+    const { hostPinia } = await setUpOnlineRoom()
+    setActivePinia(hostPinia)
+    await renderAs(hostPinia)
+
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Host's score" }))
+
+    expect(screen.queryByRole('button', { name: 'Remove Host' })).toBeNull()
+  })
+
+  it('never offers removing players to a joiner', async () => {
+    const { joinerPinia } = await setUpOnlineRoom()
+    setActivePinia(joinerPinia)
+    await renderAs(joinerPinia)
+
+    await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
+
+    expect(screen.queryByRole('button', { name: /^Remove/ })).toBeNull()
+  })
+})
+
+describe('RoomView late joiners', () => {
+  const ROOM_CODE = '7K4RQ'
+
+  /** The host plays round 1 alone and moves on; Alice joins the app during round 2. */
+  async function setUpLateJoin() {
+    const repository = new FakeOnlineRepository(ROOM_CODE)
+
+    const hostPinia = createPinia()
+    setActivePinia(hostPinia)
+    const hostGame = useGameStore()
+    await hostGame.start(repository, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await hostGame.setRoundScore({ playerId: 'host-uid', round: 1, points: 20 })
+    await hostGame.advanceRound()
+
+    const joinerPinia = createPinia()
+    setActivePinia(joinerPinia)
+    const joinerGame = useGameStore()
+    const aliceId = await joinerGame.join(repository, ROOM_CODE, {
+      name: 'Alice',
+      deviceUuid: 'device-a',
+    })
+
+    return { hostPinia, hostGame, joinerPinia, joinerGame, aliceId }
+  }
+
+  async function renderAs(pinia: ReturnType<typeof createPinia>) {
+    const router = makeTestRouter()
+    await router.push(`/room/${ROOM_CODE}`)
+    return render(RoomView, {
+      global: { plugins: [pinia, router, i18n], stubs: { RouterLink: RouterLinkStub } },
+    })
+  }
+
+  it('shows a late joiner a card for each round they missed, next to the current round', async () => {
+    const { joinerPinia } = await setUpLateJoin()
+    setActivePinia(joinerPinia)
+    await renderAs(joinerPinia)
+
+    expect(screen.getByRole('heading', { name: 'Missed rounds' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: "Fill in Alice's missed round 1" })).toBeTruthy()
+    expect(screen.getByRole('button', { name: "Enter Alice's score" })).toBeTruthy()
+  })
+
+  it('saves a missed-round score for that round', async () => {
+    const { joinerPinia, joinerGame, aliceId } = await setUpLateJoin()
+    setActivePinia(joinerPinia)
+    await renderAs(joinerPinia)
+
+    await fireEvent.click(screen.getByRole('button', { name: "Fill in Alice's missed round 1" }))
+    await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '15')
+    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await flushPromises()
+
+    expect(joinerGame.roundScores).toContainEqual({ playerId: aliceId, round: 1, points: 15 })
+    expect(screen.queryByRole('heading', { name: 'Missed rounds' })).toBeNull()
+  })
+
+  it('keeps Next disabled until the late joiner has filled in every missed round', async () => {
+    const { hostPinia, hostGame, joinerGame, aliceId } = await setUpLateJoin()
+    await hostGame.setRoundScore({ playerId: 'host-uid', round: 2, points: 10 })
+    await joinerGame.setRoundScore({ playerId: aliceId, round: 2, points: 5 })
+    setActivePinia(hostPinia)
+    await renderAs(hostPinia)
+    const nextButton = () => screen.getByRole('button', { name: 'Next round' }) as HTMLButtonElement
+
+    expect(nextButton().disabled).toBe(true)
+
+    await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 15 })
+    await flushPromises()
+    expect(nextButton().disabled).toBe(false)
+  })
+
+  it('lets the host fill in a missed round for the late joiner', async () => {
+    const { hostPinia } = await setUpLateJoin()
+    setActivePinia(hostPinia)
+    await renderAs(hostPinia)
+
+    expect(screen.getByRole('button', { name: "Fill in Alice's missed round 1" })).toBeTruthy()
   })
 })
 

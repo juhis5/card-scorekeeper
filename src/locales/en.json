@@ -83,13 +83,18 @@
       "invalidError": "Enter a multiple of 5 from 0 to {max}.",
       "cardLabel": "Enter {name}'s score",
       "cardLabelScored": "Edit {name}'s score (scored)",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "cardLabelMissed": "Fill in {name}'s missed round {round}",
+      "missedRoundLabel": "Round {round}",
+      "missedHeading": "Missed rounds",
+      "missedHint": "Fill in the scores from rounds played before joining the app."
     },
     "saveError": {
       "score": "Couldn't save {name}'s score. Check your connection and enter it again.",
       "nextRound": "Couldn't start the next round. Try again.",
       "finish": "Couldn't finish the game. Try again.",
-      "closed": "This room isn't accepting changes anymore. It may have expired."
+      "closed": "This room isn't accepting changes anymore. It may have expired.",
+      "remove": "Couldn't remove {name}. Try again."
     },
     "photoCount": {
       "trigger": "Snap cards",
@@ -118,12 +123,21 @@
     },
     "live": {
       "scoreEntered": "{name} scored {points} points.",
-      "scoreEnteredLeading": "{name} scored {points} points — now leading."
+      "scoreEnteredLeading": "{name} scored {points} points — now leading.",
+      "playerRemoved": "{name} was removed from the game."
     },
     "empty": {
       "heading": "No local game in progress",
       "body": "Start a new game from the home screen.",
       "backHome": "Back to home"
+    },
+    "remove": {
+      "trigger": "Remove {name}",
+      "confirmText": "Remove {name} and their scores from this game?",
+      "keep": "Keep",
+      "keepLabel": "Keep {name}",
+      "confirm": "Remove",
+      "confirmLabel": "Yes, remove {name}"
     }
   },
   "notFound": {

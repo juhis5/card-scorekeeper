@@ -11,23 +11,24 @@
  * waits. Never gate any of this on `status === 'playing'`: online, `status` stays `'waiting'`
  * until the host's first `advanceRound()` (see DECISIONS.md), so gating on it would hide round 1.
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { WifiOff } from '@lucide/vue'
 import ContractBanner from '@/components/ContractBanner.vue'
+import RemovePlayerControl from '@/components/RemovePlayerControl.vue'
 import ScoreCard from '@/components/ScoreCard.vue'
 import ScoreBoard from '@/components/ScoreBoard.vue'
 import WinnerBanner from '@/components/WinnerBanner.vue'
 import { Button } from '@/components/ui/button'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
-import { TOTAL_ROUNDS } from '@/lib/rules'
+import { isEveryRoundScored, missingRounds, TOTAL_ROUNDS } from '@/lib/rules'
 import { isPermissionDenied } from '@/lib/write-errors'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/repository'
-import type { Standing } from '@/lib/types'
+import type { ContractRoundNumber, Player, Standing } from '@/lib/types'
 
 const { t, n } = useI18n()
 const route = useRoute()
@@ -52,6 +53,7 @@ const announcement = ref('')
 /** Why the last score, Next or Finish didn't save. Cleared by the next save that succeeds. */
 const saveError = ref('')
 const isAdvancing = ref(false)
+const scoreEntryHeading = useTemplateRef<HTMLHeadingElement>('scoreEntryHeading')
 const isFinishing = ref(false)
 
 // `standings` is sorted by total, so it reorders after every commit — great for the scoreboard,
@@ -72,24 +74,33 @@ watch(
   },
   { immediate: true },
 )
+// The host (offline or online) enters and fixes anyone's score; an online joiner edits only their
+// own seat. firestore.rules enforces the same split.
 const entryStandings = computed(() => {
   const ordered = seatOrder.value
     .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
     .filter((standing): standing is Standing => standing !== undefined)
-  // Online, host-editing-others is deferred (see DECISIONS.md) — every device, host included,
-  // edits only its own seat; offline, the host still enters everyone's score as today.
-  return isOnline.value
-    ? ordered.filter((standing) => standing.player.id === myPlayerId.value)
-    : ordered
+  return isHost.value
+    ? ordered
+    : ordered.filter((standing) => standing.player.id === myPlayerId.value)
 })
+
+/** Earlier rounds an editable player has no score for: a late joiner fills these in, so nobody is
+ * ranked on fewer rounds than the others. */
+const missedRoundCards = computed(() =>
+  entryStandings.value.flatMap(({ player }) =>
+    missingRounds(player.id, roundScores.value, currentRound.value)
+      .filter((round) => round < currentRound.value)
+      .map((round) => ({ player, round })),
+  ),
+)
 
 const hasActiveGame = computed(() => standings.value.length > 0)
 const isFinalRound = computed(() => currentRound.value === TOTAL_ROUNDS)
 const isFinished = computed(() => status.value === 'finished')
-// Derived from synced `roundScores`, not view-local commits: online, only this device's own row
-// is ever committed here, so a view-local "who did I just commit" set would never see the other
-// seats' scores and the Next/Finish gate could never open. `roundScores` is the shared source of
-// truth for both modes (see repository.ts).
+// Derived from synced `roundScores`, not view-local commits: online, other devices' scores only
+// ever arrive through the subscription. `roundScores` is the shared source of truth for both modes
+// (see repository.ts).
 const scoredPlayerIdsThisRound = computed(
   () =>
     new Set(
@@ -98,19 +109,32 @@ const scoredPlayerIdsThisRound = computed(
         .map((score) => score.playerId),
     ),
 )
+// Every round so far, not just the current one: a late joiner's missed rounds block Next too.
 const allPlayersScored = computed(() =>
-  standings.value.every((standing) => scoredPlayerIdsThisRound.value.has(standing.player.id)),
+  isEveryRoundScored(
+    standings.value.map((standing) => standing.player.id),
+    roundScores.value,
+    currentRound.value,
+  ),
 )
+
+function canRemove(playerId: PlayerId): boolean {
+  return isHost.value && playerId !== myPlayerId.value
+}
 
 /** The rules refuse every write to an expired room; any other failure is worth retrying. */
 function describeSaveFailure(error: unknown, retryMessage: string): string {
   return isPermissionDenied(error) ? t('room.saveError.closed') : retryMessage
 }
 
-async function handleScoreCommit(playerId: PlayerId, points: number): Promise<void> {
+async function handleScoreCommit(
+  playerId: PlayerId,
+  round: ContractRoundNumber,
+  points: number,
+): Promise<void> {
   const player = standings.value.find((standing) => standing.player.id === playerId)?.player
   try {
-    await game.setRoundScore({ playerId, round: currentRound.value, points })
+    await game.setRoundScore({ playerId, round, points })
   } catch (error) {
     saveError.value = describeSaveFailure(
       error,
@@ -125,6 +149,20 @@ async function handleScoreCommit(playerId: PlayerId, points: number): Promise<vo
   announcement.value = isLeading
     ? t('room.live.scoreEnteredLeading', { name: player.name, points: n(points) })
     : t('room.live.scoreEntered', { name: player.name, points: n(points) })
+}
+
+async function handleRemovePlayer(player: Player): Promise<void> {
+  try {
+    await game.removePlayer(player.id)
+  } catch (error) {
+    saveError.value = describeSaveFailure(error, t('room.saveError.remove', { name: player.name }))
+    return
+  }
+  saveError.value = ''
+  announcement.value = t('room.live.playerRemoved', { name: player.name })
+  // The removed player's card (and the focused control in it) is gone; keep the host's place.
+  await nextTick()
+  scoreEntryHeading.value?.focus()
 }
 
 async function handleNextRound(): Promise<void> {
@@ -227,8 +265,34 @@ onMounted(() => {
 
       <WinnerBanner v-if="isFinished" :winners="winners" />
 
-      <section v-else aria-labelledby="score-entry-heading" class="flex flex-col gap-2">
-        <h2 id="score-entry-heading" class="text-lg font-semibold">
+      <section
+        v-if="!isFinished && missedRoundCards.length > 0"
+        aria-labelledby="missed-rounds-heading"
+        class="flex flex-col gap-2"
+      >
+        <h2 id="missed-rounds-heading" class="text-lg font-semibold">
+          {{ t('room.score.missedHeading') }}
+        </h2>
+        <p class="text-muted-foreground text-sm">{{ t('room.score.missedHint') }}</p>
+        <ul role="list" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <ScoreCard
+            v-for="card in missedRoundCards"
+            :key="`${card.player.id}-${card.round}`"
+            :player="card.player"
+            :round="card.round"
+            is-missed-round
+            @commit="handleScoreCommit"
+          />
+        </ul>
+      </section>
+
+      <section v-if="!isFinished" aria-labelledby="score-entry-heading" class="flex flex-col gap-2">
+        <h2
+          id="score-entry-heading"
+          ref="scoreEntryHeading"
+          tabindex="-1"
+          class="focus-visible:ring-ring rounded-sm text-lg font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
           {{ t('room.score.sectionHeading', { round: n(currentRound) }) }}
         </h2>
         <!-- role="list": Tailwind's list reset makes Safari/VoiceOver drop <ul> semantics. -->
@@ -242,7 +306,14 @@ onMounted(() => {
             :can-use-photo-count="isOnline && standing.player.id === myPlayerId"
             :room-code="roomCode"
             @commit="handleScoreCommit"
-          />
+          >
+            <template v-if="canRemove(standing.player.id)" #actions>
+              <RemovePlayerControl
+                :player-name="standing.player.name"
+                @remove="handleRemovePlayer(standing.player)"
+              />
+            </template>
+          </ScoreCard>
         </ul>
       </section>
 

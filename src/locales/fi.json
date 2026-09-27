@@ -83,13 +83,18 @@
       "invalidError": "Anna viiden kerrannainen väliltä 0–{max}.",
       "cardLabel": "Syötä pisteet: {name}",
       "cardLabelScored": "Muokkaa pisteitä: {name} (syötetty)",
-      "cancel": "Peruuta"
+      "cancel": "Peruuta",
+      "cardLabelMissed": "Täydennä puuttuva kierros {round}: {name}",
+      "missedRoundLabel": "Kierros {round}",
+      "missedHeading": "Puuttuvat kierrokset",
+      "missedHint": "Syötä pisteet kierroksilta, jotka pelattiin ennen sovellukseen liittymistä."
     },
     "saveError": {
       "score": "Pelaajan {name} pisteitä ei voitu tallentaa. Tarkista yhteys ja syötä pisteet uudelleen.",
       "nextRound": "Seuraavaa kierrosta ei voitu aloittaa. Yritä uudelleen.",
       "finish": "Peliä ei voitu päättää. Yritä uudelleen.",
-      "closed": "Tähän huoneeseen ei voi enää tallentaa. Se on ehkä vanhentunut."
+      "closed": "Tähän huoneeseen ei voi enää tallentaa. Se on ehkä vanhentunut.",
+      "remove": "Pelaajaa {name} ei voitu poistaa. Yritä uudelleen."
     },
     "photoCount": {
       "trigger": "Kuvaa kortit",
@@ -118,12 +123,21 @@
     },
     "live": {
       "scoreEntered": "{name} sai {points} pistettä.",
-      "scoreEnteredLeading": "{name} sai {points} pistettä — johtaa nyt."
+      "scoreEnteredLeading": "{name} sai {points} pistettä — johtaa nyt.",
+      "playerRemoved": "Pelaaja {name} poistettiin pelistä."
     },
     "empty": {
       "heading": "Ei käynnissä olevaa paikallista peliä",
       "body": "Aloita uusi peli etusivulta.",
       "backHome": "Takaisin etusivulle"
+    },
+    "remove": {
+      "trigger": "Poista pelaaja {name}",
+      "confirmText": "Poistetaanko pelaaja {name} ja hänen pisteensä tästä pelistä?",
+      "keep": "Älä poista",
+      "keepLabel": "Älä poista pelaajaa {name}",
+      "confirm": "Poista",
+      "confirmLabel": "Kyllä, poista pelaaja {name}"
     }
   },
   "notFound": {
