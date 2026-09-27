@@ -28,7 +28,7 @@ function createDeps(overrides: Partial<CountHandlerDeps> = {}): CountHandlerDeps
   }
 }
 
-/** A well-formed request body, with room to override any single field per test. */
+/** A well-formed body; a test overrides the field it's about. */
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
     roomCode: 'ABCDE',
@@ -202,7 +202,7 @@ describe('handleCountRequest', () => {
         { rank: 'K', suit: 'spades', value: 10 },
         { rank: 'A', suit: 'hearts', value: 15 },
       ],
-      total: 999, // adversarial/buggy model total — must not survive
+      total: 999, // a wrong model total, which must not survive
     })
     const deps = createDeps({
       geminiClient: { extractCards: vi.fn().mockResolvedValue(modelOutput) },

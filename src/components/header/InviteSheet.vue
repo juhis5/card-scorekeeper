@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: the invite sheet the header's Kutsu opens. A QR code of the join link for people at
- * the same table, the code itself to read out, Kopioi koodi, and Jaa linkki: the phone's share
- * sheet, or copying the link where there is none (desktop Firefox). The link is built from the
- * current address, so on a preview or test-rommi it points there.
+ * Single job: the Kutsu sheet, with the join link as a QR code, the code, copy, and share (which
+ * copies the link where there's no share sheet). The link uses the current origin, so preview and
+ * test-rommi links invite there.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -40,8 +39,7 @@ async function shareLink(): Promise<void> {
   try {
     await share({ title: t('app.title'), text: t('invite.shareText', { code }), url: link.value })
   } catch (error) {
-    // Closing the share sheet rejects with AbortError: the player changed their mind. Any other
-    // refusal (no permission) falls back to copying the link.
+    // AbortError means the player closed the share sheet. Any other refusal falls back to copying.
     if (error instanceof DOMException && error.name === 'AbortError') return
     await copy(link.value)
   }

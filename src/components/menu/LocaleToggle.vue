@@ -1,10 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: the app menu's language row (third playtest: settings as whole tappable rows). Only
- * two locales exist (`SUPPORTED_LOCALES` in `i18n/index.ts`), so tapping the row flips to the other
- * one through `setLocale()`, which persists the choice and sets `<html lang>` (see the i18n skill).
- * The row reads "Language · English"; its accessible name is that text plus a hint that a tap
- * switches it.
+ * Single job: the menu's language row. There are only two locales, so a tap flips to the other one
+ * via `setLocale()`, which persists it and sets `<html lang>`. The sr-only hint follows the visible
+ * text, so the spoken name still starts with what's shown.
  */
 import { useI18n } from 'vue-i18n'
 import { Languages } from '@lucide/vue'
@@ -13,7 +11,6 @@ import { setLocale, type SupportedLocale } from '@/i18n'
 
 const { t, locale } = useI18n()
 
-/** Only two locales exist (see `SUPPORTED_LOCALES`), so "the other one" is just the flip side. */
 function otherLocale(): SupportedLocale {
   return locale.value === 'en' ? 'fi' : 'en'
 }

@@ -1,10 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: the app menu, a side panel from the right. The header has room only for Back, the
- * room code and this button, so everything else lives here: the app's name (nothing else on
- * screen names it), the pages (Home, Stats, Rules), the language and theme settings, and installing
- * the app. Every row is one whole-width tap target (third playtest). Reka's dialog traps focus
- * while it's open and returns it to the menu button when it closes; following a link closes it.
+ * Single job: the app menu, a side panel with what the header has no room for: the app's name,
+ * pages, settings and install. Reka's dialog traps focus and returns it to the menu button.
  */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'

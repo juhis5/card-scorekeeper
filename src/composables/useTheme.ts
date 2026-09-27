@@ -1,8 +1,7 @@
 /**
- * The theme: classes on `<html>` (`dark` for every dark theme, plus the palette's own class) and
- * the choice in localStorage under `theme`, read the same way as index.html's no-flash script
- * (see lib/platform/themes.ts). Deliberately not the persisted Pinia store: it would JSON-wrap
- * the value the no-flash script reads as a plain string.
+ * The theme: classes on `<html>` and a plain string in localStorage under `theme`, which
+ * index.html's no-flash script reads the same way. Not a persisted Pinia store: that would
+ * JSON-wrap the value.
  */
 import { ref } from 'vue'
 import { isDarkTheme, paletteClass, parseTheme, THEMES, type Theme } from '@/lib/platform/themes'

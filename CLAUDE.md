@@ -42,9 +42,14 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 - `review-checklist` — the merge gate: skills followed, no regressions, tests sufficient, security/a11y, no hacks. Used by `/feature` + standalone.
 - `git-workflow` — Conventional Commits, branch naming, git hooks (husky/lint-staged/commitlint), CI.
 
+## Where things live
+
+`src/` (layers split by area; see `src/CLAUDE.md`), `api/` (the photo-count function; `api/CLAUDE.md`), `tests/` (rules, integration, e2e, visual; `tests/CLAUDE.md`), `firebase/firestore.rules`, `docs/` (`PLAN.md` = the app as it is, `DECISIONS.md` = why).
+
 ## Commands
 
 - `pnpm dev` — local dev server. `pnpm build` — typecheck (`vue-tsc`) + build. `pnpm preview` — serve build.
 - `pnpm lint:check` / `pnpm format:check` — the non-fixing checks CI runs. `pnpm lint` / `pnpm format` rewrite files.
+- `pnpm test:run` (unit), `pnpm test:api`, `pnpm test:rules` + `pnpm test:integration` (start the Firebase emulator themselves), `pnpm test:e2e` / `test:e2e:ci`, `pnpm test:visual` / `test:visual:update` (Docker).
 - `vercel dev` — run the app + `/api` photo-count function together locally.
-- Firebase emulator suite for testing Firestore rules before deploy.
+- Rules deploys: always `--project` (`card-scorekeeper-staging` before merging into `develop`, `card-scorekeeper-prod-1673f` before a release). Never `firebase use`.

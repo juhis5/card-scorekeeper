@@ -1,12 +1,9 @@
 /**
- * Makes happy-dom's `navigator.sendBeacon` behave like a browser's.
- *
- * When `deleteApp` ends a Firestore WebChannel, the SDK sends a `TYPE=terminate` request through
- * `navigator.sendBeacon` and never awaits it. happy-dom implements the beacon as a plain `fetch()`
- * whose promise nobody handles. If Vitest tears the window down while that fetch is still in
- * flight, the aborted fetch rejects unhandled and the run exits 1 even though every assertion
- * passed (about 1 run in 11). A real browser never reports a beacon failure back to the page, so
- * the replacement sends the same request and drops its outcome.
+ * Makes happy-dom's `navigator.sendBeacon` behave like a browser's. `deleteApp` ends a Firestore
+ * WebChannel with a `TYPE=terminate` beacon it never awaits. happy-dom sends it as a plain
+ * `fetch()`, and if Vitest tears the window down mid-flight, the aborted fetch rejects unhandled
+ * and fails the run (about 1 in 11) although every test passed. A browser never reports a beacon's
+ * outcome to the page, so this sends the same request and drops the result.
  */
 Object.defineProperty(navigator, 'sendBeacon', {
   configurable: true,

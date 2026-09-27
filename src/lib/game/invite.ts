@@ -1,8 +1,5 @@
-/**
- * Inviting others to a room: the link that opens its join page, and the SVG path for that link's
- * QR code. Pure: the caller passes the app's address (location.origin, so previews and
- * test-rommi link to themselves) and the QR modules from the encoder.
- */
+/** A room's join link and its QR code. The caller passes `location.origin`, so previews and
+ * staging link to themselves. */
 
 export function joinUrl(origin: string, roomCode: string): string {
   return `${origin}/join/${roomCode}`

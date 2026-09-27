@@ -22,8 +22,8 @@ const mode = ref<(typeof PLAY_MODES)[number]>('join')
 /** One name for both, so switching modes keeps what was typed. */
 const playerName = ref(identity.displayName)
 
-// A game left via Back is still running in the store; after a reload only storage remembers it.
-// Leaving a room never ends its game, so Home offers the way back.
+// Leaving a room never ends its game, so Home offers the way back: from the store, or from
+// storage after a reload.
 const rememberedRoom = lastRoom()
 const hasSavedLocalGame = hasUnfinishedPersistedGame()
 const isStoreGameRunning = computed(() => game.gameId !== null && game.status !== 'finished')
@@ -39,8 +39,7 @@ const canContinueLocalGame = computed(
   <main
     class="bg-background text-foreground mx-auto flex w-full max-w-md flex-1 flex-col gap-6 p-4"
   >
-    <!-- For screen readers only: navigation focuses and announces it, but on a phone the forms
-         matter more than a title (second playtest). -->
+    <!-- Screen-reader only: navigation focuses it, but on a phone the forms need the space. -->
     <h1 id="main-heading" tabindex="-1" class="sr-only">{{ t('home.heading') }}</h1>
     <section
       v-if="onlineRoomToContinue || canContinueLocalGame"
@@ -61,7 +60,7 @@ const canContinueLocalGame = computed(
         </RouterLink>
       </Button>
     </section>
-    <!-- One card: join (what most players do) or start a game, with one name field between them. -->
+    <!-- One card: join or start a game, sharing one name field. -->
     <Card class="gap-4 px-4">
       <div
         role="group"

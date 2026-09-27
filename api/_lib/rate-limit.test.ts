@@ -49,7 +49,6 @@ describe('checkRateLimit with InMemoryRateLimitStore', () => {
 
     expect(await checkRateLimit(store, 'room:AAAA', config, 0)).toBe(true)
     expect(await checkRateLimit(store, 'room:AAAA', config, 10)).toBe(true)
-    // A different key (e.g. a different room, or the global key) has its own independent budget.
     expect(await checkRateLimit(store, 'room:BBBB', config, 20)).toBe(true)
   })
 

@@ -1,36 +1,6 @@
 /**
- * Read-side stats store (the Stats screen; see docs/PLAN.md "Stats & history"). Loads this
- * device's `game_player` rows from Firestore and derives its stats + head-to-head records via
- * the pure `lib/stats.ts` functions — this store owns I/O only, never the math (see the
- * clean-code/vue-pinia skills: dependencies point inward, `lib/` stays framework/network-free).
- *
- * Identity: the stats key is the Firebase Anonymous Auth **uid**, not the separate localStorage
- * `device_uuid` the identity store holds (see docs/DECISIONS.md's 2026-07-24 "Stats rows key on
- * the anon UID" entry). `ensureSignedIn()` (from `lib/firebase.ts`) resolves it.
- *
- * Read strategy — kept lean, two passes, never "read the whole `game_player` collection" (which
- * only grows, across every room anyone has ever played):
- *   1. This device's OWN rows (`where('deviceUuid', '==', uid)`) — cheap, and enough to answer
- *      "does this device have any finished games at all" (the empty state) and to learn which
- *      `gameId`s to look at next.
- *   2. Every OTHER row from those same games (`where('gameId', 'in', <chunk>)`, chunked to stay
- *      under Firestore's `in`-clause limit) — this is what gives head-to-head its opponents. This
- *      device's `game_result` docs (`participantUids array-contains uid`) are fetched alongside for
- *      their `finishedAt`, the only way to pick the "most recent" `displayName` per opponent uid
- *      (`game_player` itself carries no timestamp). Not `documentId() in <chunk>`: production
- *      Firestore refuses that combined with the participant filter, though the emulator allows it. Both stay bounded by "games THIS device
- *      played", never the whole collection — the one accepted inefficiency is that step 2
- *      re-reads this device's own rows too (querying by `gameId` returns every participant); for
- *      a hobby-scale game count that's still tiny, and avoiding it would need a compound filter
- *      Firestore doesn't offer cleanly.
- *
- * Graceful degrade (mirrors `useGameConnectivity`): Firebase/Firestore load via a dynamic
- * `import()` so visiting the Stats screen never taxes the initial bundle, and
- * `probeBackendReachable` (the same reachability probe `useGameConnectivity` uses, checking
- * `checkBackendReachable` with a bounded timeout) gates the read — offline, a broken `VITE_FIREBASE_*`
- * config, or any failure along the way lands on the `error` status, never a throw/crash.
- * error-ux's four states have no separate "offline" bucket, so `error` covers both here; the
- * view's retry action is just calling `load()` again.
+ * This device's stats and head-to-head records, keyed on the Firebase anonymous uid, not the
+ * identity store's deviceUuid. Reads only games this device played; the math is in lib/game/stats.
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -46,8 +16,8 @@ export type StatsStatus = 'loading' | 'loaded' | 'empty' | 'error'
 
 export interface OpponentRecord {
   opponentDeviceUuid: string
-  /** The displayName from the OPPONENT's most recently finished shared game (see the file doc
-   * comment on why "most recent" needs `game_result.finishedAt`, not a field on `GamePlayer`). */
+  /** From the most recently finished shared game. `game_player` rows carry no timestamp, so
+   * `game_result.finishedAt` decides. */
   displayName: string
   record: HeadToHeadRecord
 }
@@ -60,19 +30,12 @@ function chunk<T>(items: readonly T[], size: number): T[][] {
   return chunks
 }
 
-/**
- * The opponent's displayName from whichever of `rows` belongs to the most recently finished game,
- * per `finishedAtByGameId` (ISO strings sort correctly as plain strings). Falls back to the last
- * row seen if none of them have a resolvable `finishedAt` — should not happen (every `game_player`
- * row's `game_result` is required to exist by firestore.rules's create rule) but keeps this total
- * rather than throwing on a row this module didn't expect.
- */
+/** The displayName from the most recently finished of `rows` (ISO timestamps sort as strings). */
 function mostRecentDisplayName(
   rows: readonly GamePlayer[],
   finishedAtByGameId: ReadonlyMap<string, string>,
 ): string {
-  // `reduce` with no seed operates directly on elements (never an out-of-bounds index), so this
-  // needs no non-null assertion even under `noUncheckedIndexedAccess` — unlike `rows[0]`.
+  // Unseeded reduce needs no `rows[0]` assertion; every opponent has at least one row.
   return rows.reduce((best, row) => {
     const bestFinishedAt = finishedAtByGameId.get(best.gameId) ?? ''
     const finishedAt = finishedAtByGameId.get(row.gameId) ?? ''
@@ -80,8 +43,7 @@ function mostRecentDisplayName(
   }).displayName
 }
 
-/** Groups every non-own row by opponent uid and derives each opponent's displayName + head-to-head
- * record. `rows` is the FULL loaded set (own + opponents') — `headToHead` filters internally. */
+/** Each opponent's latest name and head-to-head record. `rows` includes this device's own. */
 function buildOpponentRecords(
   uid: string,
   rows: GamePlayer[],
@@ -109,8 +71,7 @@ export const useStatsStore = defineStore('stats', () => {
   const stats = ref<PlayerStats | null>(null)
   const opponents = ref<OpponentRecord[]>([])
 
-  /** Loads (or reloads) this device's stats. Never throws — every failure mode, including a
-   * broken/absent Firebase config, an offline device, or a rejected read, lands on `error`. */
+  /** Never throws: offline, a broken config or a refused read all land on `error`. */
   async function load(): Promise<void> {
     status.value = 'loading'
     try {
@@ -150,6 +111,9 @@ export const useStatsStore = defineStore('stats', () => {
         IN_QUERY_CHUNK_SIZE,
       )
 
+      // Every row of those games gives the opponents; the results give their finish times.
+      // Results by participant, not `documentId() in`: production refuses that with this filter,
+      // though the emulator allows it.
       const [playerSnapshots, resultSnapshot] = await Promise.all([
         Promise.all(
           gameIdChunks.map((ids) =>

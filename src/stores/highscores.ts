@@ -1,8 +1,6 @@
 /**
- * Global highscores (fourth round): three top-10 lists across every game played with the app,
- * read from the public `leaderboard` entries a finished game publishes (lib/data/firestore-stats).
- * Loaded on its own, so a problem here never hides this device's own stats, or the other way
- * round. Firebase loads on first use, like the stats store.
+ * Global top-10 lists, read from the public `leaderboard` entries finished games publish. Loaded
+ * apart from this device's stats, so a failure in one never hides the other.
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'

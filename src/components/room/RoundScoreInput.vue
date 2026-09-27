@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: a labelled numeric field for one leftover-card score. Wraps the shadcn
- * Input/Label primitives; exposes its value as `number | null` via `defineModel` (Input's own
- * v-model is string-only, so the string<->number conversion lives here, once). The default slot
- * sits beside the field, under the label, for an action such as ScoreCard's Save.
+ * Single job: a labelled numeric score field whose model is `number | null` (Input's own v-model
+ * is string-only). The default slot sits beside the field, for actions such as ✓.
  */
 import { computed } from 'vue'
 import { Input } from '@/components/ui/input'
@@ -21,13 +19,12 @@ const {
   label: string
   describedBy?: string
   isInvalid?: boolean
-  /** Keeps the label for screen readers only, for rows where something visible already says
-   * what the field is (the photo-count card list). */
+  /** Screen-reader-only label, for rows where something visible already names the field. */
   isLabelHidden?: boolean
   placeholder?: string
 }>()
 
-/** `commit` fires on Enter. */
+/** Fires on Enter. */
 const emit = defineEmits<{ commit: [] }>()
 
 const model = defineModel<number | null>({ default: null })

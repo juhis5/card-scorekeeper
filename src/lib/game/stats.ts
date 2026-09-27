@@ -1,27 +1,12 @@
-/**
- * Persistent player stats — pure derivation over `GamePlayer[]` rows (see docs/PLAN.md "Stats &
- * history" and docs/DECISIONS.md's 2026-07-24 "Stats identity keying" entry). No I/O: every row
- * this module reads is already in memory (loaded from `game_player` by whatever calls in from
- * the stats store/view, a later slice) — this file only computes numbers from them.
- *
- * `GameResult[]` turns out NOT to be needed here: every fact "Stats tracked" in docs/PLAN.md asks
- * for (games played, wins, best/worst score, best/worst round, averages, head-to-head) is already
- * on each `GamePlayer` row (including its own `gameId`), so grouping by `gameId` within
- * `GamePlayer[]` alone is sufficient — matching docs/PLAN.md's "Head-to-head is derived by
- * comparing placement... across games that share a game_id — no separate table needed."
- *
- * Identity caveat (per DECISIONS): these functions don't know or care whether a `deviceUuid` is a
- * real device or a local game's synthetic per-game id — that distinction is the caller's
- * responsibility (only real devices' rows should be fed in for aggregation); the math here is the
- * same either way.
- */
+/** Stats derived from `GamePlayer` rows alone, grouped by `gameId`. The math can't tell a real
+ * device from a local game's synthetic id, so callers pass only real devices' rows. */
 import type { GamePlayer } from './types'
 
 export interface PlayerStats {
   deviceUuid: string
   gamesPlayed: number
   wins: number
-  /** `0` (not `null`) when `gamesPlayed` is 0 — "0 games, 0% win rate" reads better than NaN. */
+  /** 0, not NaN, with no games. */
   winRate: number
   bestFinalScore: number | null
   worstFinalScore: number | null
@@ -41,10 +26,7 @@ const NO_GAMES_STATS_EXCEPT_IDENTITY = {
   averageFinalScore: null,
 } as const
 
-/**
- * Derives one player's stats from every `GamePlayer` row across every finished game, theirs and
- * others' alike — filters to `deviceUuid` internally so callers can pass the whole loaded table.
- */
+/** Filters to `deviceUuid`, so callers can pass every loaded row. */
 export function playerStats(deviceUuid: string, games: GamePlayer[]): PlayerStats {
   const own = games.filter((game) => game.deviceUuid === deviceUuid)
   if (own.length === 0) {
@@ -72,18 +54,14 @@ export function playerStats(deviceUuid: string, games: GamePlayer[]): PlayerStat
 export interface HeadToHeadRecord {
   deviceUuid: string
   opponentDeviceUuid: string
-  /** Games where BOTH device UUIDs have a row — not either player's total games played. */
+  /** Games both played, not either one's total. */
   gamesPlayed: number
   wins: number
   losses: number
   ties: number
 }
 
-/**
- * `deviceUuid`'s record against `opponentDeviceUuid`, across every game both of them share (same
- * `gameId`). Lower `placement` wins that game; equal placement (co-winner tie, or any other
- * shared placement) is a tie. Symmetric: swapping the two arguments swaps wins and losses.
- */
+/** Across the games both played: the lower placement wins, an equal one is a tie. */
 export function headToHead(
   deviceUuid: string,
   opponentDeviceUuid: string,
@@ -115,14 +93,7 @@ export function headToHead(
   return { deviceUuid, opponentDeviceUuid, gamesPlayed, wins, losses, ties }
 }
 
-/**
- * The best (lowest) and worst (highest) single-round point total from one player's round scores
- * in one game — feeds `GamePlayer.bestRound`/`worstRound` at persistence time (see
- * `local-repository.ts` and `firestore-repository.ts`'s `finishGame`). Throws on an empty list —
- * there is no best/worst of zero rounds; callers with no recorded rounds for a player must guard
- * before calling this, the same way `rules.ts#contractForRound` throws on an invalid round rather
- * than silently returning a meaningless value.
- */
+/** Lowest and highest round. Throws on an empty list: there's no best of zero rounds. */
 export function bestAndWorstRound(points: readonly number[]): {
   bestRound: number
   worstRound: number

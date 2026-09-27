@@ -1,13 +1,4 @@
-/**
- * CI-gated (test:run) unit test for `FirestoreGameRepository.finishGame`'s stats-building —
- * mocks the Firestore SDK boundary entirely (no emulator), unlike the deeper real-emulator proof
- * in tests/integration/firestore-repository.test.ts (quarantined, not in CI). This test exists
- * specifically to pin the forgery fix (docs/DECISIONS.md): the `game_player` rows finishGame
- * builds must carry each participant's own AUTH UID as `deviceUuid` — not their localStorage
- * `device_uuid` — because firestore.rules can only verify room participation
- * (`exists(room/{gameId}/players/{deviceUuid})`) against the value player docs are actually keyed
- * by.
- */
+/** The Firestore SDK is mocked here; tests/integration runs the real emulator. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GamePlayer, GameResult } from '../game/types'
 

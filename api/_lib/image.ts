@@ -1,11 +1,6 @@
-/**
- * Server-side image size cap — defence-in-depth behind the client-side downscale (see the
- * vercel-gemini skill: "Downscale the image in the browser before upload"). The client resize
- * targets well under ~1.5 MB; this cap is the trust boundary, not the optimisation.
- */
+/** The server-side image size cap: the trust boundary behind the client's downscale. */
 
-/** ~1.5 MB of decoded image bytes — matches the client downscale target in the vercel-gemini
- * skill, with headroom for JPEG quality variance. */
+/** ~1.5 MB decoded: above the client's downscale target, with headroom for JPEG quality. */
 export const MAX_IMAGE_BYTES = 1_500_000
 
 /** Decoded byte length of a base64 string, without allocating a buffer for it. */

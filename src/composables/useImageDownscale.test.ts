@@ -31,8 +31,7 @@ describe('computeDownscaledDimensions', () => {
   })
 })
 
-/** A fake `ImageBitmap` — just enough shape for `downscale()` to read `width`/`height` and call
- * `close()`, no real decoded image needed (see the tdd skill's "mock at the boundary"). */
+/** A fake `ImageBitmap`: just `width`, `height` and `close()`. */
 function makeFakeBitmap(width: number, height: number) {
   return { width, height, close: vi.fn() } as unknown as ImageBitmap
 }

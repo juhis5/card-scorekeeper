@@ -12,8 +12,7 @@ vi.mock('@/lib/data/firebase', () => ({
   checkBackendReachable: () => ensureSignedInMock(),
 }))
 
-/** A where() clause captured as data so the getDocs mock can dispatch on it (see below) — mirrors
- * firestore-stats.test.ts's "mock the boundary, inspect the shape" style rather than the real SDK. */
+/** A where() clause captured as data, so the getDocs mock can dispatch on it. */
 interface WhereClause {
   field: string
   op: string
@@ -91,8 +90,7 @@ const ALL_ROWS: GamePlayer[] = [
     worstRound: 22,
   },
   {
-    // A solo local game with no opponent row at all — must still count toward this device's own
-    // aggregate stats (see docs/DECISIONS.md's "Stats identity keying" entry).
+    // A solo game with no opponent row still counts toward this device's own stats.
     gameId: 'g3',
     deviceUuid: ME,
     displayName: 'Me',
@@ -105,7 +103,7 @@ const ALL_ROWS: GamePlayer[] = [
 
 const ALL_RESULTS: Record<string, string> = {
   g1: '2026-01-01T00:00:00.000Z',
-  g2: '2026-02-01T00:00:00.000Z', // later than g1 — "most recent" must pick this row's Bob name.
+  g2: '2026-02-01T00:00:00.000Z', // after g1, so "most recent" picks this Bob name
   g3: '2026-01-15T00:00:00.000Z',
 }
 
@@ -125,8 +123,7 @@ function clauseOn(query: FakeQuery, field: string): WhereClause | undefined {
   return query.clauses.find((clause) => clause.field === field)
 }
 
-/** Dispatches a mocked getDocs call by inspecting the fake query's collection path + where clauses
- * — robust to call order/chunking, unlike a fixed mockResolvedValueOnce chain. */
+/** Answers getDocs from the fake query's collection and where clauses, whatever the call order. */
 function installFixtureGetDocs(rows: GamePlayer[] = ALL_ROWS): void {
   getDocsMock.mockImplementation(async (query: FakeQuery) => {
     const byDevice = clauseOn(query, 'deviceUuid')
@@ -155,9 +152,7 @@ beforeEach(() => {
   getDbMock.mockReturnValue({ marker: 'db' })
 })
 
-// Unconditional, unlike an inline `vi.unstubAllGlobals()` at the end of a test body — a stubbed
-// `navigator` must never survive a failing assertion into the next test (see the tdd skill's
-// "test-order / shared state" flakiness guidance).
+// In afterEach, so a failing assertion can't leave `navigator` stubbed.
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -204,8 +199,7 @@ describe('useStatsStore.load — success', () => {
 
     expect(statsStore.opponents).toHaveLength(1)
     const bob = statsStore.opponents.at(0)
-    // g1: me placement 1 < Bob placement 2 -> a win. g2: me placement 2 > Bob placement 1 -> a
-    // loss. g3 has no Bob row, so it's excluded from gamesPlayed (2, not 3).
+    // g1 a win, g2 a loss; g3 has no Bob row, so it doesn't count.
     expect(bob?.record).toEqual({
       deviceUuid: ME,
       opponentDeviceUuid: BOB,
@@ -223,7 +217,7 @@ describe('useStatsStore.load — success', () => {
 
     await statsStore.load()
 
-    // g2 (2026-02) finished after g1 (2026-01) — Bob's g2 name must win, not the last-seen row.
+    // g2 finished after g1, so Bob's g2 name wins.
     expect(statsStore.opponents.at(0)?.displayName).toBe('Bob (game 2)')
   })
 

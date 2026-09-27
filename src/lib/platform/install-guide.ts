@@ -1,8 +1,7 @@
 /**
- * Which install steps to show when the browser has no install prompt of its own (third playtest:
- * installing didn't work on an iPhone with Chrome). Android Chrome and desktop Chromium fire
- * `beforeinstallprompt` and need no steps. No iPhone browser ever does: they all run on WebKit,
- * and there installing is Share → Add to Home Screen, with Share in a different place per browser.
+ * Install steps for browsers without an install prompt. Android Chrome and desktop Chromium fire
+ * `beforeinstallprompt`. No iPhone browser does: all run on WebKit, where installing is Share →
+ * Add to Home Screen, and each browser puts Share somewhere else.
  */
 
 export type InstallGuide = 'ios-safari' | 'ios-chrome' | 'ios-other' | 'android'
@@ -12,7 +11,7 @@ export interface DeviceHints {
   maxTouchPoints: number
 }
 
-/** iPadOS Safari asks for desktop sites, so its user agent says Macintosh: the touch screen tells. */
+/** iPadOS Safari's user agent says Macintosh, so the touch screen tells it apart. */
 function isAppleMobile({ userAgent, maxTouchPoints }: DeviceHints): boolean {
   return /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1)
 }

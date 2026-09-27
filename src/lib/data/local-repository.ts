@@ -1,16 +1,5 @@
-/**
- * LocalGameRepository — offline, single-device GameRepository. In-memory GameState
- * persisted to localStorage so a page reload resumes the same game. No network;
- * `roomCode` is always null. `subscribe` re-emits the full state to a new listener
- * immediately, and to every listener again on each mutation.
- *
- * `finishGame` also queues the permanent stats record (a `GameResult` plus the HOST's own single
- * `GamePlayer` row only — see `buildHostGamePlayer`'s doc comment for why not the local
- * co-players' too, see docs/PLAN.md "Stats & history") into the pending-results localStorage
- * queue — there is no network here, so they can't be written to Firestore directly;
- * `pending-results.ts`'s `flushPendingResults` uploads them once the app is next online (see
- * docs/DECISIONS.md's "Reconnect = push final result only").
- */
+/** Offline, single-device game, saved to localStorage so a reload resumes it. With no network,
+ * `finishGame` queues the stats for the reconnect flush. */
 import {
   TOTAL_ROUNDS,
   contractForRound,
@@ -35,19 +24,13 @@ import type {
   Unsubscribe,
 } from './repository'
 
-/** Exported so tests can pre-seed/inspect the exact key this repository persists under. */
 export const STORAGE_KEY = 'card-scorekeeper:local-game'
 const FIRST_ROUND = 1
 
-/** Everything this repository persists: the domain GameState plus the bits it alone needs. */
 interface StoredGame {
   gameId: GameId
-  /** Not enforced in local mode (single device, single host) — kept so a future permission
-   * model (or a shared-device edge case) has it available without a repository change. */
   hostDeviceUuid: string
-  /** The host's seated playerId — kept alongside (not inside) GameState, so a resumed repository
-   * can report it back to the game store (see `getResumeInfo`) without `createGame()` having run
-   * in this process. */
+  /** Kept outside GameState so a resumed repository can report it (see `getResumeInfo`). */
   hostPlayerId: PlayerId
   state: GameState
 }
@@ -65,9 +48,7 @@ function emptyStoredGame(): StoredGame {
   }
 }
 
-// Re-exported so existing call sites (`stores/game.ts`, this file's own tests) keep importing it
-// from here — the interface itself now lives in `key-value-storage.ts`, shared with
-// `pending-results.ts` (see that file's doc comment on why it was extracted).
+// Re-exported for the stores and tests that import it from here.
 export type { KeyValueStorage }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,9 +89,8 @@ function isGameState(value: unknown): value is GameState {
   )
 }
 
-/** Guards the localStorage boundary: untrusted `unknown` in, a real `StoredGame` or nothing. A
- * schema change, a partial write, or foreign data under our key must never crash the offline
- * host — it must just look like "no saved game" and start fresh. */
+/** A schema change, partial write or foreign data under our key reads as no saved game, never a
+ * crash. */
 function isStoredGame(value: unknown): value is StoredGame {
   return (
     isRecord(value) &&
@@ -128,24 +108,17 @@ function readStoredGame(storage: KeyValueStorage): StoredGame | null {
     const parsed: unknown = JSON.parse(raw)
     return isStoredGame(parsed) ? parsed : null
   } catch {
-    // Corrupted or foreign localStorage value under our key — start fresh instead of crashing.
     return null
   }
 }
 
-/**
- * True when `storage` holds a local game that has actually been started (`createGame()` called at
- * least once) — used to decide whether to resume on mount rather than show the empty state (see
- * `stores/game.ts`'s `resume()` and RoomView). Reading a "no persisted game" / corrupted value the
- * same way `readStoredGame` does means this never throws either.
- */
+/** A local game was started here, so the room screen can resume it. */
 export function hasPersistedGame(storage: KeyValueStorage = browserLocalStorage()): boolean {
   const stored = readStoredGame(storage)
   return stored !== null && stored.gameId !== ''
 }
 
-/** True when `storage` holds a local game that was started and isn't finished: the one Home
- * offers to continue, and the one a new local game would replace. */
+/** The game Home offers to continue, and the one a new local game would replace. */
 export function hasUnfinishedPersistedGame(
   storage: KeyValueStorage = browserLocalStorage(),
 ): boolean {
@@ -191,13 +164,7 @@ export class LocalGameRepository implements GameRepository {
     return { gameId, roomCode: null, hostPlayerId }
   }
 
-  /**
-   * The identifying bits `stores/game.ts`'s `resume()` needs to reconstruct the store's identity
-   * flags (`myPlayerId`, `isHost`) that normally come back from `createGame()`'s `CreatedGame` —
-   * resuming (a fresh repository instance reading an existing `StoredGame` from storage, not a
-   * fresh `createGame()` call) has no such return value to draw from otherwise. `null` when
-   * nothing has been persisted yet (mirrors `hasPersistedGame`).
-   */
+  /** What `createGame()` would have returned, for a repository resumed from storage. */
   getResumeInfo(): { gameId: GameId; hostPlayerId: PlayerId } | null {
     if (!this.game.gameId) return null
     return { gameId: this.game.gameId, hostPlayerId: this.game.hostPlayerId }
@@ -275,8 +242,7 @@ export class LocalGameRepository implements GameRepository {
   }
 
   async finishGame(): Promise<GameResult> {
-    // Only guards "too early" (round not yet reached) — trusts the caller (the UI, gating its
-    // Finish button) to have actually collected every player's score for round 5 first.
+    // Only guards "too early". The UI's Finish gate makes sure every score is in.
     if (this.game.state.currentRound !== TOTAL_ROUNDS) {
       throw new Error(
         `finishGame called at round ${this.game.state.currentRound}, before the final round ${TOTAL_ROUNDS}`,
@@ -291,9 +257,7 @@ export class LocalGameRepository implements GameRepository {
       totalRounds: TOTAL_ROUNDS,
     }
 
-    // No network here (offline by construction): queue the permanent record for the reconnect
-    // flush (see pending-results.ts) instead of writing it anywhere now. Best-effort, same as
-    // persistAndNotify above — a queueing failure must not fail the game the player just finished.
+    // Best-effort, like persistAndNotify: a queueing failure must not fail the finished game.
     appendPendingResult(this.storage, { result, players: [this.buildHostGamePlayer()] })
 
     return result
@@ -304,21 +268,9 @@ export class LocalGameRepository implements GameRepository {
   }
 
   /**
-   * Builds the ONE permanent `GamePlayer` row `finishGame` queues: the host's own — never the
-   * local ad-hoc co-players'. Two independent reasons this is correct, not a shortcut:
-   *
-   * 1. Locked decision (docs/DECISIONS.md "Stats identity keying"): local co-players get a fresh
-   *    synthetic per-game UUID, so their stats never aggregate across games anyway — a permanent
-   *    Firestore row for them would never be useful.
-   * 2. Security (docs/DECISIONS.md's forgery-fix entry): `firestore.rules`' local-path
-   *    (no-room) `game_player` create rule requires `deviceUuid == request.auth.uid` — a
-   *    self-write only. The reconnect flush (`reconnect-flush.ts`) stamps this row's `deviceUuid`
-   *    with whoever is actually signed in at flush time; queuing a co-player's row here would
-   *    just be queued data that could never pass that rule under anyone's auth session.
-   *
-   * `finalScore` is recomputed from `roundScores` (not the possibly-stale `totalScore` field) the
-   * same way the game store's `rankedPlayers` does, for the same reason: a written stats row is
-   * worth getting exactly right.
+   * Only the host's row: the no-room `game_player` rule accepts only a self-write (deviceUuid ==
+   * auth.uid), and co-players' synthetic per-game ids never aggregate anyway. `finalScore` comes
+   * from `roundScores`, not the possibly stale `totalScore`.
    */
   private buildHostGamePlayer(): GamePlayer {
     const { roundScores, players } = this.game.state
@@ -333,9 +285,7 @@ export class LocalGameRepository implements GameRepository {
     const points = roundScores
       .filter((score) => score.playerId === host.id)
       .map((score) => score.points)
-    // Trusts the same finishGame precondition as above — the host should have a score for every
-    // round reached — but never crashes on the edge case (no recorded rounds) rather than let
-    // bestAndWorstRound's empty-input throw surface here.
+    // No rounds shouldn't happen, but mustn't throw.
     const { bestRound, worstRound } =
       points.length > 0 ? bestAndWorstRound(points) : { bestRound: 0, worstRound: 0 }
 
@@ -351,14 +301,11 @@ export class LocalGameRepository implements GameRepository {
   }
 
   private persistAndNotify(): void {
-    // Persistence is best-effort: a save failure (e.g. iOS Safari private mode throws on
-    // setItem when its quota is 0) must not stop the in-memory game from running — it just
-    // means this game won't survive a reload. The live game notifying its subscribers is not
-    // allowed to depend on storage succeeding.
     try {
       this.storage.setItem(STORAGE_KEY, JSON.stringify(this.game))
     } catch {
-      // Swallowed deliberately — see comment above. Nothing actionable for the caller to do.
+      // Best-effort (Safari private mode has zero quota): the game runs on, it just won't
+      // survive a reload.
     }
     this.listeners.forEach((listener) => listener(this.game.state))
   }

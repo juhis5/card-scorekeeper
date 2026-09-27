@@ -20,37 +20,27 @@ const headerRoomCode = computed(() =>
   route.name === 'room' && game.roomCode === String(route.params.code) ? game.roomCode : null,
 )
 
-// Announces the active view's heading on every navigation — SPA route changes are otherwise
-// silent to screen readers (see a11y-mobile + routing skills). Focus itself moves to the
-// view's <h1> in router/index.ts; this is the redundant "hear it even if you're not tracking
-// focus" channel.
+// Announces each view's heading, for anyone not following the focus move in router/index.ts.
 const routeAnnouncement = computed(() => (route.meta.announceKey ? t(route.meta.announceKey) : ''))
 
-// A new version waiting: a dismissible banner, never an automatic reload (see stores/app-update).
 const appUpdate = useAppUpdateStore()
 const { needRefresh } = storeToRefs(appUpdate)
-// A live-region announcement is only reliable when the region already exists in the DOM before
-// its content changes (screen readers watch existing regions for mutations; inserting a whole
-// new role="status" node with text already inside it is not consistently announced) — same
-// always-present-but-empty pattern as `routeAnnouncement` above. The visible banner below is a
-// separate, purely visual element so the Reload/Dismiss buttons only enter the tab order while
-// the prompt is actually showing.
+// Both live regions stay in the DOM, empty until needed: screen readers reliably announce only
+// changes to a region that already exists. The visible banner is separate, so its buttons join
+// the tab order only while it shows.
 const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.available') : ''))
 </script>
 
 <template>
-  <!-- `env(safe-area-inset-*)` on the app frame, once, per the mobile-first golden rule. -->
+  <!-- Safe-area insets once, on the app frame. -->
   <div
     class="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
   >
     <div aria-live="polite" role="status" class="sr-only">{{ routeAnnouncement }}</div>
     <div aria-live="polite" role="status" class="sr-only">{{ updateAnnouncement }}</div>
 
-    <!-- Persistent chrome (see the routing skill), reachable from every route incl. mid-game:
-         Back, the room code while in an online room, and the menu with the pages (Stats is a
-         device-wide record, not tied to any one room) and the settings. No title link: Back
-         already leads home, and the app's name sits in the menu. Sticky: the only part of a page
-         that stays put while the rest scrolls (owner's call, second playtest). -->
+    <!-- On every route: Back, the room code in an online room, and the menu. No title link: Back
+         already leads home. Sticky: the one part of a page that stays put while it scrolls. -->
     <header
       data-app-header
       class="bg-background sticky top-0 z-20 mx-auto flex h-(--app-header-height) w-full max-w-md items-center gap-1 px-4 pt-2"
@@ -84,8 +74,8 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
       </Button>
     </div>
 
-    <!-- Keyed by path: a room's view state (seat order, which scores this device entered) belongs
-         to that room, so moving on to the next room after Play again starts the view afresh. -->
+    <!-- Keyed by path: a room's view state belongs to that room, so the next room after Play
+         again starts afresh. -->
     <RouterView v-slot="{ Component, route: current }">
       <component :is="Component" :key="current.path" />
     </RouterView>

@@ -1,13 +1,7 @@
 /**
- * Places a card as it opens, before its field is focused. On a touch screen it goes up to just
- * under the sticky header (`data-app-header`): a phone doesn't scroll a field it focuses from code
- * out from behind its keyboard (only one the finger tapped), and the keyboard only ever covers the
- * lower part of the screen (third playtest, iPhone: the lowest cards' fields stayed hidden). With a
- * mouse it just moves clear of the header and a room's bottom bar (`data-bottom-bar`).
- *
- * Deliberately not a resize listener. Following window.visualViewport while the keyboard was up
- * fought the player's own scrolling on an iPhone, whose visual viewport also resizes while
- * scrolling (the toolbars sliding in and out): the page jumped back mid-scroll (third playtest).
+ * Places a card as it opens. On touch it goes just under the sticky header, since a phone won't
+ * scroll a field focused from code out from behind its keyboard. No resize listener: an iPhone's
+ * viewport also resizes while scrolling, so following it fought the player's own scrolling.
  */
 import type { Ref } from 'vue'
 import { scrollToReveal, scrollToTop, type VerticalBox } from '@/lib/platform/keep-in-view'

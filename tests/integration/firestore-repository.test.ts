@@ -1,14 +1,7 @@
 /**
- * Emulator-backed integration test for `FirestoreGameRepository`, driving the real Firestore
- * client SDK against the same live emulator `pnpm test:rules` boots (see firebase.json), rules
- * fully enforced — no mocks. This is the one thing a fake-`GameRepository` unit test on
- * `stores/game.ts` cannot prove: that the join order (seat yourself, *then* subscribe) actually
- * works against real `onSnapshot` listeners. Reversing it would make the joiner's own subscribe
- * hit a real permission-denied that never self-heals, even after the join completes — see
- * `stores/game.ts`'s `join()` doc comment and docs/DECISIONS.md's read-gate entry.
- *
- * Runs on the SDK's browser build (WebChannel), the transport the app actually ships — see
- * vitest.integration.config.ts for why the Node/gRPC build was flaky against the emulator.
+ * `FirestoreGameRepository` against the emulator and the real rules, no mocks. Proves what a fake
+ * can't, such as seating yourself before subscribing (the reverse hits a permission-denied that
+ * never heals). Uses the SDK's browser build; vitest.config.ts says why.
  */
 import { afterEach, describe, expect, it } from 'vitest'
 import { deleteApp, initializeApp, type FirebaseApp } from 'firebase/app'
@@ -41,8 +34,7 @@ interface Device {
 let deviceCount = 0
 const apps: FirebaseApp[] = []
 
-/** A fresh Firebase App + emulator-connected Firestore/Auth — models one physical device. Each
- * gets its own independent anonymous auth session, exactly like two phones at the same table. */
+/** One device: its own Firebase app and anonymous session, connected to the emulators. */
 function makeDevice(): Device {
   deviceCount += 1
   const app = initializeApp(
@@ -57,8 +49,7 @@ function makeDevice(): Device {
   return { app, db, auth }
 }
 
-/** Resolves with the first emitted state matching `predicate`, then unsubscribes — event-driven
- * (no sleep/poll): `onSnapshot` pushes new states as they arrive on its own. */
+/** The first emitted state matching `predicate`, then unsubscribes. No sleeping or polling. */
 function waitForState(
   repo: FirestoreGameRepository,
   predicate: (state: GameState) => boolean,
@@ -95,9 +86,7 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
       auth: joiner.auth,
       roomCode: created.roomCode ?? undefined,
     })
-    // addPlayer *before* subscribe, mirroring stores/game.ts's join() — the whole point of this
-    // test. Seats Alice as a room member first so her own subscribe (below) passes the
-    // members-only read gate on players/roundScores from its very first snapshot.
+    // Seat first, then subscribe (as join() does), so the first snapshot passes the read gate.
     const aliceUid = await joinerRepo.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
     expect(joiner.auth.currentUser?.uid).toBe(aliceUid)
 
@@ -111,9 +100,7 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     const joinerState = await joinerSeesSelf
     expect(joinerState.players.some((player) => player.id === aliceUid)).toBe(true)
 
-    // The player-total update and the roundScore doc live in separate onSnapshot listeners
-    // (players vs roundScores subcollections) that resolve independently — wait for BOTH to have
-    // landed in the same emitted state, not just whichever settles first.
+    // The total and the round score arrive through separate listeners: wait for both.
     const hostSeesScore = waitForState(
       hostRepo,
       (state) =>
@@ -129,10 +116,8 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     joinerRepo.leave()
   })
 
-  // Proves the real write finishGame() produces actually satisfies the real firestore.rules —
-  // the mocked unit test (firestore-stats.test.ts) only proves the shape of the call, and the
-  // rules test (tests/rules) only proves the rules against hand-written fixtures; this is the one
-  // place both meet against a real emulator.
+  // The real finishGame() writes against the real rules: the unit test checks only the calls, and
+  // the rules test only hand-written fixtures.
   it('writes game_result + a game_player row per player on finishGame, readable back', async () => {
     const host = makeDevice()
     const hostRepo = new FirestoreGameRepository({ db: host.db, auth: host.auth })
@@ -166,10 +151,8 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
       participantUids: expect.arrayContaining([created.hostPlayerId, aliceUid]),
     })
 
-    // deviceUuid on these permanent rows is each participant's own auth uid (room/{code}/players
-    // is keyed by it) — NOT the localStorage device_uuid ('device-host'/'device-a') passed to
-    // createGame/addPlayer above. See docs/DECISIONS.md's forgery-fix entry: firestore.rules can
-    // only verify room participation against the value player docs are actually keyed by.
+    // A stats row's deviceUuid is the auth uid, not the device_uuid passed above: the rules can
+    // check room membership only against the uid players/ is keyed by.
     const hostPlayerDoc = await getDoc(
       doc(host.db, `game_player/${roomCode}_${created.hostPlayerId}`),
     )

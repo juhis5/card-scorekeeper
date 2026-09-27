@@ -5,11 +5,6 @@ import pluginPlaywright from 'eslint-plugin-playwright'
 import pluginVitest from '@vitest/eslint-plugin'
 import skipFormatting from 'eslint-config-prettier/flat'
 
-// To allow more languages other than `ts` in `.vue` files, uncomment the following lines:
-// import { configureVueProject } from '@vue/eslint-config-typescript'
-// configureVueProject({ scriptLangs: ['ts', 'tsx'] })
-// More info at https://github.com/vuejs/eslint-config-typescript/#advanced-setup
-
 export default defineConfigWithVueTs(
   {
     name: 'app/files-to-lint',
@@ -47,8 +42,7 @@ export default defineConfigWithVueTs(
   },
 
   {
-    // shadcn-vue copy-in primitives are named after their HTML/Reka concept (Button, Input,
-    // Table, ...) by convention across the whole ecosystem — not our naming to change.
+    // shadcn-vue primitives keep their ecosystem-wide single-word names (Button, Input, Table).
     name: 'app/ui-primitives',
     files: ['src/components/ui/**/*.vue'],
     rules: {

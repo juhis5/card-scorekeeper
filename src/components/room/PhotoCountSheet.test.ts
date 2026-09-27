@@ -7,11 +7,8 @@ import { i18n } from '@/i18n'
 
 const countCardsMock = vi.fn()
 
-// A REAL ref, not a plain `{ value: false }` object — the component's template reads `isPending`
-// via Vue's runtime `unref()`, which only unwraps genuine refs (checked via `isRef()`); a plain
-// object would stay truthy forever and the pending branch would never clear (found in review).
-// Flipped around `countCardsMock`'s call here, mirroring the real composable's own
-// try/finally, so tests get a realistic pending → settled transition for free.
+// A real ref: the template unwraps `isPending` with `unref()`, which leaves a plain object as is,
+// so the pending branch would never clear. Flipped around the call like the real composable.
 const isPendingMock = ref(false)
 
 vi.mock('@/composables/usePhotoCount', () => ({
@@ -39,8 +36,7 @@ function renderSheet() {
   })
 }
 
-/** Opens the sheet, taps "take a photo", and picks a fake file — mirrors the real
- * trigger-then-camera flow players go through on a phone. */
+/** Opens the sheet, taps "take a photo" and picks a fake file, as on a phone. */
 async function selectAPhoto(): Promise<void> {
   await fireEvent.click(screen.getByRole('button', { name: 'Snap cards' }))
   await fireEvent.click(screen.getByRole('button', { name: 'Take or choose a photo' }))
@@ -50,8 +46,7 @@ async function selectAPhoto(): Promise<void> {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  // A "never resolves" test (the in-flight/pending cases below) leaves this stuck `true` —
-  // reset unconditionally so it can never bleed into an unrelated test's initial render.
+  // A "never resolves" test leaves this stuck at true.
   isPendingMock.value = false
 })
 

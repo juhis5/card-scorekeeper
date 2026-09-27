@@ -1,14 +1,7 @@
 /**
- * The game/room setup store. Orchestrates over a `GameRepository` — never Firestore, never
- * `LocalGameRepository` directly — so this file is identical whether the caller injected a
- * local offline game or (slice 4) a Firestore-backed online room. See the `GameRepository`
- * seam in src/lib/repository.ts and the firestore-realtime + vue-pinia skills.
- *
- * `resume()` (slice 5, offline robustness) is the one deliberate exception to "never
- * `LocalGameRepository` directly": resuming a persisted game after a reload is local-only by
- * definition (an online room is Firestore-backed and reconnects there, not resumed here — see
- * docs/DECISIONS.md's slice-5 entries), so there is no online counterpart this needs to stay
- * identical to, unlike `start`/`join`.
+ * The game store. It talks only to a `GameRepository`, so local and online games run the same
+ * code. The one exception is `resume()`, which is local-only by definition and so builds a
+ * `LocalGameRepository` itself.
  */
 import { computed, onScopeDispose, ref } from 'vue'
 import { defineStore } from 'pinia'
@@ -47,16 +40,12 @@ export const useGameStore = defineStore('game', () => {
   const state = ref<GameState>(initialGameState())
   const gameId = ref<GameId | null>(null)
   const roomCode = ref<string | null>(null)
-  /** True on this device after `start()` (it created the game); false after `join()`. Gates
-   * host-only actions (advance round / finish) in the UI — see RoomView. */
+  /** This device hosts the game: it created it, or rejoined as its host. */
   const isHost = ref(false)
-  /** The playerId THIS device is seated as — the host's seat after `start()`, the joiner's own
-   * seat after `join()`. Lets the UI show only this device's own editable score row online. */
+  /** The seat this device plays in. */
   const myPlayerId = ref<PlayerId | null>(null)
 
-  // Not `ref`s: the repository/unsubscribe handles are I/O plumbing, not state to render.
-  // Injected by `start()` — this is the seam. Tests pass a fake or a LocalGameRepository;
-  // slice 4 passes a FirestoreGameRepository. The store never imports a concrete repository.
+  // Not refs: I/O handles, nothing to render.
   let repository: GameRepository | null = null
   let unsubscribe: Unsubscribe | null = null
   /** Why the live room stopped updating: 'removed' when the rules stopped letting this device
@@ -85,19 +74,11 @@ export const useGameStore = defineStore('game', () => {
     completedRoundsFor(state.value.currentRound, state.value.status),
   )
   const roundScores = computed(() => state.value.roundScores)
-  /** A non-null room code only ever comes from an online (Firestore) repository — local mode's
-   * `CreatedGame.roomCode` is always null (see repository.ts) — so this doubles as "is this a
-   * live multi-device room" without the store importing a concrete repository to ask. */
+  /** Only an online repository returns a room code, so this means "a live multi-device room". */
   const isOnline = computed(() => roomCode.value !== null)
 
-  /**
-   * Players with `totalScore` RECOMPUTED from `state.roundScores`, never the writable field a
-   * repository/document reports. Low-total-wins makes a falsified `totalScore` self-SERVING
-   * (not "self-defeating" — see docs/DECISIONS.md), and Firestore rules bound `points`/`round`
-   * but can't sum a player's own docs into a trustworthy total — so ranking derives it here
-   * instead of trusting the field. Both repositories already emit `roundScores`, so this covers
-   * local and online alike.
-   */
+  /** Totals recomputed from `roundScores`, never the writable `totalScore` field: the rules can't
+   * verify a sum, and with the low total winning, a faked total would pay off. */
   const rankedPlayers = computed<Player[]>(() =>
     state.value.players.map((player) => ({
       ...player,
@@ -105,8 +86,8 @@ export const useGameStore = defineStore('game', () => {
     })),
   )
   const standings = computed(() => standingsFor(rankedPlayers.value))
-  /** What the scoreboard shows: numbers only for revealed rounds (see lib/scoreboard.ts).
-   * `standings` stays the full live ranking, for seat order, the Next gate and the winner. */
+  /** What the scoreboard shows: numbers only for revealed rounds. `standings` stays the full
+   * live ranking, for seat order, the Next gate and the winner. */
   const board = computed(() =>
     boardRows(state.value.players, state.value.roundScores, completedRounds.value),
   )
@@ -134,7 +115,7 @@ export const useGameStore = defineStore('game', () => {
     followRoom(repo)
   }
 
-  /** Starts a new game against the given repository and begins reflecting its live state. */
+  /** Starts a new game as its host. */
   async function start(repo: GameRepository, config: GameConfig): Promise<void> {
     leave()
     repository = repo
@@ -142,12 +123,9 @@ export const useGameStore = defineStore('game', () => {
   }
 
   /**
-   * Play again: starts the next game with the same players while the finished one stays on
-   * screen, then follows it as its host. A failed create changes nothing, so the host can retry.
-   *
-   * Online, the next room is linked from the finished one first, then everyone is seated there
-   * as they were (the rules only let the host seat them in the room the finished one points at),
-   * and each phone moves over once it sees its seat. Locally, `otherNames` are seated again.
+   * Starts the next game with the same players while the finished one stays on screen. Online,
+   * the finished room links to the next one first: the rules only let the host seat players in
+   * the room it points at. A failed create changes nothing, so the host can retry.
    */
   async function playAgain(
     nextRepo: GameRepository,
@@ -159,12 +137,11 @@ export const useGameStore = defineStore('game', () => {
     if (finishedRoomCode && isReplayable(finished) && isReplayable(nextRepo)) {
       const created = await nextRepo.createNextGame(config, finishedRoomCode)
       if (created.roomCode) {
-        // The next game goes ahead even when the link doesn't land: an expired room refuses it,
-        // and the next room's code is on screen to share instead. Guests still come along.
+        // A refused link (an expired room) doesn't stop the next game: its code is on screen.
         await finished.linkNextRoom(created.roomCode).catch(() => undefined)
       }
-      // Nor when bringing the others fails: the link is set once, so a retry would point the
-      // others at a room the host isn't in. Their phones still have "Join the next game".
+      // Nor a failed carry: the link is set once, so a retry would point the others at a room
+      // the host isn't in. Their phones still offer "Join the next game".
       await nextRepo.carrySeats().catch(() => undefined)
       leave()
       hostCreatedGame(nextRepo, created)
@@ -177,16 +154,9 @@ export const useGameStore = defineStore('game', () => {
   }
 
   /**
-   * Joins an existing online game by room code: seats `player` as a new player, then begins
-   * reflecting the room's live state — never calling `createGame` (the host already did that;
-   * see `start`). Order matters: `addPlayer` must resolve *before* `subscribe` is called. The
-   * room-scoped read gate in firestore.rules only lets already-seated members read the
-   * players/roundScores subcollections, so subscribing first would hit a permission-denied that
-   * `onSnapshot` never recovers from, even after the join completes (see firestore-realtime).
-   *
-   * The current game, if any, is left only once the seat is taken: a refused seat changes nothing
-   * here, so a player joining the next game from a finished one still sees it, and Home never
-   * offers to continue a room this device never got into.
+   * Joins an online room by code. `addPlayer` must resolve before `subscribe`: the rules only let
+   * seated players read the room, and a refused `onSnapshot` never recovers. The current game is
+   * left only once the seat is taken, so a refused join changes nothing.
    */
   async function join(
     repo: GameRepository,
@@ -207,11 +177,7 @@ export const useGameStore = defineStore('game', () => {
     return playerId
   }
 
-  /**
-   * Resumes this device's seat in an online room after a reload: the room code comes from the
-   * URL, the seat and host status from the room itself. Returns false, leaving the store idle,
-   * when a game is already running or this device has no seat there.
-   */
+  /** Resumes this device's online seat after a reload. False when busy or not seated there. */
   async function resumeOnline(repo: ResumableGameRepository, code: string): Promise<boolean> {
     if (repository) return false
     const seat = await repo.findSeat()
@@ -225,23 +191,13 @@ export const useGameStore = defineStore('game', () => {
     return true
   }
 
-  /**
-   * Resumes an already-persisted LOCAL game after a hard reload — mirrors `start()`'s wiring
-   * (records identity, subscribes) but skips `createGame()`: the repository's storage already has
-   * a game, `getResumeInfo()` reads back the identity `createGame()` would otherwise have
-   * returned. No-ops (returns `false`) when a repository is already active — never clobber a
-   * running game — or when nothing is persisted. `deps.storage` lets tests inject a fake instead
-   * of real `localStorage` (see the tdd skill); RoomView calls this with no args in production.
-   */
+  /** Resumes the saved local game after a reload. False when busy or nothing is saved. */
   function resume(deps: { storage?: KeyValueStorage } = {}): boolean {
     if (repository) return false
     if (!hasPersistedGame(deps.storage)) return false
 
     const repo = new LocalGameRepository({ storage: deps.storage })
     const resumed = repo.getResumeInfo()
-    // Belt-and-suspenders: storage could in principle change between the hasPersistedGame()
-    // check above and this read. Never expected in practice (single-threaded, no await between
-    // them), but falling through to "nothing to resume" is always safe.
     if (!resumed) return false
 
     repository = repo
@@ -278,10 +234,7 @@ export const useGameStore = defineStore('game', () => {
     return requireRepository().finishGame()
   }
 
-  /** Tears down the subscription and the repository's own resources. Safe to call repeatedly.
-   * Resets `state` too — not just the identity flags — so a finished game's players/roundScores/
-   * status never linger in the UI after leaving, waiting for the next repository's first
-   * snapshot to overwrite them (Play again moves straight from a finished game to the next). */
+  /** Tears everything down, state included, so a finished game never lingers. Safe to repeat. */
   function leave(): void {
     unsubscribe?.()
     unsubscribe = null

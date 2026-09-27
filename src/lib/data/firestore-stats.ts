@@ -1,28 +1,5 @@
-/**
- * Writes the permanent stats records (`game_result` + `game_player`, see docs/PLAN.md "Stats &
- * history") to Firestore, and each row's public highscore entry (`leaderboard`). Shared by two call sites that both need exactly this shape:
- * `FirestoreGameRepository.finishGame` (an online game finishing normally) and the reconnect
- * flush wiring (`pending-results.ts`'s `flushPendingResults`, for a `LocalGameRepository` game
- * finished offline and only now reaching a connection) — see docs/DECISIONS.md's "Reconnect =
- * push final result only".
- *
- * Sequential, not batched — `game_result` is created (and confirmed to exist) before any
- * `game_player` doc is written, mirroring `FirestoreGameRepository.createGame`'s room-then-player
- * write order. This isn't just style: `firestore.rules`' `game_player` create rule checks a
- * matching `game_result` already `exists()`, and a `get()` inside a rule does not see a sibling
- * write from the same batch/transaction — so the two must be genuinely sequential writes, not one
- * atomic batch.
- *
- * Idempotent per document (`getDoc` before `setDoc`, skipping a doc that's already there) — not
- * just for tidiness. The reconnect flush (`pending-results.ts`) retries a whole `PendingResult` on
- * its NEXT launch after any failure, including a *partial* one: `Promise.all` over `game_player`
- * writes rejects as soon as one of them fails, but any others that already resolved are already
- * committed in Firestore. Firestore's append-only `game_result`/`game_player` rules deny `update`,
- * so blindly re-`setDoc`-ing a doc a prior attempt already wrote would turn one transient failure
- * into a permanent one — the retry itself would be denied forever, silently blocking every later
- * offline game from ever syncing. Checking existence first makes every write here safe to retry
- * any number of times.
- */
+/** A finished game's permanent records and highscore entries, written by the online finishGame
+ * and by the reconnect flush for games finished offline. */
 import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore'
 import type { GamePlayer, GameResult } from '../game/types'
 
@@ -79,24 +56,24 @@ async function ensureLeaderboardEntryWritten(
   })
 }
 
-/** Writes one finished game's permanent records: the `game_result` doc, then every player's
- * `game_player` row (in parallel with each other — they don't depend on one another, only on the
- * already-committed `game_result`). Safe to call repeatedly for the same result (see doc
- * comment above) — already-written docs are left untouched. */
+/** Safe to retry: each write skips a doc that exists. The rules forbid updates, so re-writing a doc
+ * that a partly failed attempt already wrote would be denied forever and block every later sync. */
 export async function writeGameResult(
   db: Firestore,
   result: GameResult,
   players: GamePlayer[],
 ): Promise<void> {
-  // Every doc names the game's players (their auth uids, which is what `deviceUuid` holds on
-  // these rows), so firestore.rules can show a result only to the people who played it.
+  // The players' auth uids (what `deviceUuid` holds here), so firestore.rules shows a result
+  // only to the people who played it.
   const participantUids = players.map((player) => player.deviceUuid)
+  // Before the player rows, not batched: their rule checks this doc exists(), and a rule doesn't
+  // see a sibling write in the same batch.
   await ensureGameResultWritten(db, result, participantUids)
   await Promise.all(
     players.map(async (player) => {
       await ensureGamePlayerWritten(db, player, participantUids)
-      // Highscores are an extra: an entry that can't be written (rules without the leaderboard, a
-      // dropped connection) must never keep a game from finishing, so it's left out, not retried.
+      // Highscores are an extra: a failed entry (say, rules without the leaderboard yet) must
+      // never keep a game from finishing, so it's dropped, not retried.
       await ensureLeaderboardEntryWritten(db, result, player).catch(() => undefined)
     }),
   )

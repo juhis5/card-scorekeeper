@@ -1,20 +1,7 @@
 /**
- * Firebase init — app, Firestore, and Anonymous Auth. The web config is public by design
- * (see CLAUDE.md); security is enforced entirely by `firestore.rules`, never by hiding this
- * config. See the firestore-realtime skill and docs/DECISIONS.md's 2026-07-24 online-auth entry:
- * Anonymous Auth's `uid` is the AUTH key Firestore rules check; `device_uuid` (identity store)
- * stays the separate, persistent STATS key.
- *
- * Every real Firebase call (`initializeApp`, `initializeFirestore`, `getAuth`) is deferred to
- * first use via the `getDb()`/`getFirebaseAuth()` getters below, instead of running eagerly at
- * module top level. This is defensive, belt-and-suspenders init (see docs/DECISIONS.md's slice-5
- * offline-robustness entry) — the actual GUARANTEE that a broken/missing `VITE_FIREBASE_*` config
- * degrades the host to a local game is the try/catch around `loadFirebase()` in
- * `useGameConnectivity.ts` (a dynamic `import()` rejects if the imported module throws
- * synchronously while evaluating — confirmed empirically: `getAuth(app)` on a blank config throws
- * `Firebase: Error (auth/invalid-api-key)` synchronously). Keeping this module's own top level
- * free of any Firebase call means merely importing it can never itself crash — only actually
- * calling `getDb()`/`getFirebaseAuth()` can, and every call site is behind that guaranteed catch.
+ * The web config is public; firestore.rules is the security. No Firebase call runs at import, as
+ * getAuth() throws synchronously on a blank config. Only the getters can throw, inside callers'
+ * catches (useGameConnectivity.ts falls back to local play).
  */
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
@@ -47,16 +34,8 @@ function getFirebaseApp(): FirebaseApp {
   return cachedApp
 }
 
-/**
- * True when this browsing context can plausibly support IndexedDB-backed persistence. A
- * synchronous localStorage write/remove is the best signal available before Firestore's own
- * (async, internal) IndexedDB open would fail — constrained storage (iOS Safari PRIVATE mode
- * blocks IndexedDB/localStorage together) throws here too, so this predicts the same failure up
- * front instead of letting `persistentLocalCache` fail into it later, noisily (see
- * docs/DECISIONS.md's slice-5 entry: `Failed to set zombie client id` / `removeItem
- * NS_ERROR_FAILURE` observed in the 4b-ii e2e). Pure + injectable so it's unit-testable without a
- * real browser storage API (see the tdd skill's "mock at the boundary").
- */
+/** A synchronous localStorage write is the best early sign that IndexedDB persistence will work.
+ * Constrained storage (iOS Safari private mode) throws here instead of failing noisily later. */
 export function canUsePersistentCache(
   deps: {
     hasIndexedDb?: () => boolean
@@ -77,8 +56,6 @@ export function canUsePersistentCache(
     probeLocalStorage()
     return true
   } catch {
-    // Constrained storage (private-mode Safari, cookies/site-data disabled, etc.) — fall back to
-    // the memory cache rather than let Firestore's own persistence setup fail into it later.
     return false
   }
 }
@@ -86,14 +63,9 @@ export function canUsePersistentCache(
 let cachedDb: Firestore | undefined
 
 /**
- * Lazily initializes Firestore, choosing `persistentLocalCache` — survives brief disconnects mid
- * online-game via cached reads + queued writes (see the firestore-realtime skill's "Offline host
- * mode") — when this context can support it, `memoryLocalCache` otherwise (see
- * `canUsePersistentCache`). Uses `persistentSingleTabManager`, not `persistentMultipleTabManager`:
- * multi-tab sync isn't a real need for a mobile, one-device-per-player card-table app, and
- * dropping it removes the cross-tab "zombie leadership" handshake that was the other source of
- * the persistence noise (see docs/DECISIONS.md) — the trade-off is that a player with the same
- * game open in two tabs on one device won't see the second tab live-update, an accepted edge case.
+ * The persistent cache rides out brief disconnects mid-game. Single-tab, since a phone at the table
+ * needs no multi-tab sync and its cross-tab leadership handshake was noisy. The cost: a second tab
+ * of the same game on one device doesn't live-update.
  */
 export function getDb(): Firestore {
   if (cachedDb) return cachedDb
@@ -102,8 +74,7 @@ export function getDb(): Firestore {
     : memoryLocalCache()
   cachedDb = initializeFirestore(getFirebaseApp(), { localCache })
   if (useEmulator) {
-    // Emulator connection must happen once, before any read/write — gated behind an explicit env
-    // flag (off in prod) so slice 4b's dev/e2e workflows can point at local emulators.
+    // Must connect before any read or write.
     connectFirestoreEmulator(cachedDb, 'localhost', 8280)
   }
   return cachedDb
@@ -120,19 +91,11 @@ export function getFirebaseAuth(): Auth {
   return cachedAuth
 }
 
-// Keyed by Auth instance (not a single module-level variable) so a test spinning up its own
-// emulator-connected Auth instance gets its own independent sign-in, never sharing state with
-// the app's singleton auth above.
+// Per Auth instance, so a test's own emulator Auth never shares sign-in state with the app's.
 const signInPromises = new WeakMap<Auth, Promise<string>>()
 
-/**
- * Ensures a device has an anonymous auth session, idempotently — `FirestoreGameRepository` must
- * await this (passing its own injected `auth` dep) before its first write (createGame/join/
- * addPlayer) or Firestore rules reject it (every rule requires `request.auth != null`). Safe to
- * call repeatedly and concurrently: an in-flight sign-in promise is reused rather than starting
- * a second one. Defaults to the app's singleton auth (lazily created) for convenience at call
- * sites that don't inject one.
- */
+/** Every rule needs `request.auth`, so await this before the first write. Concurrent calls share
+ * the sign-in in flight. */
 export function ensureSignedIn(authInstance: Auth = getFirebaseAuth()): Promise<string> {
   if (authInstance.currentUser) return Promise.resolve(authInstance.currentUser.uid)
   const existing = signInPromises.get(authInstance)
@@ -152,11 +115,9 @@ export function ensureSignedIn(authInstance: Auth = getFirebaseAuth()): Promise<
 const REACHABILITY_PROBE_PATH = 'room/probe'
 
 /**
- * The check before starting or joining an online game. Signing in isn't enough on its own: a
- * returning device's anonymous session is restored from cache with no network call, so on Wi-Fi
- * with no internet it would pass and the first write would then hang. A read from the server
- * proves Firestore itself answers. The rules let any signed-in user get a single room doc, and
- * getting one that doesn't exist is fine.
+ * Signing in isn't enough: a cached session restores with no network, so on Wi-Fi without internet
+ * it passes and the first write hangs. A server read proves Firestore answers. The rules let any
+ * signed-in user get one room doc, even a missing one.
  */
 export async function checkBackendReachable(authInstance: Auth, db: Firestore): Promise<void> {
   await ensureSignedIn(authInstance)

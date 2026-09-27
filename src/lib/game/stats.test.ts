@@ -6,7 +6,6 @@ const HOST = 'device-host'
 const ALICE = 'device-alice'
 const BOB = 'device-bob'
 
-/** A minimal, fully-specified GamePlayer row — tests override only the fields they care about. */
 function gamePlayer(
   overrides: Partial<GamePlayer> & Pick<GamePlayer, 'gameId' | 'deviceUuid'>,
 ): GamePlayer {

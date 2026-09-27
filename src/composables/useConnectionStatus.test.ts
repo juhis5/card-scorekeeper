@@ -2,8 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { effectScope } from 'vue'
 import { useConnectionStatus } from './useConnectionStatus'
 
-/** A fully injectable stand-in for `window`'s online/offline event wiring — deterministic, no
- * real browser events (see the tdd skill: mock the boundary, never real network/timers). */
+/** A stand-in for `window`'s online/offline events. */
 function makeFakeEventTarget() {
   const listeners: Record<'online' | 'offline', Array<() => void>> = { online: [], offline: [] }
   return {
@@ -22,9 +21,7 @@ function makeFakeEventTarget() {
   }
 }
 
-/** `onScopeDispose` (used for cleanup) only registers inside an active Vue effect scope — the
- * scope a component's `setup()` runs in normally. Runs the composable inside one explicitly,
- * matching how RoomView's `<script setup>` actually invokes it. */
+/** Runs `fn` in an effect scope, as a component's setup would, so `onScopeDispose` registers. */
 function runInScope<T>(fn: () => T): { result: T; dispose: () => void } {
   const scope = effectScope()
   const result = scope.run(fn) as T

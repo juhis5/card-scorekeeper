@@ -1,8 +1,7 @@
 {
   "extends": "./tsconfig.app.json",
 
-  // Override to include only test files and clear exclusions.
-  // Application code imported in tests is automatically included via module resolution.
+  // Test files only; the app code they import comes in through module resolution.
   "include": [
     "src/**/*.test.ts",
     "tests/**/*.test.ts",
@@ -13,13 +12,8 @@
   "exclude": [],
 
   "compilerOptions": {
-    // Tests run under happy-dom, which emulates the browser DOM, so component tests need the
-    // same DOM lib as the app. Inherit `lib` from tsconfig.app.json (es2022 + dom + dom.iterable)
-    // instead of overriding it — only `types` differs for the Vitest/node test environment.
+    // `lib` stays inherited from tsconfig.app.json: tests run under happy-dom and need the DOM.
     "types": ["node", "vitest/globals"],
-
-    // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
-    // Specified here to keep it out of the root directory.
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo"
   }
 }

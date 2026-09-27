@@ -1,20 +1,13 @@
 /**
- * Orchestrates the `/api/count` request: wires the pure gate/rate-limit/extraction logic plus the
- * two SDK boundaries (`verifyIdToken`/`getRoomSnapshot` from the Admin SDK, `geminiClient` from
- * the Gemini SDK) together. Every dependency is injected via `CountHandlerDeps`, so this whole
- * function is unit-testable with fakes — no real Firebase project or Gemini API key needed (see
- * the tdd skill). `api/count.ts` is the thin Vercel adapter that wires the real SDKs and calls
- * this.
- *
- * Gate order (cheapest checks first, per the vercel-gemini skill's "layered protection"):
- *   1. method + request shape (no I/O)               → 405 / 400
- *   2. image size cap (no I/O)                         → 413
- *   3. Firebase ID token (Admin SDK verify)            → 401
- *   4. room exists/active + caller is a member         → 403
- *   5. per-room, then global rate limit                → 429
- *   6. Gemini call (timeout / busy / other)            → 504 / 503 / 502
- *   7. model output validation                         → 422
- *   8. success — server-recomputed cards + total       → 200
+ * Handles POST /api/count with every dependency injected, so tests use fakes. Cheapest first:
+ *   1. method + request shape (no I/O)       → 405 / 400
+ *   2. image size cap (no I/O)               → 413
+ *   3. Firebase ID token                     → 401
+ *   4. room live + caller seated             → 403
+ *   5. per-room, then global rate limit      → 429
+ *   6. Gemini call (timeout / busy / other)  → 504 / 503 / 502
+ *   7. model output validation               → 422
+ *   8. recomputed cards + total              → 200
  */
 import { parseBearerToken, parseCountRequestBody } from './request.js'
 import { authenticateRequest, evaluateRoomGate, type RoomSnapshot } from './gate.js'
@@ -25,18 +18,16 @@ import type { GeminiClient } from './gemini.js'
 import { logServerError } from './log.js'
 import type { CountResponseBody } from './types.js'
 
-/** A hand-count happens a few times per round; 30 calls per 15 minutes comfortably covers every
- * player photographing their hand every round of a single game, without leaving headroom for
- * draining the shared free-tier quota (see docs/PLAN.md "Protecting your Gemini free tier"). */
+/** Covers every player photographing their hand every round, without room to drain the shared
+ * free-tier quota. */
 const PER_ROOM_RATE_LIMIT: RateLimitConfig = { windowMs: 15 * 60 * 1000, maxRequests: 30 }
 
 /** Backstop across every room so nobody beats the per-room cap by spinning up many fake rooms. */
 const GLOBAL_RATE_LIMIT: RateLimitConfig = { windowMs: 60 * 60 * 1000, maxRequests: 300 }
 const GLOBAL_RATE_LIMIT_KEY = 'global'
 
-/** Minimal request shape this handler needs — deliberately not `@vercel/node`'s `VercelRequest`,
- * so tests can pass plain objects. The real Vercel Node runtime provides exactly this shape
- * (pre-parsed JSON `body`, lower-cased `headers`) without needing that package. */
+/** Not `@vercel/node`'s `VercelRequest`, so tests can pass plain objects. Vercel's Node runtime
+ * provides this shape: a parsed JSON `body` and lower-case `headers`. */
 export interface CountApiRequest {
   method?: string
   headers: Record<string, string | string[] | undefined>
@@ -53,7 +44,7 @@ export interface CountHandlerDeps {
   getRoomSnapshot: (roomCode: string, uid: string) => Promise<RoomSnapshot>
   rateLimitStore: RateLimitStore
   geminiClient: GeminiClient
-  /** Injected clock — deterministic tests for the rate-limit/room-expiry checks. */
+  /** Injected clock, for deterministic tests. */
   now: () => number
 }
 

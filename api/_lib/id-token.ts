@@ -1,11 +1,7 @@
 /**
- * Verifies a Firebase ID token with `jose`, following Firebase's documented checks for
- * third-party JWT libraries: RS256 signature against Google's published keys, audience and
- * issuer equal to the project, not expired, a non-empty `sub` (the uid) and a past `auth_time`.
- *
- * Not the Admin SDK's `verifyIdToken`: `firebase-admin/auth` loads `jwks-rsa`, which `require()`s
- * the ESM-only `jose` v6. Node 24 allows that, but Vercel's function loader does not, so the whole
- * function failed to load (see docs/DECISIONS.md, 2026-09-27 deploy fix).
+ * Verifies a Firebase ID token with `jose`, following Firebase's checks for third-party JWT
+ * libraries. Not `firebase-admin/auth`: its `jwks-rsa` `require()`s the ESM-only `jose`, which
+ * Vercel's function loader refuses (docs/DECISIONS.md, 2026-09-27).
  */
 import { errors, jwtVerify, type JWTVerifyGetKey } from 'jose'
 
@@ -34,8 +30,8 @@ export interface IdTokenVerifierOptions {
   now?: () => Date
 }
 
-/** Errors carry Firebase Auth's `auth/...` codes, so `gate.ts` treats them as the caller's fault;
- * anything else (e.g. the key fetch failing) is rethrown untouched and becomes a logged 500. */
+/** A bad token rejects with an `auth/...` code, which `gate.ts` treats as the caller's fault.
+ * Anything else, such as a failed key fetch, is rethrown as is and becomes a logged 500. */
 export function createIdTokenVerifier({
   projectId,
   keys,

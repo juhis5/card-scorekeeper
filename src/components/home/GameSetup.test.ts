@@ -13,11 +13,8 @@ import type { GameRepository } from '@/lib/data/repository'
 import type { GameState } from '@/lib/game/types'
 import type { HostGameMode } from '@/lib/data/game-mode'
 
-// The store's own test suite (stores/game.test.ts) covers isHost/myPlayerId/isOnline directly;
-// here we only need to prove GameSetup drives the right repository/route for each outcome, so
-// the connectivity-checked repository choice — the one thing this component owns — is mocked at
-// its own seam (see the tdd skill's "mock at the boundary") rather than the lower-level
-// connectivity/Firebase modules it's built from.
+// Mock the repository choice, the one thing GameSetup owns, not the connectivity/Firebase modules
+// under it. The store's own tests cover isHost/myPlayerId/isOnline.
 const { hostRepository, localRepository } = vi.hoisted(() => ({
   hostRepository: vi.fn(),
   localRepository: vi.fn(),
@@ -27,7 +24,7 @@ vi.mock('@/composables/useGameConnectivity', () => ({
   useGameConnectivity: () => ({ hostRepository, joinRepository: vi.fn(), localRepository }),
 }))
 
-/** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
+/** An in-memory stand-in for localStorage. */
 function makeMemoryStorage(): KeyValueStorage {
   const values = new Map<string, string>()
   return {
@@ -42,7 +39,7 @@ function offlineMode(): HostGameMode {
   return { kind: 'offline', repository: new LocalGameRepository({ storage: makeMemoryStorage() }) }
 }
 
-/** A hand-written online repository so tests never touch real Firestore — see the tdd skill. */
+/** A hand-written online repository, so tests never touch Firestore. */
 function makeFakeOnlineRepository(roomCode: string): GameRepository {
   return {
     createGame: vi.fn().mockResolvedValue({ gameId: roomCode, roomCode, hostPlayerId: 'host-uid' }),
@@ -96,8 +93,7 @@ async function startAs(name: string): Promise<void> {
   await flushPromises()
 }
 
-/** A promise you can resolve from outside — lets a test observe the "checking connection…"
- * state while the probe is still in flight, without a real network delay. */
+/** A promise resolved from outside, to see "checking connection…" mid-probe. */
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((res) => {

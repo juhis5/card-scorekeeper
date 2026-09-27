@@ -1,10 +1,5 @@
 <script setup lang="ts">
-/**
- * Renders this device's PlayerStats as a labelled grid of stat tiles: games played, wins + win
- * rate, best/worst final score, best/worst single round, average final score (see docs/PLAN.md
- * "Stats tracked"). No charts here — deferred to polish (see the slice-6-ui delegation brief); a
- * `<dl>` grid of tiles is the deliverable.
- */
+/** Single job: this device's PlayerStats as a `<dl>` grid of stat tiles. */
 import { useI18n } from 'vue-i18n'
 import StatTile from './StatTile.vue'
 import type { PlayerStats } from '@/lib/game/stats'
@@ -13,8 +8,7 @@ const { stats } = defineProps<{ stats: PlayerStats }>()
 
 const { t, n } = useI18n()
 
-/** `null` only ever means "no games yet" (see PlayerStats's doc comment) — `stats.gamesPlayed`
- * is always > 0 by the time this component renders (StatsView only shows it once `loaded`). */
+/** `null` means "no games yet" (see PlayerStats). */
 function formatScore(value: number | null): string {
   return value === null ? t('stats.summary.noValue') : n(value)
 }

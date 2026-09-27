@@ -3,12 +3,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import { useIdentityStore } from '@/stores/identity'
 
-/** Every route's `<h1>` carries this id so focus can move there after navigation (a11y-mobile). */
+/** Every view's `<h1>` has this id, so focus can move there after navigation. */
 const MAIN_HEADING_ID = 'main-heading'
 
 declare module 'vue-router' {
   interface RouteMeta {
-    /** Redirect home when no device identity exists yet — set by useIdentityStore in main.ts. */
+    /** Redirect home until this device has an identity (main.ts assigns one at startup). */
     requiresIdentity?: boolean
     /** i18n key for this route's heading, announced via a polite live region on navigation. */
     announceKey?:
@@ -40,7 +40,6 @@ const router = createRouter({
       meta: { requiresIdentity: true, announceKey: 'room.heading' },
     },
     {
-      // The page an invite link or QR code opens: the code is filled in, only a name is asked.
       path: '/join/:code',
       name: 'join',
       component: () => import('@/views/JoinView.vue'),
@@ -56,9 +55,6 @@ const router = createRouter({
       path: '/stats',
       name: 'stats',
       component: () => import('@/views/StatsView.vue'),
-      // Guards on the identity store's deviceUuid, same as /room — belt-and-suspenders: main.ts
-      // already assigns it before the router's first navigation, and useStatsStore itself keys
-      // on the separate Firebase Anonymous Auth uid (see its doc comment), not this deviceUuid.
       meta: { requiresIdentity: true, announceKey: 'stats.heading' },
     },
     {
@@ -70,17 +66,14 @@ const router = createRouter({
   ],
 })
 
-// Thin guard: decides access only, delegates the "do we have an identity" question to the
-// identity store — no business logic or mutation here (see the routing skill).
 router.beforeEach((to) => {
   if (to.meta.requiresIdentity && !useIdentityStore().deviceUuid) {
     return { name: 'home' }
   }
 })
 
-// SPA navigations are silent to screen readers. Move focus to the new view's heading so it
-// gets announced; App.vue's live region (keyed off `meta.announceKey`) announces the same text
-// for anyone not tracking focus.
+// SPA navigation is silent to screen readers: focus the new heading. App.vue's live region
+// announces it too.
 router.afterEach(() => {
   nextTick(() => {
     document.getElementById(MAIN_HEADING_ID)?.focus()

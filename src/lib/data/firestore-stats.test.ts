@@ -42,7 +42,6 @@ const PLAYERS: GamePlayer[] = [
   },
 ]
 
-/** By default, nothing has been written yet — every doc's existence check reports false. */
 function pathOf(ref: unknown): string {
   return (ref as { path: string }).path
 }

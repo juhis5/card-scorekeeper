@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: the header's Back control. Goes to the previous screen in this tab, or Home when the
- * page was opened directly (a room link, a new tab), so Back never leaves the app. Leaving a room
- * doesn't end the game: Home offers to continue it.
+ * Single job: the header's Back. Goes back in this tab, or Home when the page was opened directly
+ * (a room link, a new tab), so Back never leaves the app.
  */
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'

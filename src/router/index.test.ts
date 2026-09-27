@@ -5,9 +5,8 @@ import { useIdentityStore } from '@/stores/identity'
 
 beforeEach(async () => {
   setActivePinia(createPinia())
-  // `router` is the app's real singleton (shared across every test in this file, and every
-  // shuffled run order) — reset it to a neutral route first so each test starts a genuine
-  // navigation rather than a same-location no-op if the previous test left it on `room`.
+  // The real router is a shared singleton: start each test from home, so its navigation is
+  // never a same-location no-op.
   await router.push({ name: 'home' })
 })
 

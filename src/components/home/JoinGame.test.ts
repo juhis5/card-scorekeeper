@@ -10,8 +10,7 @@ import { NameTakenError } from '@/lib/game/player-names'
 import type { GameRepository } from '@/lib/data/repository'
 import type { GameState } from '@/lib/game/types'
 
-// See GameSetup.test.ts's comment: mock the connectivity-checked repository seam, not the
-// lower-level connectivity/Firebase modules it wraps.
+// Mock the repository seam, not the connectivity/Firebase modules under it.
 const { joinRepository } = vi.hoisted(() => ({ joinRepository: vi.fn() }))
 
 vi.mock('@/composables/useGameConnectivity', () => ({

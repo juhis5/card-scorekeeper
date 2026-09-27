@@ -1,37 +1,25 @@
-/**
- * Backend-reachability probe used on "start game" to pick between the online and offline
- * `GameRepository` (see `game-mode.ts` and docs/PLAN.md "Offline host mode"). Never throws — a
- * probe that can't tell is treated as unreachable, not a crash. Every input is injected
- * (`isOnline`, `checkBackend`, `timeoutMs`) so tests are deterministic: no real network, no real
- * clock (see the tdd skill).
- */
+/** Whether the backend answers, e.g. before starting or joining a game. Never throws: a probe that
+ * can't tell counts as unreachable. */
 
-/** How long to wait for `checkBackend` before treating the backend as unreachable. */
 /** A cold Firestore connection alone can take close to 3 s (seen in CI), and giving up too soon puts
  * a host in a local game nobody can join. A device known to be offline still skips the wait. */
 const DEFAULT_TIMEOUT_MS = 8000
 
 export interface ProbeBackendReachableDeps {
-  /** Defaults to `navigator.onLine`. Checked first — a device the OS already reports as offline
-   * skips the network round-trip entirely. */
+  /** Defaults to `navigator.onLine`. Checked first, so a device known to be offline skips the
+   * round trip. */
   isOnline?: () => boolean
-  /** A lightweight backend call, e.g. `() => ensureSignedIn(auth)` — resolving means reachable. */
+  /** A lightweight backend call; resolving means reachable. */
   checkBackend: () => Promise<unknown>
-  /** Milliseconds to wait for `checkBackend` before giving up. Defaults to `DEFAULT_TIMEOUT_MS`. */
   timeoutMs?: number
 }
 
-/** Resolves `false` after `timeoutMs`, standing in for "checkBackend took too long". */
 function timeout(timeoutMs: number): Promise<boolean> {
   return new Promise((resolve) => setTimeout(() => resolve(false), timeoutMs))
 }
 
-/**
- * Races `checkBackend` against a timeout. Resolves `true` only if `checkBackend` settles first
- * *and* succeeds; resolves `false` for an offline device, a rejection, a timeout, or a
- * `checkBackend` that throws synchronously — every failure mode collapses to the same "treat as
- * offline" answer.
- */
+/** True only if `checkBackend` succeeds before the timeout. Every failure, even a synchronous
+ * throw, counts as offline. */
 export async function probeBackendReachable(deps: ProbeBackendReachableDeps): Promise<boolean> {
   try {
     const isOnline = deps.isOnline ?? (() => navigator.onLine)

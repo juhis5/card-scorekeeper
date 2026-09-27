@@ -2,9 +2,6 @@ import { createI18n } from 'vue-i18n'
 import en from '@/locales/en.json'
 import fi from '@/locales/fi.json'
 
-// `./messages.d.ts` augments vue-i18n's `DefineLocaleMessage` with `MessageSchema` so every
-// `t()`/`$t()` call below is type-checked and autocompleted against `en.json`.
-
 export const SUPPORTED_LOCALES = ['en', 'fi'] as const
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 

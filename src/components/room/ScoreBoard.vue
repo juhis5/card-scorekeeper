@@ -1,12 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: render the board rows (see lib/scoreboard.ts) as a real, sorted <table>. Five
- * narrow round columns before the total: revealed rounds show numbers, the round in progress only
- * shows who has entered. The leader is marked by an icon plus screen-reader text, never color
- * alone, and only once a round is complete: at the start everyone ties at 0.
- *
- * Rows slide to their new places when a round is revealed (a FLIP move via TransitionGroup), and
- * a changed total fades in. Both are switched off for reduced motion in main.css.
+ * Single job: the board rows (lib/game/scoreboard.ts) as a sorted <table>. The leader gets an icon
+ * plus screen-reader text, not color alone, once a round is done (everyone ties at 0 before).
+ * Rows slide and totals fade on reveal; main.css turns both off for reduced motion.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'

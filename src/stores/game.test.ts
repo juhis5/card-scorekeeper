@@ -22,7 +22,7 @@ import type { ContractRoundNumber, GameResult, GameState } from '@/lib/game/type
 const HOST_CONFIG: GameConfig = { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' }
 const ALL_ROUNDS: readonly ContractRoundNumber[] = [1, 2, 3, 4, 5]
 
-/** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
+/** An in-memory stand-in for localStorage. */
 function makeMemoryStorage(): KeyValueStorage {
   const values = new Map<string, string>()
   return {
@@ -33,17 +33,14 @@ function makeMemoryStorage(): KeyValueStorage {
   }
 }
 
-/** Minimal hand-written fake so store tests don't depend on any concrete repository's internals. */
+/** A hand-written fake, so store tests don't depend on a real repository's internals. */
 class FakeGameRepository implements GameRepository {
   listeners = new Set<(state: GameState) => void>()
   leaveCalls = 0
   lastCreateGameConfig: GameConfig | null = null
   lastSetRoundScoreInput: SetRoundScoreInput | null = null
   lastRemovedPlayerId: string | null = null
-  /** Records the order `addPlayer`/`subscribe`/`createGame` are called in, so `join()` tests can
-   * assert the store seats the joiner before subscribing (see the room-scoped read gate note in
-   * firestore-realtime — subscribing first would hit a permission-denied `onSnapshot` never
-   * recovers from). */
+  /** Call order, so `join()` tests can assert the joiner is seated before subscribing. */
   callOrder: string[] = []
   state: GameState = { status: 'waiting', currentRound: 1, players: [], roundScores: [] }
   /** Lets a test simulate an online host (non-null room code) without a real repository. */
@@ -81,7 +78,7 @@ class FakeGameRepository implements GameRepository {
   }
 
   async setRoundScore(input: SetRoundScoreInput): Promise<void> {
-    // Recorded only — these tests exercise standings via emit() directly, not this input.
+    // Recorded only: standings tests drive emit() directly.
     this.lastSetRoundScoreInput = input
   }
 
@@ -103,7 +100,7 @@ class FakeGameRepository implements GameRepository {
     this.listeners.clear()
   }
 
-  /** Test helper: pushes a new state to every current subscriber, like a real mutation would. */
+  /** Pushes a new state to every subscriber, like a real mutation would. */
   emit(next: GameState): void {
     this.state = next
     this.listeners.forEach((listener) => listener(next))
@@ -220,9 +217,7 @@ describe('useGameStore.join', () => {
     repository.emit({
       status: 'playing',
       currentRound: 1,
-      // Standings now derive totalScore from roundScores (see stores/game.ts), so the fixture's
-      // player.totalScore must agree with this — a lying totalScore is covered separately by
-      // the 'useGameStore standings' describe block's dedicated regression test.
+      // Totals derive from roundScores, so this agrees with the players' totalScore.
       roundScores: [{ round: 1, playerId: 'player-Alice', points: 7 }],
       players: [{ id: 'player-Alice', name: 'Alice', totalScore: 7 }],
     })
@@ -259,9 +254,7 @@ describe('useGameStore standings', () => {
     repository.emit({
       status: 'playing',
       currentRound: 1,
-      // Standings derive totalScore from roundScores (see stores/game.ts) — kept consistent
-      // with the players' totalScore field here so this test stays focused on sort order, not
-      // the derivation itself (that's the dedicated regression test below).
+      // Kept consistent with the players' totalScore, so this test is about sort order only.
       roundScores: [
         { round: 1, playerId: 'a', points: 30 },
         { round: 1, playerId: 'b', points: 10 },
@@ -284,11 +277,7 @@ describe('useGameStore standings', () => {
     expect(game.currentContract.melds).toEqual({ setsOfThree: 2, flushes: 0 })
   })
 
-  // Security regression test: a malicious client (or a compromised/buggy repository) could emit
-  // a `totalScore` that disagrees with the actual `roundScores` — e.g. a player who wrote
-  // themselves a favorable total directly. Low-total-wins makes that self-SERVING, not
-  // self-defeating, so ranking must never trust the writable `totalScore` field; it must be
-  // recomputed from `roundScores` (see firestore.rules' bounded points/round + docs/DECISIONS.md).
+  // Security: a player could write themselves a low `totalScore`, and a low total wins.
   it('ranks by the roundScores-derived total, ignoring a lying totalScore field', async () => {
     const game = useGameStore()
     const repository = new FakeGameRepository()
@@ -297,8 +286,7 @@ describe('useGameStore standings', () => {
     repository.emit({
       status: 'playing',
       currentRound: 1,
-      // Alice's real total (from roundScores) is 40, but her player doc's totalScore field
-      // falsely claims 1 — if the store trusted totalScore directly, Alice would wrongly lead.
+      // Alice's real total is 40, but her totalScore field claims 1.
       roundScores: [
         { round: 1, playerId: 'a', points: 25 },
         { round: 2, playerId: 'a', points: 15 },
@@ -553,8 +541,7 @@ describe('useGameStore full game flow with LocalGameRepository', () => {
     })
 
     await game.start(repository, HOST_CONFIG)
-    // createGame seats the host as the first player — score them out of contention for lowest
-    // total so the winner assertion below is unambiguous.
+    // Score the host out of contention so the winner is unambiguous.
     const hostId = game.standings[0]?.player.id
     if (!hostId) throw new Error('expected the host to be seated after start()')
     const alice = await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })

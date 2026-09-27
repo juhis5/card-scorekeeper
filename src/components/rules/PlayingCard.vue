@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: one playing card in the rules page's examples. White in both themes, like a real
- * card. The suit symbol, not only its colour, tells the suits apart, and the card has a spoken name
- * ("hertta seitsemän") since the symbols alone read badly.
+ * Single job: one card in the rules page's examples, white in both themes like a real card. The
+ * symbol, not only colour, tells suits apart. Screen readers read the symbols badly, so the card
+ * has a spoken name ("hertta seitsemän").
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'

@@ -6,13 +6,8 @@ import StatsView from './StatsView.vue'
 import { i18n } from '@/i18n'
 import type { GamePlayer } from '@/lib/game/types'
 
-/**
- * StatsView delegates all Firestore I/O to `useStatsStore` (see stores/stats.test.ts for the
- * store's own thorough coverage of the read/derivation logic) — this file only proves the view
- * renders the right thing for each of the store's four states, so it mocks at the same
- * Firebase/Firestore boundary the store itself uses (see the tdd skill's "mock at the boundary"),
- * rather than re-deriving expected numbers here.
- */
+/** Covers the view's four states only (the store's logic is in stores/stats.test.ts), mocking
+ * the same Firebase boundary as the store. */
 const ensureSignedInMock = vi.fn()
 const getDbMock = vi.fn(() => ({}))
 
@@ -97,8 +92,7 @@ function installFixtureGetDocs(rows: GamePlayer[]): void {
   })
 }
 
-/** A promise you can resolve from outside — observes the loading state mid-flight without a real
- * network delay (see GameSetup.test.ts's identical helper). */
+/** A promise resolved from outside, to observe the loading state mid-flight. */
 function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((res) => {
@@ -118,15 +112,14 @@ beforeEach(() => {
   getDbMock.mockReturnValue({})
 })
 
-// Unconditional (not an inline call at the end of each test body) so a stubbed `navigator` can
-// never survive a failing assertion into the next test (see the tdd skill's flakiness guidance).
+// In afterEach, so a failing assertion can't leave `navigator` stubbed.
 afterEach(() => {
   vi.unstubAllGlobals()
 })
 
 describe('StatsView', () => {
   it('always states the identity caveats, regardless of load state', () => {
-    ensureSignedInMock.mockReturnValue(new Promise(() => {})) // never resolves — stays loading
+    ensureSignedInMock.mockReturnValue(new Promise(() => {})) // never resolves, so it stays loading
     renderStatsView()
 
     expect(screen.getByText(/new device or cleared browser storage starts fresh/i)).toBeTruthy()

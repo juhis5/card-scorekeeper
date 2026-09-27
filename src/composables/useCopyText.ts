@@ -1,8 +1,7 @@
 /**
- * Copies text on a tap: the Clipboard API first, then a hidden textarea where it's missing or
- * refused (an older iOS, a non-secure address). `copied` holds the text just copied for a moment,
- * so the caller can say "copied" and tell which thing was copied. Not VueUse's useClipboard: it
- * only uses the Clipboard API after a permission query Firefox and Safari don't support.
+ * Copies on a tap: the Clipboard API, else a hidden textarea (older iOS, a non-secure address).
+ * `copied` briefly holds the copied text. Not VueUse's useClipboard: it first runs a permission
+ * query that Firefox and Safari don't support.
  */
 import { onScopeDispose, ref } from 'vue'
 

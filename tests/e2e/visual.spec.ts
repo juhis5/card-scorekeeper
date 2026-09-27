@@ -1,8 +1,7 @@
 /**
- * Visual snapshots of the key screens, in Finnish, dark and light (fourth round). Runs only in
- * Playwright's Linux image, where the baselines are made, so fonts and rendering match pixel for
- * pixel: `pnpm test:visual` compares, `pnpm test:visual:update` makes new baselines after an
- * intended change. A local game on this device, so no server and nothing that changes per run.
+ * Snapshots of the key screens, in Finnish, dark and light. Runs only in Playwright's Linux image,
+ * where the baselines are made (`pnpm test:visual`, `pnpm test:visual:update`). A local game, so
+ * nothing changes between runs.
  */
 import { expect, test, type Page } from '@playwright/test'
 

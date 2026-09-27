@@ -13,7 +13,7 @@ reproducibility — listed below.
 - **Why 24, not 22:** 22 is the *previous* LTS. 24 is the current LTS — CI must match the
   runtime we build on. We do **not** use the odd-numbered "Current" line (25) — it isn't
   meant for production.
-- After scaffold, declare it in `package.json`: `"engines": { "node": ">=24" }`.
+- Declared in `package.json`: `"engines": { "node": ">=24" }`.
 
 ## Package manager — pnpm (pinned exactly)
 
@@ -40,8 +40,9 @@ resolved versions, giving reproducible installs without hand-pinning:
   comment. Node comes from `.nvmrc`.
 - Revisit the pins when you touch CI, and at least whenever GitHub announces a runner Node
   deprecation: the v4 pins declared node20, which GitHub removed from runners on 2026-09-23.
-- The Firestore-rules job needs **Java + firebase-tools** for the emulator (add when rules
-  land — see git-workflow / firestore-realtime).
+- The `rules` and `e2e` jobs need **Java** for the Firestore emulator; firebase-tools is a
+  devDependency. The `visual` job runs in Playwright's own image, tagged with the
+  `@playwright/test` version.
 
 ## Pinned vs floating — summary
 
@@ -49,4 +50,4 @@ resolved versions, giving reproducible installs without hand-pinning:
 |---|---|
 | Node major — `.nvmrc` | all npm dependencies |
 | pnpm exact — `packageManager` | (lockfile captures exact resolved versions) |
-| GitHub Action majors — `@v4` | |
+| GitHub Actions — commit SHA | |

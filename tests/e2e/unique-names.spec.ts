@@ -1,7 +1,6 @@
 /**
- * A name is unique within a room, ignoring case and extra spaces. The check has to happen on the
- * server (a joiner can't see the room's names before taking a seat), so this runs the real
- * batch, the real rules and the join form's error together.
+ * A name is unique within a room, ignoring case and extra spaces. Only the server can check it (a
+ * joiner can't see the names before taking a seat), so this runs the real batch, rules and form.
  */
 import { expect, test } from '@playwright/test'
 import {
@@ -13,7 +12,6 @@ import {
   startHostedGame,
 } from './helpers'
 
-// Not run under the `webkit` project, like the other two-client specs: see playwright.config.ts.
 test.describe('unique names in a room', () => {
   test('a second "juho" is told the name is taken, and joins under another', async ({
     browser,

@@ -41,17 +41,16 @@ function scoreInput(): HTMLInputElement {
   return screen.getByLabelText("Alice's round 1 score") as HTMLInputElement
 }
 
-/** What a real browser does when a control inside the card is pressed while the input has focus:
- * pointerdown, then the input blurs, then the click. iOS Safari doesn't focus a tapped button,
- * so the blur carries no relatedTarget. */
+/** A press on a control in the card while the input has focus: pointerdown, blur, click. iOS
+ * Safari doesn't focus a tapped button, so the blur carries no relatedTarget. */
 async function pressInsideCard(control: HTMLElement): Promise<void> {
   await fireEvent.pointerDown(control)
   scoreInput().blur()
   await fireEvent.click(control)
 }
 
-/** Chromium blurs a focused input when it's removed from the DOM. Collapsing the card removes it,
- * so dispatch that blur synchronously right after the key event, before Vue patches the DOM. */
+/** Chromium blurs a focused input as it's removed, so collapsing fires a blur: dispatch it right
+ * after the key event, before Vue patches the DOM. */
 async function keyThenRemovalBlur(sendKey: () => Promise<unknown>): Promise<void> {
   const input = scoreInput()
   const pending = sendKey()
@@ -409,7 +408,7 @@ describe('ScoreCard photo-count affordance', () => {
   it('is hidden by default (offline / not this device own row)', () => {
     renderCard()
 
-    // Card must be expanded first to see photo count
+    // Collapsed, so this holds whatever the gate says; the cases below expand the card.
     expect(screen.queryByRole('button', { name: 'Snap cards' })).toBeNull()
   })
 

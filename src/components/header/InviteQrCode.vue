@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: a QR code for `text`, drawn as one SVG path. Dark on white in both themes, with a
- * quiet zone, since scanners struggle with inverted codes. The encoder is loaded only when a code
- * is first shown, so it stays out of the main bundle.
+ * Single job: a QR code for `text`, as one SVG path. Dark on white in both themes, since scanners
+ * struggle with inverted codes. The encoder loads lazily, to keep it out of the main bundle.
  */
 import { computed, ref, watchEffect } from 'vue'
 import { qrPath } from '@/lib/game/invite'

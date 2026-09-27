@@ -4,8 +4,7 @@ import StatSummary from './StatSummary.vue'
 import { i18n } from '@/i18n'
 import type { PlayerStats } from '@/lib/game/stats'
 
-// Every value is distinct on purpose so `getByText` (an exact match) can never hit two tiles at
-// once — e.g. wins and bestRound must not share a digit.
+// Every value differs, so an exact `getByText` never matches two tiles.
 const STATS: PlayerStats = {
   deviceUuid: 'uid-me',
   gamesPlayed: 3,
@@ -68,7 +67,7 @@ describe('StatSummary', () => {
     })
 
     expect(screen.getByText('0%')).toBeTruthy()
-    // bestFinalScore, worstFinalScore, bestRound, worstRound, averageFinalScore — all null.
+    // The five null stats each show a dash.
     expect(screen.getAllByText('–')).toHaveLength(5)
   })
 })

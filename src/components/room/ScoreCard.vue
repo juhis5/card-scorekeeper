@@ -1,20 +1,8 @@
 <script setup lang="ts">
 /**
- * Single job: one player's round-score entry card. Collapsed by default (name + saved points, or
- * just "scored" when the number isn't this device's to see); tapping the header expands it inline
- * into two rows: the name row gains the card's icons (photo count, and the parent's remove), and
- * below it the points field with ✓ (save) and ✕ (cancel). Only ✓ or Enter saves (fourth round): a
- * tap outside the card, or another card opening, closes it and throws the typed number away. The
- * field's label is for screen readers only; the name row already says whose points they are. A
- * non-host player's own card reads "Enter your points" instead of their name.
- * Presentation + local draft value only; persisting the score is the parent's job (it owns the
- * store call), this just emits the validated number on commit.
- *
- * Manual entry is the golden "never fails" path (see CLAUDE.md) — so an invalid commit must
- * never be silently dropped: it's rejected with a visible, screen-reader-tied error instead.
- *
- * Renders as an `<li>` — the parent wraps the cards in a `<ul role="list">` grid. No round
- * watcher: the parent keys each card by player + round, so a new round remounts it fresh.
+ * Single job: one player's score card. Opens inline; only ✓ or Enter saves, and a tap outside or
+ * another card opening discards the draft. Emits the validated score for the parent to save. The
+ * parent keys it by player + round, so a new round remounts it fresh.
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -39,18 +27,15 @@ const {
 } = defineProps<{
   player: Player
   round: ContractRoundNumber
-  /** This round's saved points for the player, or null when they haven't scored yet. */
+  /** This round's saved points, or null before they score. */
   scoredPoints?: number | null
-  /** Whether this device may show the number: players see their own, the host also sees the
-   * ones it entered. Otherwise the card only says "scored" until the round is revealed. */
+  /** Players see their own number, the host also those it entered; otherwise just "scored". */
   showPoints?: boolean
-  /** A non-host player's own card, labelled "Enter your points" rather than by name. */
+  /** A non-host player's own card, titled "Enter your points" rather than by name. */
   isOwnCard?: boolean
-  /** A round played before this player joined the app, still to be filled in. */
+  /** A round played before this player joined, still to be filled in. */
   isMissedRound?: boolean
-  /** Gates the "Snap cards" affordance — only true when this device is online AND this is its
-   * own editable card (see RoomView: photo-count is online-only, and each device only ever edits
-   * its own seat). */
+  /** Online and this device's own card; photo-count is online-only. */
   canUsePhotoCount?: boolean
   roomCode?: string | null
 }>()
@@ -61,7 +46,7 @@ const emit = defineEmits<{
 
 const { t, n } = useI18n()
 const points = ref<number | null>(null)
-/** The last score this card saved, so Cancel/Escape can restore the input to it. */
+/** The last score this card saved, restored on Cancel/Escape. */
 const savedPoints = ref<number | null>(null)
 const errorMessage = ref('')
 const isExpanded = ref(false)
@@ -87,13 +72,11 @@ const label = computed(() =>
 )
 const hasError = computed(() => errorMessage.value !== '')
 const photoCountId = computed(() => `photo-count-${player.id}`)
-/** `canUsePhotoCount` alone already implies `roomCode !== null` in practice (it's only ever true
- * online, and `isOnline` is derived from a non-null room code — see stores/game.ts), but this
- * checks both explicitly rather than assuming that invariant holds across a future refactor. */
+/** `canUsePhotoCount` implies a room code today, but this doesn't rely on it. */
 const canSnapCards = computed(() => canUsePhotoCount && roomCode !== null)
 const headerLabel = computed(() => (isOwnCard ? ownHeaderLabel() : playerHeaderLabel()))
 
-/** The spoken name replaces the visible text, so it carries the visible title and points too. */
+/** The spoken name replaces the visible text, so it includes the title and points. */
 function ownHeaderLabel(): string {
   if (isMissedRound) return t('room.score.ownCardLabelMissed', { round })
   if (visiblePoints.value !== null) {
@@ -113,20 +96,19 @@ function playerHeaderLabel(): string {
 
 async function expand(): Promise<void> {
   if (isExpanded.value) return
-  // Start from the synced score when this device may see it (it may have changed on another
-  // device), else from the last score this card saved.
+  // Start from the synced score if visible (another device may have changed it), else the last
+  // one this card saved.
   if (visiblePoints.value !== null) savedPoints.value = visiblePoints.value
   points.value = savedPoints.value
   isExpanded.value = true
   await nextTick()
-  // Placed first (on a phone: up under the header, above where the keyboard will be), then focused
-  // without the browser's own scroll, which would move it again (Chromium tucks it under the header).
+  // Place it first (on a phone: under the header, above the keyboard), then focus without the
+  // browser's own scroll, which would move it again (Chromium tucks it under the header).
   reveal()
   document.getElementById(inputId.value)?.focus({ preventScroll: true })
 }
 
-/** Collapsing unmounts the focused control, so hand focus back to the header — otherwise it
- * drops to <body> and a keyboard or screen-reader user loses their place. */
+/** Collapsing unmounts the focused control, so focus goes back to the header, not <body>. */
 async function collapse({ restoreFocus }: { restoreFocus: boolean }): Promise<void> {
   isExpanded.value = false
   errorMessage.value = ''
@@ -138,7 +120,7 @@ async function collapse({ restoreFocus }: { restoreFocus: boolean }): Promise<vo
 /** Validates and emits the typed score; false when there's nothing valid to save. */
 function savePoints(): boolean {
   if (points.value === null) {
-    // Not yet typed anything — a no-op, not an error.
+    // Nothing typed: a no-op, not an error.
     errorMessage.value = ''
     return false
   }
@@ -161,8 +143,7 @@ function discardDraft({ restoreFocus }: { restoreFocus: boolean }): void {
   void collapse({ restoreFocus })
 }
 
-/** Save and Enter ask to save, so an empty field says why nothing happened. Focus stays on the
- * removed input or button, so hand it to the header once the panel is gone. */
+/** ✓ and Enter ask to save, so an empty field says why nothing happened. */
 function handleSave(): void {
   if (points.value === null) {
     errorMessage.value = t('room.score.emptyError')
@@ -171,10 +152,8 @@ function handleSave(): void {
   commitPoints({ restoreFocus: true })
 }
 
-/** The photo is only ever a SUGGESTION (see CLAUDE.md) — confirming feeds the number through the
- * exact same commit path manual entry uses (including its validation/error display), rather than
- * writing to the store directly. Focus sits in the (teleported) sheet here, which unmounts on
- * collapse, so a successful commit always returns focus to the header. */
+/** The photo total is a suggestion: it takes the same commit path and validation as typed entry.
+ * Focus was in the sheet, which unmounts, so it returns to the header. */
 function handlePhotoConfirm(total: number): void {
   points.value = total
   commitPoints({ restoreFocus: true })
@@ -193,8 +172,7 @@ function handleKeyDown(event: KeyboardEvent): void {
     :class="isExpanded ? 'ring-ring ring-2' : 'hover:bg-muted'"
     @keydown="handleKeyDown"
   >
-    <!-- The name row. While the card is open it also holds the card's own actions (photo count,
-         the parent's remove), which wrap onto a line of their own when they need one. -->
+    <!-- The name row; while open it also holds the card's actions, wrapping when needed. -->
     <div class="flex flex-wrap items-center pr-1">
       <button
         ref="header"

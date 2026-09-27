@@ -1,22 +1,18 @@
-/** Domain types for the Rommi scorekeeper — see docs/PLAN.md for the data model. */
-
 export type Suit = 'clubs' | 'diamonds' | 'hearts' | 'spades'
 
 export type NumberRank = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10'
 export type FaceRank = 'J' | 'Q' | 'K'
 export type Rank = NumberRank | FaceRank | 'A' | 'Joker'
 
-/** A playing card. The Joker has no suit — modeled out rather than left nullable-by-convention. */
 export type Card = { rank: Exclude<Rank, 'Joker'>; suit: Suit } | { rank: 'Joker'; suit: null }
 
-/** How many of each meld a round's contract requires. */
 export interface MeldRequirement {
   setsOfThree: number
   flushes: number
 }
 
-/** Stable i18n message key for a round's contract description (display-only; see locales). */
 export type ContractRoundNumber = 1 | 2 | 3 | 4 | 5
+/** i18n key of a round's contract description. */
 export type ContractKey = `contract.round${ContractRoundNumber}`
 
 export interface Contract {
@@ -25,7 +21,7 @@ export interface Contract {
   melds: MeldRequirement
 }
 
-/** One player's leftover-card points for a single round. */
+/** One player's leftover-card points for a round. */
 export interface RoundScore {
   round: ContractRoundNumber
   playerId: string
@@ -35,7 +31,7 @@ export interface RoundScore {
 export interface Player {
   id: string
   name: string
-  /** Running total across all scored rounds so far; ascending = winning. */
+  /** Lowest wins. */
   totalScore: number
   /** Online only: a player without a phone, seated by the host, who scores for them. */
   isGuest?: boolean
@@ -48,33 +44,28 @@ export interface GameState {
   currentRound: ContractRoundNumber
   players: Player[]
   roundScores: RoundScore[]
-  /** Online only: set once the game has finished and its host started the next one (Play again),
-   * so every device still in this room can join it. */
+  /** Online only: the room the host started from this finished one (Play again). */
   nextRoomCode?: string
-  /** Online only: this device already has a seat in the next room (the host brought everyone
-   * along), so it can move there without joining. */
+  /** Online only: the host already seated this device in the next room, so it can move there
+   * without joining. */
   hasSeatInNextRoom?: boolean
 }
 
-/** A player's rank in the current (or final) standings. */
 export interface Standing {
   player: Player
   total: number
-  /** Standard competition ranking (1, 1, 3) — ties share a placement. */
+  /** Ties share a placement: 1, 1, 3. */
   placement: number
 }
 
-/**
- * Permanent per-game record written once a game finishes (see docs/PLAN.md "Stats & history").
- * Rooms are transient; these two shapes persist so stats survive room expiry.
- */
+/** Written once a game finishes. Rooms expire; these records stay, so stats survive. */
 export interface GameResult {
   gameId: string
   finishedAt: string
   totalRounds: number
 }
 
-/** One row per player per finished game — powers stats and head-to-head derivation. */
+/** One row per player per finished game. */
 export interface GamePlayer {
   gameId: string
   deviceUuid: string

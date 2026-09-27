@@ -1,31 +1,25 @@
 rules_version = '2';
 
-// Firestore rules — THE security boundary for this app (see CLAUDE.md "Golden rules" and
-// docs/DECISIONS.md's 2026-07-24 online-auth / topology / read-gate / trust-model entries,
-// which this file implements verbatim). The UI hiding a button is not security; this is.
+// Firestore rules: the security boundary (see CLAUDE.md and docs/DECISIONS.md). Hiding a button
+// in the UI is not security; this file is.
 //
-// Identity: Firebase Anonymous Auth's `request.auth.uid` is the actor Firestore checks.
-// `deviceUuid` carried on player/roundScore docs is the separate, persistent STATS key (see
-// the identity store) — it is never trusted for permission decisions, only `auth.uid` is.
+// Identity: `request.auth.uid` (anonymous auth) is the actor. `deviceUuid` is only the stats key
+// and is never trusted for permissions.
 //
-// Topology: room/{code} (room lookup by code) with two subcollections —
-// room/{code}/players/{uid} and room/{code}/roundScores/{uid}_{round} — so every write/read
-// under a room is structurally scoped to that room's code, and a player's own docs are keyed
-// by their own uid.
+// Topology: room/{code} with players/{uid}, names/{nameKey} and roundScores/{uid}_{round}, so
+// every doc is scoped to its room and a player's own docs are keyed by their uid.
 //
-// Trust model: OWN-SCORE-ONLY writes, plus the host may correct anyone's in their room. There
-// is no server here to recompute totals from N per-round docs. Note: under low-total-wins,
-// deflating your own score is SELF-SERVING, not "self-defeating" — so `points`/`round` are
-// bounded below, and the store derives standings from `roundScores`, never trusting the
-// writable `totalScore` field for ranking (see stores/game.ts).
+// Trust model: players write their own scores and the host may correct anyone's. No server
+// recomputes totals, and with low total winning a lowered score helps its writer, so `points`
+// and `round` are bounded and standings come from roundScores, never the writable `totalScore`.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /** The existing room doc's data, fetched by code — for use from the player/roundScore
-     * subcollection rules, which need to look outside their own document. */
+    /** The room doc, for the subcollection rules. get() doesn't see a sibling write in the same
+     * batch (getAfter() does), so the app creates the room before seating anyone in it. */
     function roomData(code) {
       return get(/databases/$(database)/documents/room/$(code)).data;
     }
@@ -38,74 +32,67 @@ service cloud.firestore {
       return roomData(code).hostUid == request.auth.uid;
     }
 
-    /** A room code: 5 characters from src/lib/room-code.ts's alphabet (no 0/O/1/I). */
+    /** A room code: 5 characters from src/lib/game/room-code.ts's alphabet (no 0/O/1/I). */
     function isRoomCode(code) {
       return code is string && code.matches('^[2-9A-HJ-NP-Z]{5}$');
     }
 
-    /** A local game's id: a crypto.randomUUID(). Disjoint from room codes, so a local result can
-     * never squat a room code's stats, and a room can never be minted at a local game's id. */
+    /** A local game's id (a UUID). Disjoint from room codes, so a local result can't squat a
+     * room's stats and no room can be created at a local game's id. */
     function isLocalGameId(gameId) {
       return gameId is string
         && gameId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
     }
 
-    /** A stats doc is visible only to the players it names (see the stats section below). */
+    /** A stats doc is visible only to the players it names. */
     function isParticipant() {
       return request.auth.uid in resource.data.participantUids;
     }
 
-    /** 1..40 characters: MAX_PLAYER_NAME_LENGTH in src/lib/rules.ts (tests/rules pins the pair). */
+    /** 1..40 characters: MAX_PLAYER_NAME_LENGTH in src/lib/game/rules.ts (tests/rules pins it). */
     function isValidPlayerName(name) {
       return name is string && name.size() >= 1 && name.size() <= 40;
     }
 
-    /** Stored the way cleanPlayerName (src/lib/player-names.ts) leaves it: no spaces at the ends
-     * and none doubled, so " Juho" can't dodge the unique-name check for "Juho". */
+    /** Stored the way cleanPlayerName (src/lib/game/player-names.ts) leaves it: no spaces at the
+     * ends and none doubled, so " Juho" can't dodge the unique-name check for "Juho". */
     function isCleanPlayerName(name) {
       return isValidPlayerName(name) && name == name.trim() && !name.matches('.*\\s\\s.*');
     }
 
-    /** A guest seat's id (see players/ below): 'guest-' and a lowercase UUID. An anonymous uid has
-     * no '-', so a guest id can never be anyone's signed-in identity or room membership. */
+    /** A guest seat's id: 'guest-' and a lowercase UUID. An anonymous uid has no '-', so a guest
+     * id can never be anyone's signed-in identity or room membership. */
     function isGuestId(id) {
       return id is string
         && id.matches('^guest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
     }
 
-    /** A name's unique-name record id, the same as playerNameKey in src/lib/player-names.ts.
-     * lower() only changes A to Z, so the Nordic capitals are folded here one by one, before it:
-     * keep this list and FOLDED_CAPITALS in player-names.ts the same. */
+    /** A name's unique-name record id, the same as playerNameKey in src/lib/game/player-names.ts.
+     * lower() only changes A to Z, so the Nordic capitals are folded one by one before it: keep
+     * this list and FOLDED_CAPITALS in player-names.ts the same. */
     function nameKeyOf(name) {
       return 'n_' + name.replace('Ä', 'ä').replace('Ö', 'ö').replace('Å', 'å').replace('Ü', 'ü')
         .replace('É', 'é').replace('Ø', 'ø').replace('Æ', 'æ').lower().replace('/', '_');
     }
 
-    /** Room-scoped read gate (not just "any authed user"): true only for someone already
-     * seated as a player in this room. */
+    /** The read gate: true only for someone seated in this room. */
     function isRoomMember(code) {
       return exists(/databases/$(database)/documents/room/$(code)/players/$(request.auth.uid));
     }
 
-    /** True when a `room/{code}` doc exists for this gameId — i.e. this game was (or still is) a
-     * live online room, as opposed to a purely local (offline, single-device) game whose result
-     * only ever reaches Firestore via the reconnect flush (see docs/PLAN.md "Reconnect = push
-     * final result only"). Used below to decide how much the game_result/game_player create rules
-     * CAN verify about the writer for a given gameId. */
+    /** An online game has a room doc. A local game has none: its result reaches Firestore only
+     * through the reconnect flush. */
     function roomExists(gameId) {
       return exists(/databases/$(database)/documents/room/$(gameId));
     }
 
     match /room/{code} {
-      // Join-by-code discovery: any authed user may look up a room by its KNOWN code — but
-      // `read` covers both `get` (single doc) and `list` (collection query); only `get` is
-      // granted. Without this split, any authed stranger could getDocs(collection(db,'room'))
-      // and enumerate every room (codes, hostUid, ...), defeating join-by-code privacy. The app
-      // only ever fetches/subscribes a room by code — never lists the collection.
+      // Anyone signed in may get a room by its code, to join. Only `get`, not `read`: `read` also
+      // allows `list`, and any stranger could then enumerate every room.
       allow get: if isSignedIn();
 
-      // Play again: the next room names the finished room its players come from, which lets the
-      // host seat them here (isCarriedSeat below). Only a finished room the same host ran.
+      // Play again: a new room may name the finished room its players come from (see
+      // isCarriedSeat), but only a finished room the same host ran.
       function isFinishedRoomOfHost(previousCode) {
         return isRoomCode(previousCode)
           && previousCode != code
@@ -113,9 +100,8 @@ service cloud.firestore {
           && roomData(previousCode).status == 'finished';
       }
 
-      // Only the creator can mint a room, at a real room code, seeded at round 1 with an honest
-      // expiry: in the future, and no later than the 6 h lifetime plus an hour of client clock
-      // skew (an open-ended expiry would defeat "rooms auto-expire").
+      // The creator is the host, at a real room code, from round 1. The expiry is in the future
+      // and at most the 6 h lifetime plus an hour of clock skew, so rooms really expire.
       allow create: if isSignedIn()
         && isRoomCode(code)
         && request.resource.data.keys().hasOnly(['code', 'status', 'currentRound', 'hostUid', 'createdAt', 'expiresAt', 'previousRoomCode'])
@@ -129,16 +115,11 @@ service cloud.firestore {
         && (!('previousRoomCode' in request.resource.data)
           || isFinishedRoomOfHost(request.resource.data.previousRoomCode));
 
-      // Only the host advances rounds / finishes the game, and only while the room is live.
-      // `resource` (not a get()) is enough here — we're already inside this exact document's
-      // own rule, no need to fetch it a second time. Field-restricted to exactly what the app
-      // ever writes here: status + currentRound (advanceRound/finishGame), or the one-time
-      // nextRoomCode (Play again) below. hostUid/code/createdAt/expiresAt are immutable after
-      // create — an unbounded expiry extension would undermine "rooms auto-expire"
-      // (docs/PLAN.md's Gemini free-tier protection).
-      // Values too, not just keys: a round outside 1..5 would crash every client's contract
-      // banner, and a finished room must never reopen (the /api photo gate trusts 'finished').
-      // Rounds only move forward one at a time, and the game finishes only in round 5.
+      // Only the host, while the room is live, changes status and currentRound (or sets
+      // nextRoomCode once, below). hostUid, code, createdAt and expiresAt never change: a longer
+      // expiry would defeat auto-expiry. Rounds move forward one at a time within 1..5 (other
+      // values crash every client's contract banner), the game finishes only in round 5, and a
+      // finished room never reopens (the /api photo gate trusts 'finished').
       function isRoundUpdate() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentRound'])
           && resource.data.status != 'finished'
@@ -150,9 +131,8 @@ service cloud.firestore {
           && (request.resource.data.status != 'finished' || request.resource.data.currentRound == 5);
       }
 
-      // Play again: a finished room takes one more write, `nextRoomCode`, pointing every device
-      // still in it at the room the same host just created. Set once, never changed, and the
-      // status stays 'finished', so the room still never reopens.
+      // Play again: a finished room takes one more write, `nextRoomCode`, pointing its devices at
+      // the same host's next room. Set once, and the room stays 'finished'.
       function isNextRoomLink() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nextRoomCode'])
           && resource.data.status == 'finished'
@@ -171,16 +151,14 @@ service cloud.firestore {
 
       match /players/{playerUid} {
         allow read: if isSignedIn() && isRoomMember(code);
-        // Your own seat, even before you have one: a phone left in the finished room watches for
-        // the seat the host gives it in the next one (Play again), then moves there.
+        // Your own seat, even before it exists: after Play again, a phone in the finished room
+        // watches for the seat the host gives it in the next room.
         allow get: if isSignedIn() && playerUid == request.auth.uid;
 
-        // Joining is seating yourself, and nobody may claim an ownerUid that isn't their own uid.
-        // The shape is exact: this doc is the membership key every other rule trusts, and a seat
-        // missing joinOrder would be invisible to the app's orderBy('joinOrder') subscription
-        // while still counting as a member. The seat's name must be clean and come with this
-        // player's own record under names/ (written in the same batch), which is what keeps names
-        // unique in the room.
+        // Joining: seating yourself, under your own uid. The shape is exact: this doc is the
+        // membership key other rules trust, and a seat without joinOrder would count as a member
+        // yet be missing from the app's orderBy('joinOrder') list. The name must be clean, with
+        // your own names/ record in the same batch (getAfter sees it), to keep names unique.
         function isOwnSeat() {
           return isSignedIn()
             && playerUid == request.auth.uid
@@ -198,9 +176,9 @@ service cloud.firestore {
             && request.resource.data.joinOrder is int;
         }
 
-        // A guest: a player without a phone, seated by the host, who then scores for them. Its id
-        // is a guest id (never a uid, so never a member), it's owned by the host, its deviceUuid
-        // is its own id (the stats rows' key), and its name record names this seat.
+        // A guest: a player without a phone, seated and scored by the host. Its id is a guest id
+        // (never a uid, so never a member), the host owns it, its deviceUuid is its id (the stats
+        // key), and its name record names this seat.
         function isGuestSeat() {
           return isSignedIn()
             && isHost(code)
@@ -220,10 +198,9 @@ service cloud.firestore {
             && request.resource.data.joinOrder is int;
         }
 
-        // Play again: the host seats a player of the finished room here, as they were there, so
-        // nobody has to join again. Only into the one room the finished room points at (its
-        // nextRoomCode is set once), before the game starts: the host can't seat a former
-        // player in any number of rooms. A guest goes along as a guest seat, above.
+        // Play again: the host seats a player of the finished room here, unchanged, so nobody
+        // rejoins. Only into the room its nextRoomCode points at, before the game starts, so no
+        // player can be seated in any number of rooms. Guests are carried as guest seats.
         function isCarriedSeat() {
           let previousCode = roomData(code).get('previousRoomCode', '');
           let previousSeat = get(
@@ -251,10 +228,9 @@ service cloud.firestore {
 
         allow create: if isOwnSeat() || isGuestSeat() || isCarriedSeat();
 
-        // A player's own running total, or any seat's for the host. Only totalScore may change:
-        // deviceUuid is the stats trust anchor (a player rewriting it to someone else's key could
-        // steal or corrupt that device's stats), ownerUid stays pinned to whoever created the
-        // seat, and a rename would slip past the room's unique-name records.
+        // A player's own running total, or any seat's for the host. Only totalScore may change: a
+        // rewritten deviceUuid could steal another device's stats, ownerUid stays with the
+        // seat's creator, and a rename would dodge the unique-name records.
         allow update: if isSignedIn()
           && (playerUid == request.auth.uid || isHost(code))
           && roomNotExpired(code)
@@ -262,20 +238,19 @@ service cloud.firestore {
           && request.resource.data.totalScore is int
           && request.resource.data.totalScore >= 0;
 
-        // The host removes a stalled or mistaken seat (with its scores, below). Never their own:
-        // the game can't run without the host.
+        // The host removes a stalled or mistaken seat, with its scores, but never their own: the
+        // game can't run without the host.
         allow delete: if isSignedIn()
           && isHost(code)
           && roomNotExpired(code)
           && playerUid != request.auth.uid;
       }
 
-      // One record per name in use, keyed by nameKeyOf(name): created together with its seat, and
-      // never updated, so a second player can't take the same name even at the same moment (their
-      // write would be an update). Anyone signed in may check a name, to say "taken" clearly;
-      // listing is refused. The host deletes a removed player's record with the seat.
-      // A player's own record has only ownerUid; a guest's also names its seat (playerId), which
-      // is how the app can say a name belongs to a guest.
+      // One record per name in use, keyed by nameKeyOf(name), created with its seat and never
+      // updated: a second claim to a name would be an update, so two players can't take it even
+      // at the same moment. Anyone signed in may get one (to say "taken"); listing is refused.
+      // The host deletes a removed player's record. A guest's record also names its seat
+      // (playerId), so the app can tell the name belongs to a guest.
       match /names/{nameKey} {
         function isOwnSeatRecord() {
           return request.resource.data.keys().hasOnly(['ownerUid'])
@@ -297,8 +272,8 @@ service cloud.firestore {
             && nameKey == nameKeyOf(seat.name);
         }
 
-        // A player the host seats from the finished room (Play again): the record is the
-        // player's own, as if they had joined, and names the seat the host is creating for them.
+        // Play again: the record is the carried player's own, as if they had joined, and names
+        // the seat the host is creating for them.
         function isCarriedSeatRecord() {
           let playerUid = request.resource.data.ownerUid;
           let seat = getAfter(/databases/$(database)/documents/room/$(code)/players/$(playerUid)).data;
@@ -337,21 +312,15 @@ service cloud.firestore {
             && scoreId == request.resource.data.ownerUid + '_' + string(request.resource.data.round);
         }
 
-        // Own-score-only trust model: a player writes their own score; the host may correct
-        // anyone's. `playerId == ownerUid` keeps the two fields honest with each other so
-        // nobody can write a score doc for a player they aren't, under either field. `points`/
-        // `round` are bounded (low-total-wins makes deflating your own score SELF-serving, not
-        // self-defeating — there's no server to catch a falsified value otherwise), and the doc
-        // id is pinned to `{ownerUid}_{round}` so there is structurally exactly one score per
-        // player per round — an arbitrary id would let a client double-count a round via extra
-        // sibling docs `runningTotal` would sum together. The `points` bounds mirror
-        // `isValidRoundScore` in src/lib/rules.ts: `<= 1000` is MAX_ROUND_SCORE and `% 5` is
-        // ROUND_SCORE_STEP (every card value is a multiple of 5). Change both sides together;
-        // tests/rules pins the parity by importing those constants.
-        // Only seated players (or the host) write, only while the game is running, and only for
-        // rounds that have started. A player may fill in a round they missed (create), but only
-        // the host may change an earlier round afterwards, so nobody quietly lowers round 1 in
-        // round 5.
+        // Your own score, or anyone's for the host. `playerId == ownerUid` stops a score being
+        // written for someone else under either field. The doc id is pinned to {ownerUid}_{round}
+        // so there is one score per player per round; extra docs would be summed into the total.
+        // The `points` bounds mirror isValidRoundScore in src/lib/game/rules.ts: `<= 1000` is
+        // MAX_ROUND_SCORE and `% 5` is ROUND_SCORE_STEP (every card value is a multiple of 5).
+        // Change both together; tests/rules imports those constants to pin the pair.
+        // Only seated players or the host, while the game runs, for rounds that have started. A
+        // player may fill in a missed round (create), but only the host changes an earlier round
+        // afterwards, so nobody quietly lowers round 1 in round 5.
         allow create: if isValidRoundScore(code, scoreId)
           && request.resource.data.round <= roomData(code).currentRound;
         allow update: if isValidRoundScore(code, scoreId)
@@ -362,37 +331,25 @@ service cloud.firestore {
       }
     }
 
-    // Permanent stats records (docs/PLAN.md "Stats & history" — a second layer, separate from
-    // the transient room above). APPEND-ONLY: `create` is the only write ever allowed; `update`
-    // and `delete` are always denied, so a written result can never be edited or removed
-    // afterward, even by its own writer.
+    // Permanent stats. Append-only: create is the only write, even for the writer.
     //
-    // READS are limited to participants: every stats doc carries `participantUids` (the auth uids
-    // of the game's players, written by writeGameResult), and only those players can get or list
-    // it. Head-to-head still works because a player's opponents are participants in the same
-    // games. Queries must filter `participantUids array-contains <uid>` to be allowed.
+    // Reads: only the players a doc names in `participantUids`, so a query must filter on
+    // `participantUids array-contains <uid>`. Head-to-head still works, since opponents are
+    // participants in the same games.
     //
-    // Create-authorization trade-off (see docs/DECISIONS.md): when a gameId corresponds to a
-    // room that exists (an online game — the common case), only that room's host may write its
-    // stats rows, matching "the host is the one finishing, so it writes all rows" — AND (the
-    // forgery fix below) only for a deviceUuid that was actually seated as a real participant in
-    // that room, via `exists(room/{gameId}/players/{deviceUuid})`. `deviceUuid` on these rows is
-    // therefore the room participant's own AUTH UID (see `firestore-repository.ts`'s
-    // `finishGame`), not the separate localStorage `device_uuid` the room's `players` docs carry
-    // — the auth uid is the one identity Firestore can actually verify against room membership.
+    // Who may create (see docs/DECISIONS.md):
+    // - Online game (its room exists): only the host, who finishes the game and writes every row,
+    //   and a game_player row only for a uid seated in that room, so the host can't invent an
+    //   opponent. `deviceUuid` here is the player's auth uid, because players/ is keyed by it and
+    //   membership can be checked only against it.
+    // - Local game (no room): a UUID id and self-write only (`deviceUuid == request.auth.uid`),
+    //   so nobody can forge a row for someone else.
     //
-    // When no room exists (a purely local/offline game, only reaching Firestore via the
-    // reconnect flush — see docs/PLAN.md "Reconnect = push final result only"), there is no room
-    // doc to check a participant against, so the ONLY remaining identity anchor is SELF-WRITE:
-    // `deviceUuid == request.auth.uid`. Before this fix, the local branch had no identity check
-    // at all (`!roomExists(gameId)` alone authorized the write) — any authed user could forge a
-    // permanent win/loss row for any victim's deviceUuid; closed here.
-    //
-    // `game_player` additionally requires a matching `game_result` to already exist, so a row can
-    // never be created as an orphan pointing at a game that was never (yet) finished.
+    // A game_player row needs its game_result to exist already, so no row is an orphan. get() and
+    // exists() don't see a sibling write in the same batch, so the app writes the result first.
     match /game_result/{gameId} {
-      // Only the players a result names can read it. `get` of a result that doesn't exist yet is
-      // allowed, so a writer can check before writing (writeGameResult is idempotent).
+      // A get of a result that doesn't exist yet is allowed, so a writer can check before writing
+      // (writeGameResult is idempotent).
       allow get: if isSignedIn() && (resource == null || isParticipant());
       allow list: if isSignedIn() && isParticipant();
 
@@ -455,10 +412,10 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Global highscores (fourth round): one public entry per stats row, which anyone signed in
-    // may read, ten at a time. An entry must repeat its own game_player row (and that game's
-    // finishedAt) exactly, and only one of that game's players may publish it, so who may write
-    // a stats row (above) also decides what reaches the board. Append-only, like the rows.
+    // Global highscores: one public entry per stats row, readable by anyone signed in, ten at a
+    // time. An entry must copy its game_player row (and the game's finishedAt) exactly and come
+    // from one of that game's players, so the stats-row rules above also decide what reaches the
+    // board. Append-only.
     match /leaderboard/{entryId} {
       function matchesItsStatsRow() {
         let row = get(/databases/$(database)/documents/game_player/$(entryId)).data;

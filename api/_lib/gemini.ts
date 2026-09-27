@@ -1,13 +1,10 @@
 /**
- * The only module that touches the Gemini SDK — kept behind the `GeminiClient` interface so the
- * handler can be tested with a fake instead of a real API key/network call (see the tdd skill:
- * "mock the Gemini SDK — no live calls/creds").
+ * The only module that touches the Gemini SDK, behind `GeminiClient` so the handler can be tested
+ * with a fake.
  *
- * Model: `GEMINI_MODEL` (see production-deps.ts), defaulting to Google's recommendation for new
- * projects. 2.5 Flash is limited to accounts that already used it, so a new key would be refused.
- * Check ai.google.dev/gemini-api/docs/models before changing the default. Temperature is left at
- * the model default, as Google advises for 3.x; what keeps a score honest is the server-side
- * recompute (extraction.ts) and the player's confirm step, not sampling settings.
+ * `GEMINI_MODEL` overrides the default, Google's pick for new projects (2.5 Flash refuses new
+ * keys); check ai.google.dev/gemini-api/docs/models before changing it. Temperature stays at the
+ * default, as Google advises for 3.x; the recompute and the player's confirm keep scores honest.
  */
 import { GoogleGenAI, ThinkingLevel, Type, type Schema } from '@google/genai'
 import { MAX_DETECTED_CARDS } from './extraction.js'
@@ -19,10 +16,8 @@ const GEMINI_TIMEOUT_MS = 15_000
 /** A card list is short; the cap stops a looping response from running up output tokens. */
 const MAX_OUTPUT_TOKENS = 2048
 
-/** The exact rank tokens `extraction.ts`'s `parseModelCards` accepts — kept as the one source of
- * truth for both the schema `enum` below and the prompt's token contract, so the two can't drift
- * out of sync with each other (they already independently have to match `src/lib/types.ts`'s
- * `Rank` union). */
+/** The rank tokens `parseModelCards` accepts, shared by the schema and the prompt so they can't
+ * drift apart. Must match `Rank` in `src/lib/game/types.ts`. */
 const RANK_TOKENS = [
   '2',
   '3',
@@ -40,14 +35,10 @@ const RANK_TOKENS = [
   'Joker',
 ] as const
 
-/** The extraction shape (docs/PLAN.md) as a Gemini response schema, forcing structured JSON
- * output. `rank` is constrained to an enum of the exact tokens the validator accepts (see
- * `extraction.ts`) — without this, a model free to write "King"/"Ace"/"Jack" would pass its own
- * schema but fail our validation on nearly every real hand. `suit` is nullable (a Joker has none)
- * rather than optional, so the model can't just omit it; left without its own enum (nullable +
- * enum is unreliable in this schema format), covered by the prompt's token list instead. This
- * constrains the model's OUTPUT SHAPE only — the actual values (rank/suit/value/total) are never
- * trusted as-is; the handler revalidates and recomputes them (see `extraction.ts`). */
+/** Forces structured JSON. `rank` is an enum of the exact tokens, or the model writes "King" and
+ * fails validation on nearly every hand. `suit` is nullable (a Joker has none) rather than
+ * optional, so it can't be omitted, and has no enum because nullable plus enum is unreliable here:
+ * the prompt lists the suits. Only the shape is forced; the values are checked and recomputed. */
 const RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -69,12 +60,9 @@ const RESPONSE_SCHEMA: Schema = {
   required: ['cards', 'total'],
 }
 
-/** Encodes the Rommi (Finnish Rummy) leftover-card values (see src/lib/rules.ts) so the model
- * reads photographed cards the same way manual entry scores them. The `rank` token contract is
- * spelled out explicitly (not just implied by "Jack, Queen, King...") — a model left to describe
- * cards in prose would write "King"/"Ace" and fail the schema/validator on nearly every hand.
- * The multi-deck line matters too: without it, "count each card once" invites the model to
- * collapse two identical 7♥ into one and under-count the hand. */
+/** The card values from `src/lib/game/rules.ts`, so the model scores cards as manual entry does.
+ * The rank tokens are spelled out, or the model writes "King" and "Ace". Without the multi-deck
+ * line, it merges two identical 7♥ into one. */
 const PROMPT = `You are reading a photo of leftover playing cards at the end of a round of Finnish Rummy (Rommi). Identify every visible card and score it using these exact point values:
 - Number cards 2-9 are worth 5 points each. 10 is worth 10.
 - Jack, Queen, and King are each worth 10.
@@ -85,9 +73,7 @@ The game is played with two or three decks shuffled together, so the same card (
 Return one entry per detected card with its rank, suit ("clubs", "diamonds", "hearts", "spades", or null for a Joker), and value, plus the summed total across all cards. The cards are laid flat and non-overlapping — count each physical card exactly once.`
 
 export interface GeminiClient {
-  /** Returns the model's raw response text (expected to be JSON per the response schema above) —
-   * parsing/validating it is the handler's job (see `extraction.ts`'s `parseModelOutput`), so
-   * this stays a thin passthrough. Rejects if the underlying API call fails (quota, network). */
+  /** The model's raw text, for the handler to parse. Rejects if the call fails (quota, network). */
   extractCards(image: string, mimeType: string): Promise<string>
 }
 

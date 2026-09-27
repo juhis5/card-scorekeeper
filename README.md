@@ -1,71 +1,70 @@
 # card-scorekeeper
 
-Rommi (Finnish Rummy) live scoreboard. See `CLAUDE.md` and `docs/PLAN.md` for the full spec.
+Rommi (Finnish Rummy) live scoreboard for phones. A host starts a game, players join with a room
+code, and every phone follows the scores live. With no connection, the host plays on one phone.
+Production: [rommi.vercel.app](https://rommi.vercel.app). Test site:
+[test-rommi.vercel.app](https://test-rommi.vercel.app).
 
-## Recommended IDE Setup
+- [`docs/PLAN.md`](docs/PLAN.md): how the app works.
+- [`docs/DECISIONS.md`](docs/DECISIONS.md): why it works that way.
+- [`docs/TOOLCHAIN.md`](docs/TOOLCHAIN.md): versions and pins.
+- `CLAUDE.md` and `.claude/skills/`: conventions for working on the code.
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## Setup
 
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
+Node 24 (`nvm use` reads `.nvmrc`) and pnpm through corepack.
 
 ```sh
 pnpm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
+cp .env.example .env.local # fill in the VITE_FIREBASE_* web config
 pnpm dev
 ```
 
-### Type-Check, Compile and Minify for Production
+To use the local emulators instead, run `pnpm exec firebase emulators:start` (needs Java) and
+set `VITE_USE_EMULATOR=true` with the demo web config for project `demo-card-scorekeeper`, as in
+the `webServer.env` block of `tests/e2e/playwright.config.ts`. The photo count needs
+`vercel dev` and the server variables listed in `.env.example`.
 
-```sh
-pnpm build
+## Scripts
+
+| Command                                       | What it does                                                        |
+| --------------------------------------------- | ------------------------------------------------------------------- |
+| `pnpm dev`                                    | Dev server                                                          |
+| `pnpm build`                                  | Typecheck (`vue-tsc`) and production build                          |
+| `pnpm preview`                                | Serve the build                                                     |
+| `pnpm lint`, `pnpm format`                    | Fix lint and formatting                                             |
+| `pnpm lint:check`, `pnpm format:check`        | Check only, as CI does                                              |
+| `pnpm test`, `pnpm test:run`                  | Unit tests, watching or once                                        |
+| `pnpm test:api`                               | The `/api/count` function, SDKs mocked                              |
+| `pnpm test:api-load`                          | Compile `/api` and load it the way Vercel does                      |
+| `pnpm test:rules`                             | `firebase/firestore.rules` on the emulator                          |
+| `pnpm test:integration`                       | The real Firebase client SDK on the emulator                        |
+| `pnpm test:e2e`                               | Playwright against the emulators (`pnpm e2e`: emulators already up) |
+| `pnpm test:e2e:ci`                            | The CI run: production build, Chromium and Firefox                  |
+| `pnpm test:visual`, `pnpm test:visual:update` | Compare or update screenshots in Playwright's Linux image (Docker)  |
+
+The emulator scripts start the Firebase emulators themselves. Before the first e2e run, install
+the browsers with `pnpm exec playwright install`.
+
+## Layout
+
+```
+src/
+  views/                one per route
+  components/           home, room, header, menu, stats, rules (ui/ is shadcn-vue)
+  stores/               Pinia: game, identity, stats, highscores, install, app-update
+  composables/
+  lib/game/             pure rules, scoring, stats (no Vue, no network)
+  lib/data/             GameRepository: local and Firestore, stats writes, reconnect flush
+  lib/platform/         browser helpers: connectivity, themes, updates, install
+  locales/              fi and en strings
+api/                    the photo-count function (count.ts, helpers in _lib/)
+firebase/               firestore.rules and indexes
+tests/rules/            rules tests on the emulator
+tests/integration/      client SDK tests on the emulator
+tests/e2e/              Playwright specs, visual snapshots
+docs/                   PLAN, DECISIONS, TOOLCHAIN
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
-
-```sh
-pnpm test:run
-```
-
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
-
-```sh
-# Install browsers for the first run
-npx playwright install
-
-# When testing on CI, must build the project first
-pnpm build
-
-# Runs the end-to-end tests
-pnpm e2e
-# Runs the tests only on Chromium
-pnpm e2e --project=chromium
-# Runs the tests in debug mode
-pnpm e2e --debug
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-pnpm lint
-```
+Unit tests sit next to the code they test. Deploys run on Vercel: `develop` goes to the test site
+on staging Firebase, `main` to production.

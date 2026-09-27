@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: the menu's Teema row (fourth round: more themes, the "Jani" one among them). Closed,
- * it names the current theme; open, it lists every theme as a radio with a swatch of its own
- * background and accent. A swatch wears its theme's class, so it shows that palette's tokens.
+ * Single job: the menu's Teema row, opening to a radio per theme. Each swatch wears its theme's
+ * class, so it shows that palette's own background and accent.
  */
 import { ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'

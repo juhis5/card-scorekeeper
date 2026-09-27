@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * Single job: the Stats screen's global highscores (fourth round), with its own loading and error
- * states, so it never hides this device's stats above it: best games, the hall of shame and the
- * biggest rounds, across every game played with the app.
+ * Single job: the Stats screen's global highscores. It has its own loading and error states, so a
+ * failure never hides this device's stats above it.
  */
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'

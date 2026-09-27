@@ -1,7 +1,4 @@
-/**
- * Pure request-shape validation — no SDKs, no I/O. Kept separate from the handler so every
- * malformed-input case is a plain unit test (see the tdd skill).
- */
+/** Request-shape validation, pure so every malformed input is a plain unit test. */
 import { isValidRoomCode } from '../../src/lib/game/room-code.js'
 import type { CountRequestBody } from './types.js'
 
@@ -25,12 +22,8 @@ function tryParseJson(text: string): unknown {
   }
 }
 
-/**
- * Validates and narrows an unknown request body into `CountRequestBody`, or returns null if any
- * field is missing/wrong-typed. Accepts either an already-parsed object (the common case — the
- * Vercel Node runtime pre-parses JSON bodies) or a raw JSON string, for robustness across runtime
- * versions.
- */
+/** The body as `CountRequestBody`, or null. Takes a parsed object (Vercel parses JSON bodies) or a
+ * raw JSON string. */
 export function parseCountRequestBody(rawBody: unknown): CountRequestBody | null {
   const body = typeof rawBody === 'string' ? tryParseJson(rawBody) : rawBody
   if (typeof body !== 'object' || body === null) return null
@@ -45,9 +38,8 @@ export function parseCountRequestBody(rawBody: unknown): CountRequestBody | null
   return { roomCode, image, mimeType }
 }
 
-/** Extracts the bearer token from an `Authorization` header value, or null if absent/malformed.
- * Node/Vercel lowercase header names and may present a repeated header as a string array — the
- * caller passes whichever value it finds under `authorization`. */
+/** The bearer token from an `Authorization` header, or null. A repeated header arrives as an
+ * array; the first value wins. */
 export function parseBearerToken(headerValue: string | string[] | undefined): string | null {
   const value = Array.isArray(headerValue) ? headerValue[0] : headerValue
   if (!value) return null

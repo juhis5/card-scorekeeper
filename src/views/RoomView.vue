@@ -1,15 +1,8 @@
 <script setup lang="ts">
 /**
- * The live scoreboard: contract banner, standings table, per-player round-score entry, and the
- * next-round/finish actions. Talks only to `useGameStore` — no repository, no Firestore, no
- * business logic here beyond thin UI orchestration.
- *
- * Online vs offline (see docs/DECISIONS.md's 2026-07-24 online entries + the firestore-realtime
- * skill): offline, the host enters every player's score and drives Next/Finish, unchanged from
- * slice 3. Online, each device edits only its OWN row (`myPlayerId`) — Firestore rules enforce
- * this too, this is the matching UI — and only the host (`isHost`) sees Next/Finish; a joiner
- * waits. Never gate any of this on `status === 'playing'`: online, `status` stays `'waiting'`
- * until the host's first `advanceRound()` (see DECISIONS.md), so gating on it would hide round 1.
+ * The live scoreboard. The host enters any score and drives Next/Finish; a joiner edits only
+ * their own row, as firestore.rules enforces. Never gate on `status === 'playing'`: online it
+ * stays 'waiting' until the first advanceRound(), so gating on it would hide round 1.
  */
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
@@ -62,8 +55,7 @@ const {
   connectionError,
 } = storeToRefs(game)
 const { resumeRepository } = useGameConnectivity()
-// Mid-game connectivity blip, distinct from the never-connected `!isOnline` banner below (see
-// the error-ux skill's "the two offline modes") — only ever shown while `isOnline` (a live room).
+// A blip in a live room, not the never-connected offline banner.
 const { isReconnecting } = useConnectionStatus()
 
 const announcement = ref('')
@@ -73,12 +65,8 @@ const isAdvancing = ref(false)
 const scoreEntryHeading = useTemplateRef<HTMLHeadingElement>('scoreEntryHeading')
 const isFinishing = ref(false)
 
-// `standings` is sorted by total, so it reorders after every commit — great for the scoreboard,
-// terrible for the entry list (a row would slide out from under a player's thumb mid-entry).
-// Grow a fixed seat order as players are first seen (never reorder, never drop) instead of a
-// one-time snapshot at mount: online, the first Firestore snapshot arrives asynchronously (this
-// component can mount before any player — even the host — has shown up yet), and new joiners can
-// arrive at any time during the game, so a frozen mount-time list would miss them permanently.
+// Entry cards keep a fixed seat order: `standings` re-sorts after every save and would slide a
+// row from under a thumb. It grows as players appear, since online they arrive after mount.
 const seatOrder = ref<PlayerId[]>([])
 watch(
   standings,
@@ -96,14 +84,12 @@ const seatedStandings = computed(() =>
     .map((playerId) => standings.value.find((standing) => standing.player.id === playerId))
     .filter((standing): standing is Standing => standing !== undefined),
 )
-// The host (offline or online) enters and fixes anyone's score; an online joiner edits only their
-// own seat. firestore.rules enforces the same split.
 const entryStandings = computed(() =>
   isHost.value
     ? seatedStandings.value
     : seatedStandings.value.filter((standing) => standing.player.id === myPlayerId.value),
 )
-/** Play again carries this game's names on: this device's own, and everyone else's in seat order. */
+/** Names Play again carries over: this device's own, then the others in seat order. */
 const myName = computed(
   () =>
     seatedStandings.value.find(({ player }) => player.id === myPlayerId.value)?.player.name ?? '',
@@ -122,8 +108,7 @@ const missingThisRound = computed(() =>
 )
 const isEnterAllOpen = ref(false)
 
-/** Earlier rounds an editable player has no score for: a late joiner fills these in, so nobody is
- * ranked on fewer rounds than the others. */
+/** Earlier rounds a late joiner still has to fill in, so nobody is ranked on fewer rounds. */
 const missedRoundCards = computed(() =>
   entryStandings.value.flatMap(({ player }) =>
     missingRounds(player.id, roundScores.value, currentRound.value)
@@ -157,12 +142,8 @@ const roundsToCheckText = computed(() =>
 )
 const canAdvance = computed(() => allPlayersScored.value && roundsToCheck.value.length === 0)
 
-// Card points come from the synced `roundScores`, not view-local commits: online, other devices'
-// scores only ever arrive through the subscription, and a host correction must show up too.
-/** Scores this device entered, as "playerId-round". The host may see those numbers on other
- * players' cards; scores players entered themselves stay "scored" there until the round is
- * revealed. Device memory only: after a reload the host sees "scored" for them too. A guest's
- * numbers are always the host's own, so those show regardless. */
+/** Scores entered on this device, as "playerId-round": the host sees those numbers on others'
+ * cards, while scores players entered themselves read "scored" until the reveal. Lost on reload. */
 const scoresEnteredHere = ref(new Set<string>())
 
 function scoreKey(playerId: PlayerId, round: ContractRoundNumber): string {
@@ -182,8 +163,8 @@ function isOwnCard(playerId: PlayerId): boolean {
   return !isHost.value && playerId === myPlayerId.value
 }
 
-/** Set while this device saves a score or removes a player: either can complete the round, and
- * its own announcement then says "everyone has entered" instead of a second message racing it. */
+/** True while this device saves or removes a player: that change announces "all scored" itself,
+ * so the watcher below stays quiet instead of racing it. */
 let isLocalChangeInFlight = false
 let pendingSave: Promise<void> = Promise.resolve()
 /** Shown when Next or Finish is tapped before every score is in. */
@@ -209,9 +190,7 @@ function allScoredMessage(): string {
   return t('room.live.allScored', { round: n(currentRound.value) })
 }
 
-/** "Round 2 results: Juho leads with 30 points. You're in place 2. Round 3 of 5 — …": one message
- * on every device when a round is revealed. The contract banner doesn't announce on its own, so
- * the two don't talk over each other. */
+/** One message on every device when a round is revealed; the contract banner stays quiet. */
 function revealMessage(round: number): string {
   const leaders = board.value.filter((row) => row.placement === 1)
   const names = new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
@@ -235,8 +214,8 @@ function revealMessage(round: number): string {
   return [results, place, nextRound].filter((part) => part !== '').join(' ')
 }
 
-// Announce a reveal once, on every device, but not when a room is first opened or resumed: the
-// board is already showing those rounds then. Finishing is announced by WinnerBanner instead.
+// Announce each reveal once, but not on opening or resuming a room: the board already shows it.
+// WinnerBanner announces the finish.
 let revealBaseline: { gameId: string | null; completed: number } | null = null
 watch(
   [gameId, completedRounds, hasActiveGame],
@@ -255,8 +234,7 @@ watch(
   { immediate: true },
 )
 
-// The host hears when the last score comes in from another device; its own last save says so in
-// the same message.
+// The host hears when another device sends the last score; its own saves say so themselves.
 watch(allPlayersScored, (isReady, wasReady) => {
   if (isReady) isWaitingHintShown.value = false
   if (isReady && !wasReady && isHost.value && hasActiveGame.value && !isLocalChangeInFlight) {
@@ -334,8 +312,7 @@ async function handleRemovePlayer(player: Player): Promise<void> {
   scoreEntryHeading.value?.focus()
 }
 
-/** A score saved just before the tap on Next or Finish may still be on its way; wait for it. A
- * number typed but not saved is thrown away by that tap (only ✓ saves), so it doesn't count. */
+/** Waits for a score saved just before the tap. A typed but unsaved number doesn't count. */
 async function isReadyToAdvance(): Promise<boolean> {
   await pendingSave
   isWaitingHintShown.value = !allPlayersScored.value
@@ -359,9 +336,7 @@ async function handleFinish(): Promise<void> {
   if (isFinishing.value || !(await isReadyToAdvance())) return
   isFinishing.value = true
   try {
-    // No separate "game finished" announcement here: WinnerBanner is its own `role="status"`
-    // region and announces itself the moment it mounts — a second live region saying the same
-    // thing would violate "announce sparingly" (a11y-mobile).
+    // No announcement here: WinnerBanner is its own live region and announces on mount.
     await game.finishGame()
     saveError.value = ''
   } catch (error) {
@@ -402,9 +377,8 @@ async function resumeOnlineRoom(code: string): Promise<void> {
   resumeState.value = isResumed ? 'idle' : 'not-seated'
 }
 
-// A reload loses the in-memory store. The local sentinel resumes the game kept in localStorage;
-// a real room code resumes this device's seat in that online room. Never the other way round:
-// reloading an online room must not pick up a stale local game.
+// A reload empties the store. The local sentinel resumes the localStorage game, a room code this
+// device's online seat. Never mixed: an online room must not pick up a stale local game.
 onMounted(async () => {
   if (hasActiveGame.value || roomCode.value === routeCode.value) return
   if (routeCode.value === LOCAL_GAME_ROUTE_CODE) {
@@ -416,14 +390,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <!-- On a touch screen an open card needs room to scroll up under the header, even the last
-       one, so the page gets space below while a card is open (see useKeepInView). -->
+  <!-- On touch, space below an open card lets even the last one scroll up (useKeepInView). -->
   <main
     class="group/room mx-auto flex w-full max-w-md flex-1 flex-col gap-4 p-4 pointer-coarse:has-[[data-card-open]]:pb-(--open-card-room)"
   >
-    <!-- One heading for every state: navigation focuses it before the room's first snapshot
-         arrives, and a new element per state would drop that focus when the room opens. While a
-         game is on screen it's for screen readers only; the board needs the space more. -->
+    <!-- One heading for every state: navigation focuses it before the first snapshot, and a new
+         element per state would drop that focus. Screen-reader only while a game shows. -->
     <h1
       id="main-heading"
       tabindex="-1"
@@ -580,9 +552,8 @@ onMounted(async () => {
         {{ t('room.next.severalZeros', { rounds: roundsToCheckText }) }}
       </p>
 
-      <!-- The bottom bars stick to the bottom of the screen, except while a card is open: with
-           the keyboard up the phone shows them right above it, on top of the field being typed
-           into (third playtest, iPhone). -->
+      <!-- Not sticky while a card is open: with the keyboard up, an iPhone shows sticky bars
+           right above it, over the field being typed into. -->
       <div
         v-if="isFinished"
         data-bottom-bar
