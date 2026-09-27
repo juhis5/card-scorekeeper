@@ -357,6 +357,21 @@ describe('useGameStore.finishGame', () => {
   })
 })
 
+describe('useGameStore.completedRounds', () => {
+  it('counts no completed round at the start, one after the first advance, all once finished', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+    expect(game.completedRounds).toBe(0)
+
+    await game.advanceRound()
+    expect(game.completedRounds).toBe(1)
+
+    await game.finishGame()
+    expect(game.completedRounds).toBe(5)
+  })
+})
+
 describe('useGameStore.leave', () => {
   it('unsubscribes so no further repository emissions reach the store', async () => {
     const game = useGameStore()

@@ -139,7 +139,6 @@ async function handleSubmit(): Promise<void> {
             autocomplete="name"
             enterkeyhint="next"
             class="h-11 text-base"
-            :placeholder="t('home.form.hostNamePlaceholder')"
             :aria-invalid="isHostNameInvalid"
             :aria-describedby="isHostNameInvalid ? 'host-name-error' : undefined"
           />

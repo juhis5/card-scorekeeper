@@ -77,7 +77,7 @@ test.describe('score entry on a card', () => {
     await typeMaijuScore(page, '25')
     await page.keyboard.press('Enter')
 
-    await expect(maijuCard(page)).toHaveAccessibleName("Edit Maiju's score (scored)")
+    await expect(maijuCard(page)).toHaveAccessibleName("Edit Maiju's score (25 points)")
     expect((await localGameWrites(page)) - writesBefore).toBe(1)
   })
 })

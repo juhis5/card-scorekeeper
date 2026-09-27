@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
-import { isEveryRoundScored, missingRounds, TOTAL_ROUNDS } from '@/lib/rules'
+import { isEveryRoundScored, missingRounds, pointsFor, TOTAL_ROUNDS } from '@/lib/rules'
 import { isPermissionDenied } from '@/lib/write-errors'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/repository'
@@ -38,6 +38,7 @@ const {
   standings,
   currentContract,
   currentRound,
+  completedRounds,
   status,
   winners,
   roundScores,
@@ -101,17 +102,6 @@ const missedRoundCards = computed(() =>
 const hasActiveGame = computed(() => standings.value.length > 0)
 const isFinalRound = computed(() => currentRound.value === TOTAL_ROUNDS)
 const isFinished = computed(() => status.value === 'finished')
-// Derived from synced `roundScores`, not view-local commits: online, other devices' scores only
-// ever arrive through the subscription. `roundScores` is the shared source of truth for both modes
-// (see repository.ts).
-const scoredPlayerIdsThisRound = computed(
-  () =>
-    new Set(
-      roundScores.value
-        .filter((score) => score.round === currentRound.value)
-        .map((score) => score.playerId),
-    ),
-)
 // Every round so far, not just the current one: a late joiner's missed rounds block Next too.
 const allPlayersScored = computed(() =>
   isEveryRoundScored(
@@ -120,6 +110,26 @@ const allPlayersScored = computed(() =>
     currentRound.value,
   ),
 )
+
+// Card points come from the synced `roundScores`, not view-local commits: online, other devices'
+// scores only ever arrive through the subscription, and a host correction must show up too.
+/** Scores this device entered, as "playerId-round". The host may see those numbers on other
+ * players' cards; scores players entered themselves stay "scored" there until the round is
+ * revealed. Device memory only: after a reload the host sees "scored" for them too. */
+const scoresEnteredHere = ref(new Set<string>())
+
+function scoreKey(playerId: PlayerId, round: ContractRoundNumber): string {
+  return `${playerId}-${round}`
+}
+
+function canSeePoints(playerId: PlayerId, round: ContractRoundNumber): boolean {
+  return playerId === myPlayerId.value || scoresEnteredHere.value.has(scoreKey(playerId, round))
+}
+
+/** A non-host player's own card reads "Enter your points"; the host sees names on every card. */
+function isOwnCard(playerId: PlayerId): boolean {
+  return !isHost.value && playerId === myPlayerId.value
+}
 
 function canRemove(playerId: PlayerId): boolean {
   return isHost.value && playerId !== myPlayerId.value
@@ -146,6 +156,7 @@ async function handleScoreCommit(
     return
   }
   saveError.value = ''
+  scoresEnteredHere.value.add(scoreKey(playerId, round))
   if (!player) return
 
   const isLeading = standings.value[0]?.player.id === playerId
@@ -321,7 +332,7 @@ onMounted(async () => {
 
       <ContractBanner :round="currentRound" :contract-key="currentContract.contractKey" />
 
-      <ScoreBoard :standings="standings" />
+      <ScoreBoard :standings="standings" :show-leader="completedRounds > 0" />
 
       <WinnerBanner v-if="isFinished" :winners="winners" />
 
@@ -334,12 +345,13 @@ onMounted(async () => {
           {{ t('room.score.missedHeading') }}
         </h2>
         <p class="text-muted-foreground text-sm">{{ t('room.score.missedHint') }}</p>
-        <ul role="list" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ul role="list" class="flex flex-col gap-3">
           <ScoreCard
             v-for="card in missedRoundCards"
             :key="`${card.player.id}-${card.round}`"
             :player="card.player"
             :round="card.round"
+            :is-own-card="isOwnCard(card.player.id)"
             is-missed-round
             @commit="handleScoreCommit"
           />
@@ -356,13 +368,15 @@ onMounted(async () => {
           {{ t('room.score.sectionHeading', { round: n(currentRound) }) }}
         </h2>
         <!-- role="list": Tailwind's list reset makes Safari/VoiceOver drop <ul> semantics. -->
-        <ul role="list" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <ul role="list" class="flex flex-col gap-3">
           <ScoreCard
             v-for="standing in entryStandings"
             :key="`${standing.player.id}-${currentRound}`"
             :player="standing.player"
             :round="currentRound"
-            :is-scored="scoredPlayerIdsThisRound.has(standing.player.id)"
+            :scored-points="pointsFor(standing.player.id, currentRound, roundScores)"
+            :show-points="canSeePoints(standing.player.id, currentRound)"
+            :is-own-card="isOwnCard(standing.player.id)"
             :can-use-photo-count="isOnline && standing.player.id === myPlayerId"
             :room-code="roomCode"
             @commit="handleScoreCommit"

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import {
   ROOM_CODE_PATTERN,
+  enterOwnRoundScore,
   enterRoundScore,
   joinHostedGame,
   readRoomCode,
@@ -59,7 +60,7 @@ test.describe('two-client live score sync', () => {
       await expect(scoreboardRow(hostPage, joinerName)).toBeVisible()
 
       // 2. The joiner enters their own round-1 score; it appears on the HOST's scoreboard live.
-      await enterRoundScore(joinerPage, joinerName, 1, 15)
+      await enterOwnRoundScore(joinerPage, 1, 15)
       await expect(scoreboardRow(hostPage, joinerName)).toContainText('15')
 
       // 3. The host enters their own round-1 score; it appears on the JOINER's scoreboard live.

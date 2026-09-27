@@ -94,6 +94,14 @@ beforeEach(() => {
   hostRepository.mockReset()
 })
 
+describe('GameSetup name fields', () => {
+  it('shows no example name, so nobody copies the placeholder', () => {
+    renderGameSetup()
+
+    expect(screen.getByLabelText('Your name').getAttribute('placeholder')).toBeNull()
+  })
+})
+
 describe('GameSetup validation', () => {
   it('shows a host-name error and never probes connectivity when the host name is missing', async () => {
     renderGameSetup()

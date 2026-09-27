@@ -13,6 +13,7 @@
 import { computed, onScopeDispose, ref } from 'vue'
 import { defineStore } from 'pinia'
 import {
+  completedRounds as completedRoundsFor,
   contractForRound,
   runningTotal,
   standings as standingsFor,
@@ -73,6 +74,9 @@ export const useGameStore = defineStore('game', () => {
   const status = computed(() => state.value.status)
   const currentRound = computed(() => state.value.currentRound)
   const currentContract = computed(() => contractForRound(state.value.currentRound))
+  const completedRounds = computed(() =>
+    completedRoundsFor(state.value.currentRound, state.value.status),
+  )
   const roundScores = computed(() => state.value.roundScores)
   /** A non-null room code only ever comes from an online (Firestore) repository — local mode's
    * `CreatedGame.roomCode` is always null (see repository.ts) — so this doubles as "is this a
@@ -234,6 +238,7 @@ export const useGameStore = defineStore('game', () => {
     status,
     currentRound,
     currentContract,
+    completedRounds,
     roundScores,
     standings,
     winners,

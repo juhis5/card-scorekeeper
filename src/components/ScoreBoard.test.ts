@@ -28,7 +28,7 @@ describe('ScoreBoard', () => {
 
   it('marks the leader with text, not color alone', () => {
     render(ScoreBoard, {
-      props: { standings: standings(PLAYERS) },
+      props: { standings: standings(PLAYERS), showLeader: true },
       global: { plugins: [i18n] },
     })
 
@@ -36,5 +36,20 @@ describe('ScoreBoard', () => {
     expect(rows[0]?.textContent).toContain('Bob')
     expect(rows[0]?.textContent).toContain('Leader')
     expect(rows[1]?.textContent).not.toContain('Leader')
+  })
+
+  it('marks no leader before a round is complete, when everyone is tied at 0', () => {
+    const tiedAtZero: Player[] = PLAYERS.map((player) => ({ ...player, totalScore: 0 }))
+    render(ScoreBoard, {
+      props: { standings: standings(tiedAtZero), showLeader: false },
+      global: { plugins: [i18n] },
+    })
+
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(3)
+    for (const row of rows) {
+      expect(row.textContent).not.toContain('Leader')
+      expect(row.classList.contains('bg-muted')).toBe(false)
+    }
   })
 })
