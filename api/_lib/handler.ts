@@ -15,13 +15,13 @@
  *   6. Gemini call + output validation                 → 502 / 422
  *   7. success — server-recomputed cards + total       → 200
  */
-import { parseBearerToken, parseCountRequestBody } from './request'
-import { authenticateRequest, evaluateRoomGate, type RoomSnapshot } from './gate'
-import { checkRateLimit, type RateLimitConfig, type RateLimitStore } from './rate-limit'
-import { exceedsSizeCap } from './image'
-import { parseModelOutput, buildExtractionResult } from './extraction'
-import type { GeminiClient } from './gemini'
-import type { CountResponseBody } from './types'
+import { parseBearerToken, parseCountRequestBody } from './request.js'
+import { authenticateRequest, evaluateRoomGate, type RoomSnapshot } from './gate.js'
+import { checkRateLimit, type RateLimitConfig, type RateLimitStore } from './rate-limit.js'
+import { exceedsSizeCap } from './image.js'
+import { parseModelOutput, buildExtractionResult } from './extraction.js'
+import type { GeminiClient } from './gemini.js'
+import type { CountResponseBody } from './types.js'
 
 /** A hand-count happens a few times per round; 30 calls per 15 minutes comfortably covers every
  * player photographing their hand every round of a single game, without leaving headroom for

@@ -2,7 +2,7 @@
  * Pure request-shape validation — no SDKs, no I/O. Kept separate from the handler so every
  * malformed-input case is a plain unit test (see the tdd skill).
  */
-import type { CountRequestBody } from './types'
+import type { CountRequestBody } from './types.js'
 
 function tryParseJson(text: string): unknown {
   try {

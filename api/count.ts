@@ -8,8 +8,8 @@
  * from Vercel's file-system routing (folders starting with `_` aren't turned into functions), so
  * `/api` exposes exactly one route.
  */
-import { handleCountRequest, type CountApiRequest } from './_lib/handler'
-import { createProductionDeps } from './_lib/production-deps'
+import { handleCountRequest, type CountApiRequest } from './_lib/handler.js'
+import { createProductionDeps } from './_lib/production-deps.js'
 
 interface CountApiResponse {
   status(code: number): CountApiResponse

@@ -88,7 +88,8 @@ export function toRoomSnapshot(roomDoc: RoomDocLike, playerDoc: PlayerDocLike): 
   if (!roomDoc.exists) {
     return { exists: false, status: null, expiresAtMs: null, isMember: false }
   }
-  const data = roomDoc.data() as RoomDocFields | undefined
+  // The Admin SDK types data() as DocumentData; the fields are checked below before use.
+  const data = roomDoc.data() as unknown as RoomDocFields | undefined
   return {
     exists: true,
     status: data?.status ?? null,

@@ -6,14 +6,8 @@
     "vitest.config.*",
     "cypress.config.*",
     "playwright.config.*",
-    "eslint.config.*",
-    // The /api photo-count function (see the vercel-gemini skill) — Node.js code, not part of
-    // the Vue app project (tsconfig.app.json) or its test project (tsconfig.vitest.json, which
-    // separately picks up api/**/*.test.ts below). Test files are excluded here: they need
-    // vitest globals (describe/it/expect), which this project's "types" doesn't include.
-    "api/**/*.ts"
+    "eslint.config.*"
   ],
-  "exclude": ["api/**/*.test.ts"],
   "compilerOptions": {
     // Most tools use transpilation instead of Node.js's native type-stripping.
     // Bundler mode provides a smoother developer experience.

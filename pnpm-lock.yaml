@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@google/genai':
-        specifier: ^2.13.0
-        version: 2.13.0(@modelcontextprotocol/sdk@1.29.0(supports-color@7.2.0)(zod@4.4.3))(supports-color@7.2.0)
+        specifier: ^2.24.0
+        version: 2.24.0(@modelcontextprotocol/sdk@1.29.0(supports-color@7.2.0)(zod@4.4.3))(supports-color@7.2.0)
       '@lucide/vue':
         specifier: ^1.25.0
         version: 1.25.0(vue@3.5.40(typescript@6.0.3))
@@ -1173,8 +1173,8 @@ packages:
     resolution: {integrity: sha512-l+IFTkd+6Y5LoAuXyYCKNAKtw/Ci+rAMqgdTB1jv4iZiLhw0rtq+0qjIRbBizXkNzEFmXiXUW0H7sZQQvk1ffA==}
     engines: {node: '>=14'}
 
-  '@google/genai@2.13.0':
-    resolution: {integrity: sha512-GM7C8Kaomvjz05x5JEO6+l3d/pciL9LxAG9dUjJLD7nTPZ9X0Cfsf2Z7eET6UjgWyUmxXCHtYnQoQ77F9+ZIOQ==}
+  '@google/genai@2.24.0':
+    resolution: {integrity: sha512-bIu5eoxF1AaPWs9ivmUJGp1RpDHyapoODvWvnkzRDx2CTIW6UJXFhDdjj0BlRve3ZHMMuEkQBVrA/ALqpW4apA==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       '@modelcontextprotocol/sdk': ^1.25.2
@@ -8336,7 +8336,7 @@ snapshots:
       - supports-color
     optional: true
 
-  '@google/genai@2.13.0(@modelcontextprotocol/sdk@1.29.0(supports-color@7.2.0)(zod@4.4.3))(supports-color@7.2.0)':
+  '@google/genai@2.24.0(@modelcontextprotocol/sdk@1.29.0(supports-color@7.2.0)(zod@4.4.3))(supports-color@7.2.0)':
     dependencies:
       google-auth-library: 10.9.0(supports-color@7.2.0)
       p-retry: 4.6.2

@@ -11,10 +11,10 @@
  * `RateLimitStore`. Not built in this slice (out of scope — "don't require live KV"); flagged
  * here and in the handoff so it isn't mistaken for a real production guarantee.
  */
-import { createGeminiClient } from './gemini'
-import { getRoomSnapshot, verifyIdToken } from './firebase-admin'
-import { InMemoryRateLimitStore } from './rate-limit'
-import type { CountHandlerDeps } from './handler'
+import { createGeminiClient } from './gemini.js'
+import { getRoomSnapshot, verifyIdToken } from './firebase-admin.js'
+import { InMemoryRateLimitStore } from './rate-limit.js'
+import type { CountHandlerDeps } from './handler.js'
 
 // Module-scoped, so it's reused across warm invocations of the same instance (see the doc
 // comment above for why that's still not a real cross-instance cap).

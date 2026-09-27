@@ -8,7 +8,7 @@
 import { cert, getApps, initializeApp, type App, type ServiceAccount } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { getFirestore, type Firestore } from 'firebase-admin/firestore'
-import { toRoomSnapshot, type RoomSnapshot } from './gate'
+import { toRoomSnapshot, type RoomSnapshot } from './gate.js'
 
 let cachedApp: App | undefined
 
