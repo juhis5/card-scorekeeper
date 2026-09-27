@@ -46,7 +46,7 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 - **backend (`firestore-realtime`, `vercel-gemini`, `vercel-deploy`)**: Firestore rules are the security boundary (not the UI); public web config (`VITE_FIREBASE_*`) vs server-only secrets (`GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`) kept separate; photo-count room+token gate + per-room/global rate limits present; total recomputed server-side; listeners unsubscribed.
 - **`routing`**: routes lazy-loaded + named; guards thin (delegate to stores, no logic/mutation/network in a guard — offline nav must not block); focus moved + announced on navigation.
 - **`i18n`**: no hardcoded user-facing strings (all via `t()` keys); numbers/dates via Intl; `<html lang>` = the active locale.
-- **domain (`rules.ts`)**: card values (number=face, J/Q/K=10, Ace=15, Joker=25), the 5 contracts, low-total-wins, tie handling — all correct and unit-tested.
+- **domain (`rules.ts`)**: card values (2–9=5, 10=10, J/Q/K=10, Ace=15, Joker=25; round score = multiple of 5; duplicates from 2–3 decks count per card), the 5 contracts, low-total-wins, tie handling — all correct and unit-tested.
 
 ### 4. Maintainability & aesthetics — no shortcut hacks
 The bar: code should read like the surrounding code and be pleasant to maintain.

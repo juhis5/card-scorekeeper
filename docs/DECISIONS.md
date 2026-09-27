@@ -315,3 +315,14 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   `<meta name="theme-color">` stays dark-tinted in light mode (a clean fix needs reading
   `--background` at runtime, not a second hardcoded hex); shadcn `SheetContent`'s built-in "Close"
   label is hardcoded English but unreachable today (`PhotoCountSheet` sets `:show-close-button="false"`).
+- 2026-09-27 — Card values changed to the house rule: **2–9 = 5, 10 = 10**, J/Q/K = 10, Ace = 15,
+  Joker = 25 (was number = face value). Every value is now a multiple of 5, so a round score must be
+  too — `isValidRoundScore` in `rules.ts` rejects anything else, and `firestore.rules` mirrors it
+  with `points % 5 == 0` on `roundScores` only. `gamePlayers` bounds are deliberately NOT tightened:
+  an offline host's pending result recorded under the old values would otherwise be rejected on
+  reconnect forever.
+- 2026-09-27 — The game is played with **2 decks (sometimes 3)**. Scoring is per physical card, so
+  deck count changes nothing in `rules.ts`; the one single-deck assumption was the Gemini prompt
+  ("count each card once" invites merging two identical 7♥), now told to list every copy. No
+  deck-count game setting: its only use would be capping copies per card when validating a photo
+  read, which isn't worth a new field through types, both repositories, rules and UI.

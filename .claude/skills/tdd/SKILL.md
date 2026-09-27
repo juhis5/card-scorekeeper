@@ -29,7 +29,7 @@ Don't chase a coverage number. Coverage is a signal (untested logic branch = wri
 
 ## What to test where
 
-- **`lib/rules.ts`** — the highest-value TDD target here. Test the fixed rules exactly: card values (number = face, J/Q/K = 10, Ace = 15, Joker = 25); a round total sums correctly; the 5 contracts map round → required melds; winner = lowest total after round 5; ties handled. Pure functions with exact expected values — ideal for test-first.
+- **`lib/rules.ts`** — the highest-value TDD target here. Test the fixed rules exactly: card values (2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25; repeated cards from 2–3 decks each count); a round total sums correctly; the 5 contracts map round → required melds; winner = lowest total after round 5; ties handled. Pure functions with exact expected values — ideal for test-first.
 - **Stats logic** — win rate, best/worst round, head-to-head derivation from `game_player` rows. Pure functions over fixtures; TDD them (the identity caveats don't change the math).
 - **Stores (Pinia)** — fresh Pinia per test (`setActivePinia(createPinia())`). Mock Firestore (`onSnapshot`/writes) at the boundary — never hit real Firebase in unit tests. Test that a snapshot payload maps to sorted standings, that the current round advances, that permissions are respected in the action.
 - **Serverless photo-count** — unit-test the pure parts: room+token gate logic, rate-limit windows, server-side recompute of the card total, response validation. Mock the Gemini SDK and the Admin SDK. Assert: no valid room/token → 403, over cap → 429, bad model output rejected.

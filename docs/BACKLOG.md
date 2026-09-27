@@ -21,12 +21,12 @@ design-system dark tokens, deleted the Scaffolding section from CLAUDE.md, commi
 
 ## Slice 1 — Domain foundation (`lib/`) — STRICT TDD
 
-**Status: DONE** — `lib/rules.ts` + `lib/types.ts` pure & TDD'd (26 tests: card values, 55
+**Status: DONE** — `lib/rules.ts` + `lib/types.ts` pure & TDD'd (26 tests: card values, 54
 example, all 5 contracts, tie ranking 1/1/3, contractKey↔locale linkage). Fresh review: no blocks.
 Pure domain, no Vue/network. `src/lib/types.ts` (domain types mirroring the PLAN data model:
 Player, RoundScore, GameState, GameResult, contracts, card enums). `src/lib/rules.ts`:
 
-- Card values: 2–9 = 5, 10 = 10, J/Q/K = 10, **Ace = 15, Joker = 25**.
+- Card values: number = face, J/Q/K = 10, **Ace = 15, Joker = 25**.
 - The **5 contracts** (round → required melds), display strings via i18n keys (not hardcoded prose).
 - Round total = sum of leftover-card points; running total per player.
 - Winner = **lowest total** after round 5; tie handling defined.

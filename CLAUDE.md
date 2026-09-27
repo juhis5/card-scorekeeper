@@ -19,7 +19,7 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 - **Target platforms.** Must work on **Android (Chrome), iOS (Safari), and desktop browsers** (Chromium/Firefox/Safari). Responsive ~360px→desktop (cap + center, no overflow on wide screens); camera (photo-count) falls back to a file picker on desktop; usable by touch **and** mouse/keyboard. Test on the three.
 - **Firestore rules are the security boundary**, not the UI. Any player edits their own score; the host edits anyone's — enforced in `firestore.rules`.
 - **Firebase web config is public** (`VITE_FIREBASE_*`) — fine. The **Gemini key is not** — it lives only in the serverless function env.
-- **Fixed rules live in code**, not the DB: the 5 contracts and card values (number=face, J/Q/K=10, Ace=15, Joker=25) go in `src/lib/rules.ts`. Low score wins.
+- **Fixed rules live in code**, not the DB: the 5 contracts and card values (2–9=5, 10=10, J/Q/K=10, Ace=15, Joker=25; played with 2–3 decks, so duplicate cards are normal) go in `src/lib/rules.ts`. Low score wins.
 - **Lightweight layering, small components.** Pure domain in `lib/` (no Vue/network), I/O behind a `GameRepository` interface, Pinia orchestrates, small dumb components. Not formal Clean Architecture — keep the ceremony out. See `vue-pinia` + `clean-code`.
 - Photo card-count is a **suggestion** — always confirm/edit before it commits; manual entry is the never-fails path.
 - **Offline-capable host.** The host can run a full game on one device with no backend — a `LocalGameRepository` + the pure `rules.ts`. Firestore/Gemini are enhancements, not hard dependencies. Stores depend on a `GameRepository` interface so local vs online is a swap. Reconnect pushes only the final result. See `firestore-realtime`.

@@ -185,6 +185,9 @@ a problem actually shows up.
 
 The scorekeeper is built around this specific ruleset, not generic Rummy:
 
+- **Decks:** played with **2 decks** shuffled together (sometimes 3), jokers included. So
+  the same card (rank + suit) can appear more than once in a hand or a meld, and a hand
+  can hold several jokers. Scoring counts every physical card.
 - **Scoring direction:** points count **against** cards left in your hand when someone
   goes out. Low is good.
 - **Card values (cards left in hand):**
@@ -201,7 +204,8 @@ The scorekeeper is built around this specific ruleset, not generic Rummy:
 This is a Contract Rummy style: each round requires a specific set of melds to go
 down. Terms:
 
-- **Set of three** = at least 3 cards of the same rank (suits may differ).
+- **Set of three** = at least 3 cards of the same rank (suits may differ or repeat —
+  multiple decks).
 - **Flush** = at least 4 sequential cards of the same suit (a run).
 
 | Round | Required contract |
