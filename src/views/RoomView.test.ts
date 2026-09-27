@@ -26,7 +26,11 @@ import type { ContractRoundNumber, GameResult, GameState } from '@/lib/types'
 // RoomView resumes an online room after a reload through this seam; tests hand it a fake room.
 const { resumeRepository } = vi.hoisted(() => ({ resumeRepository: vi.fn() }))
 vi.mock('@/composables/useGameConnectivity', () => ({
-  useGameConnectivity: () => ({ resumeRepository }),
+  useGameConnectivity: () => ({
+    resumeRepository,
+    // A local Play again starts its next game here; in memory, like the rest of this file.
+    localRepository: () => ({ kind: 'offline', repository: makeRepository() }),
+  }),
 }))
 
 /** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
@@ -578,7 +582,7 @@ describe('RoomView finishing the game', () => {
     expect(screen.getByText('Alice and Bob tie for the win!')).toBeTruthy()
   })
 
-  it("offers Play again with this game's names, host first and in seat order", async () => {
+  it('starts the next local game at once with the same players in the same order', async () => {
     const game = useGameStore()
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
@@ -598,8 +602,13 @@ describe('RoomView finishing the game', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
     await flushPromises()
 
-    expect(router.currentRoute.value.name).toBe('home')
-    expect(router.options.history.state.playAgainNames).toEqual(['Host', 'Alice', 'Bob'])
+    expect(router.currentRoute.value.name).toBe('room')
+    expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
+    expect(
+      screen
+        .getAllByRole('button', { name: /^Enter .+'s score$/ })
+        .map((card) => card.getAttribute('aria-label')),
+    ).toEqual(["Enter Host's score", "Enter Alice's score", "Enter Bob's score"])
   })
 })
 

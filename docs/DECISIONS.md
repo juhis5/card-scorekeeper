@@ -651,3 +651,13 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     the keyboard.
   - Saving goes through the room's own handler, so the saved-score announcement, the room's
     error message, and which numbers the host may see work as they do for the cards.
+- 2026-09-27 — One form on Home (third playtest: "Other players not needed at start, combine with
+  join"):
+  - One card with a Liity | Uusi peli toggle, Liity first (the owner's call): most people at a
+    table join, one starts. The name field is shared, so a typed name stays when switching, and
+    Liity also asks for the room code.
+  - "Muut pelaajat" is gone from the start form: the host adds the others in the room (guest
+    seats), or they join with the code. A game on this device starts with the host alone and the
+    same Add player card fills the table.
+  - Play again on this device starts the next game at once with the same players, in the same
+    order, instead of going back to a prefilled Home form.

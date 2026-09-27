@@ -30,19 +30,6 @@ export function isNameTaken(name: string, existingNames: readonly string[]): boo
   return existingNames.some((existing) => playerNameKey(existing) === key)
 }
 
-/** Indexes of the names that repeat an earlier one. Empty fields are skipped. */
-export function duplicateNameIndexes(names: readonly string[]): Set<number> {
-  const seen = new Set<string>()
-  const duplicates = new Set<number>()
-  names.forEach((name, index) => {
-    if (cleanPlayerName(name) === '') return
-    const key = playerNameKey(name)
-    if (seen.has(key)) duplicates.add(index)
-    seen.add(key)
-  })
-  return duplicates
-}
-
 /** Someone in this game already uses the name, compared as above. `isGuestSeat` when it's a
  * player without a phone the host added, so a joiner can be told to ask the host. */
 export class NameTakenError extends Error {

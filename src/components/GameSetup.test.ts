@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h, ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { render, screen, fireEvent } from '@testing-library/vue'
@@ -74,10 +75,25 @@ function makeTestRouter() {
   })
 }
 
+/** GameSetup with its name bound the way Home binds it (`v-model:name`). */
+const BoundGameSetup = defineComponent({
+  setup() {
+    const name = ref('')
+    return () =>
+      h(GameSetup, { name: name.value, 'onUpdate:name': (value: string) => (name.value = value) })
+  },
+})
+
 function renderGameSetup() {
   const router = makeTestRouter()
-  render(GameSetup, { global: { plugins: [i18n, router] } })
+  render(BoundGameSetup, { global: { plugins: [i18n, router] } })
   return router
+}
+
+async function startAs(name: string): Promise<void> {
+  await fireEvent.update(screen.getByLabelText('Your name'), name)
+  await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+  await flushPromises()
 }
 
 /** A promise you can resolve from outside — lets a test observe the "checking connection…"
@@ -96,31 +112,14 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-describe('GameSetup name fields', () => {
+describe('GameSetup name field', () => {
   it('shows no example name, so nobody copies the placeholder', () => {
     renderGameSetup()
 
     expect(screen.getByLabelText('Your name').getAttribute('placeholder')).toBeNull()
   })
-})
 
-describe('GameSetup after Play again', () => {
-  it("fills in the finished local game's names, host first", async () => {
-    const router = makeTestRouter()
-    await router.push({ name: 'home', state: { playAgainNames: ['Juho', 'Jani', 'Ripa'] } })
-    render(GameSetup, { global: { plugins: [i18n, router] } })
-
-    expect((screen.getByLabelText('Your name') as HTMLInputElement).value).toBe('Juho')
-    expect(
-      screen
-        .getAllByLabelText(/^Player \d+ name$/)
-        .map((input) => (input as HTMLInputElement).value),
-    ).toEqual(['Jani', 'Ripa'])
-  })
-})
-
-describe('GameSetup validation', () => {
-  it('shows a host-name error and never probes connectivity when the host name is missing', async () => {
+  it('asks for a name and never probes the connection when it is empty', async () => {
     renderGameSetup()
 
     await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
@@ -129,96 +128,52 @@ describe('GameSetup validation', () => {
     expect(screen.getByText('Enter your name to continue.')).toBeTruthy()
     expect(hostRepository).not.toHaveBeenCalled()
   })
-
-  it('requires at least one other player only once hosting resolves to a local (offline) game', async () => {
-    hostRepository.mockResolvedValue(offlineMode())
-    const router = renderGameSetup()
-
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-
-    expect(screen.getByText('Add at least one other player.')).toBeTruthy()
-    expect(screen.queryByText('Enter your name to continue.')).toBeNull()
-    expect(router.currentRoute.value.name).toBe('home')
-  })
 })
 
-describe('GameSetup adding and removing players', () => {
-  it('adds and removes other-player name fields', async () => {
-    renderGameSetup()
+describe('GameSetup hosting online (backend reachable)', () => {
+  it('starts a room under the name, alone, and goes to its code', async () => {
+    const onlineRepo = makeFakeOnlineRepository('7K4RQ')
+    hostRepository.mockResolvedValue({ kind: 'online', repository: onlineRepo })
+    const router = renderGameSetup()
+    const game = useGameStore()
 
-    expect(screen.getAllByLabelText(/Player \d name/)).toHaveLength(1)
+    await startAs(' Juho ')
 
-    await fireEvent.click(screen.getByRole('button', { name: 'Add player' }))
-    expect(screen.getAllByLabelText(/Player \d name/)).toHaveLength(2)
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Remove player 1' }))
-    expect(screen.getAllByLabelText(/Player \d name/)).toHaveLength(1)
+    expect(onlineRepo.createGame).toHaveBeenCalledWith(
+      expect.objectContaining({ hostDisplayName: 'Juho' }),
+    )
+    expect(onlineRepo.addGuest).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.params.code).toBe('7K4RQ')
+    expect(game.isHost).toBe(true)
+    expect(game.isOnline).toBe(true)
   })
 })
 
 describe('GameSetup hosting offline (backend unreachable)', () => {
-  it('starts a local game with the entered players and navigates to the room', async () => {
+  it('starts a local game with just the host; the others are added in the room', async () => {
     hostRepository.mockResolvedValue(offlineMode())
     const router = renderGameSetup()
     const game = useGameStore()
 
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Alice')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
+    await startAs('Juho')
 
-    expect(router.currentRoute.value.name).toBe('room')
     expect(router.currentRoute.value.params.code).toBe('local')
-    expect(game.standings.map((standing) => standing.player.name).sort()).toEqual(['Alice', 'Juho'])
+    expect(game.standings.map((standing) => standing.player.name)).toEqual(['Juho'])
   })
 })
 
-describe('GameSetup with repeated names', () => {
-  it('flags them online too, before any room is created', async () => {
-    const onlineRepo = makeFakeOnlineRepository('7K4RQ')
-    hostRepository.mockResolvedValue({ kind: 'online', repository: onlineRepo })
-    renderGameSetup()
-
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'JUHO')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-
-    expect(screen.getByText('Each player needs a different name.')).toBeTruthy()
-    expect(onlineRepo.createGame).not.toHaveBeenCalled()
-  })
-
-  it('flags the repeated name, ignoring case and spaces, and starts nothing', async () => {
-    hostRepository.mockResolvedValue(offlineMode())
-    renderGameSetup()
-    const game = useGameStore()
-
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), ' juho ')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-
-    expect(screen.getByText('Each player needs a different name.')).toBeTruthy()
-    expect(screen.getByLabelText('Player 1 name').getAttribute('aria-invalid')).toBe('true')
-    expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('false')
-    expect(game.gameId).toBeNull()
-  })
-
-  it('starts once the names differ', async () => {
-    hostRepository.mockResolvedValue(offlineMode())
+describe('GameSetup when the online room cannot be created', () => {
+  it('falls back to a local game', async () => {
+    const repository = makeFakeOnlineRepository('7K4RQ')
+    repository.createGame = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('timed out'), { code: 'deadline-exceeded' }))
+    hostRepository.mockResolvedValue({ kind: 'online', repository })
+    localRepository.mockReturnValue(offlineMode())
     const router = renderGameSetup()
 
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'juho')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Jani')
+    await startAs('Juho')
 
-    expect(screen.queryByText('Each player needs a different name.')).toBeNull()
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
     expect(router.currentRoute.value.params.code).toBe('local')
   })
 })
@@ -232,20 +187,13 @@ describe('GameSetup with a local game already in progress', () => {
     })
   }
 
-  async function submitOfflineGame(): Promise<void> {
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Alice')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-  }
-
   it('asks before a new local game replaces it, and keeps it if you say so', async () => {
     await startLocalGameInProgress()
     hostRepository.mockResolvedValue(offlineMode())
     const router = renderGameSetup()
     const game = useGameStore()
 
-    await submitOfflineGame()
+    await startAs('Juho')
     expect(
       screen.getByText('Start a new game? The game in progress on this device will be lost.'),
     ).toBeTruthy()
@@ -264,12 +212,12 @@ describe('GameSetup with a local game already in progress', () => {
     const router = renderGameSetup()
     const game = useGameStore()
 
-    await submitOfflineGame()
+    await startAs('Juho')
     await fireEvent.click(screen.getByRole('button', { name: 'Start new game' }))
     await flushPromises()
 
     expect(router.currentRoute.value.params.code).toBe('local')
-    expect(game.standings.map((standing) => standing.player.name).sort()).toEqual(['Alice', 'Juho'])
+    expect(game.standings.map((standing) => standing.player.name)).toEqual(['Juho'])
   })
 
   it('never asks when the new game is online, since that one stays on this device', async () => {
@@ -280,72 +228,10 @@ describe('GameSetup with a local game already in progress', () => {
     })
     const router = renderGameSetup()
 
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
+    await startAs('Juho')
 
     expect(screen.queryByText(/will be lost/)).toBeNull()
     expect(router.currentRoute.value.params.code).toBe('7K4RQ')
-  })
-})
-
-describe('GameSetup when the online room cannot be created', () => {
-  function unreachableAfterProbe(): HostGameMode {
-    const repository = makeFakeOnlineRepository('7K4RQ')
-    repository.createGame = vi
-      .fn()
-      .mockRejectedValue(Object.assign(new Error('timed out'), { code: 'deadline-exceeded' }))
-    return { kind: 'online', repository }
-  }
-
-  it('falls back to a local game with the entered players', async () => {
-    hostRepository.mockResolvedValue(unreachableAfterProbe())
-    localRepository.mockReturnValue(offlineMode())
-    const router = renderGameSetup()
-    const game = useGameStore()
-
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Alice')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-
-    expect(router.currentRoute.value.params.code).toBe('local')
-    expect(game.standings.map((standing) => standing.player.name).sort()).toEqual(['Alice', 'Juho'])
-  })
-
-  it('asks for the other players when none were entered for the local fallback', async () => {
-    hostRepository.mockResolvedValue(unreachableAfterProbe())
-    localRepository.mockReturnValue(offlineMode())
-    const router = renderGameSetup()
-
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-
-    expect(screen.getByText('Add at least one other player.')).toBeTruthy()
-    expect(router.currentRoute.value.name).not.toBe('room')
-  })
-})
-
-describe('GameSetup hosting online (backend reachable)', () => {
-  it('hosts with just the host name and navigates to the real room code, ignoring any typed other players', async () => {
-    const onlineRepo = makeFakeOnlineRepository('7K4RQ')
-    hostRepository.mockResolvedValue({ kind: 'online', repository: onlineRepo })
-    const router = renderGameSetup()
-    const game = useGameStore()
-
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Alice')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
-
-    expect(router.currentRoute.value.name).toBe('room')
-    expect(router.currentRoute.value.params.code).toBe('7K4RQ')
-    expect(onlineRepo.addPlayer).not.toHaveBeenCalled()
-    expect(onlineRepo.addGuest).toHaveBeenCalledWith({ name: 'Alice' })
-    expect(game.isHost).toBe(true)
-    expect(game.isOnline).toBe(true)
-    expect(screen.queryByText('Add at least one other player.')).toBeNull()
   })
 })
 
@@ -355,9 +241,7 @@ describe('GameSetup connection status', () => {
     hostRepository.mockReturnValue(promise)
     renderGameSetup()
 
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
+    await startAs('Juho')
 
     expect(screen.getByText('Checking connection…')).toBeTruthy()
     expect((screen.getByRole('button', { name: 'Start game' }) as HTMLButtonElement).disabled).toBe(
@@ -376,9 +260,7 @@ describe('GameSetup start failure', () => {
     hostRepository.mockRejectedValue(new Error('boom'))
     renderGameSetup()
 
-    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
-    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
-    await flushPromises()
+    await startAs('Juho')
 
     expect(screen.getByText("Couldn't start the game. Try again.")).toBeTruthy()
   })

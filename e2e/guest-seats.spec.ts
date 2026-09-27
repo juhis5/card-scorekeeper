@@ -9,7 +9,8 @@ import {
   expectOnlineRoom,
   enterOwnRoundScore,
   enterRoundScore,
-  hostForm,
+  addPlayerInRoom,
+  startHostedGame,
   joinHostedGame,
   openFromMenu,
   readRoomCode,
@@ -53,11 +54,9 @@ test.describe('players without a phone', () => {
       const hostPage = await hostContext.newPage()
       const joinerPage = await joinerContext.newPage()
 
-      await hostPage.goto('/')
-      await hostForm(hostPage).getByLabel('Your name', { exact: true }).fill('Host')
-      await hostForm(hostPage).getByLabel('Player 1 name').fill('Mummo')
-      await hostForm(hostPage).getByRole('button', { name: 'Start game' }).click()
+      await startHostedGame(hostPage, 'Host')
       await expectOnlineRoom(hostPage)
+      await addPlayerInRoom(hostPage, 'Mummo')
       await expect(scoreboardRow(hostPage, 'Mummo')).toContainText('guest')
 
       const roomCode = await readRoomCode(hostPage)
@@ -70,9 +69,7 @@ test.describe('players without a phone', () => {
       await moveOn(hostPage, joinerPage, 1)
 
       // Round 2: Ripa arrives without a phone, and the host fills in the round they missed.
-      await hostPage.getByRole('button', { name: 'Add player' }).click()
-      await hostPage.getByLabel("Player's name").fill('Ripa')
-      await hostPage.getByRole('button', { name: 'Add', exact: true }).click()
+      await addPlayerInRoom(hostPage, 'Ripa')
       await fillMissedRound(hostPage, 'Ripa', 1, 30)
       for (const round of [2, 3, 4, 5]) {
         await scoreRound(hostPage, joinerPage, round, ['Mummo', 'Ripa'])

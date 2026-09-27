@@ -34,25 +34,22 @@
   },
   "home": {
     "heading": "Rommi-pisteet",
-    "orDivider": "tai",
     "statsLink": "Katso tilastosi",
+    "play": {
+      "label": "Pelaa",
+      "join": "Liity",
+      "new": "Uusi peli"
+    },
     "form": {
-      "heading": "Uusi peli",
       "hostNameLabel": "Oma nimesi",
-      "otherPlayersHeading": "Muut pelaajat",
-      "otherPlayersHint": "Pelaajat ilman omaa puhelinta: syötät heidän pisteensä. Muut liittyvät huonekoodilla.",
-      "otherPlayersEmpty": "Ei vielä muita pelaajia — lisää vähintään yksi aloittaaksesi.",
-      "nameLabel": "Pelaajan {number} nimi",
-      "removeLabel": "Poista pelaaja {number}",
-      "addPlayerButton": "Lisää pelaaja",
       "startButton": "Aloita peli",
       "checkingConnection": "Tarkistetaan yhteyttä…",
       "replaceConfirm": "Aloitetaanko uusi peli? Tällä laitteella kesken oleva peli menetetään.",
       "replaceStart": "Aloita uusi peli",
-      "replaceKeep": "Jatka peliä"
+      "replaceKeep": "Jatka peliä",
+      "hint": "Muut lisäät pelissä, tai he liittyvät huonekoodilla."
     },
     "join": {
-      "heading": "Liity peliin",
       "roomCodeLabel": "Huonekoodi",
       "roomCodePlaceholder": "esim. 7K4RQ",
       "nameLabel": "Oma nimesi",
@@ -67,9 +64,7 @@
     },
     "errors": {
       "hostNameRequired": "Anna nimesi jatkaaksesi.",
-      "otherPlayersRequired": "Lisää vähintään yksi muu pelaaja.",
-      "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen.",
-      "duplicateName": "Jokaisella pelaajalla pitää olla eri nimi."
+      "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen."
     },
     "continue": {
       "heading": "Peli kesken",

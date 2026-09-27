@@ -7,6 +7,7 @@
  * device. Score entry is the same component online, and a local game needs no second browser.
  */
 import { expect, test, type Page } from '@playwright/test'
+import { startLocalGame } from './helpers'
 
 const LOCAL_GAME_KEY = 'card-scorekeeper:local-game'
 
@@ -27,14 +28,8 @@ function localGameWrites(page: Page): Promise<number> {
   return page.evaluate(() => (window as unknown as { localGameWrites: number }).localGameWrites)
 }
 
-async function startLocalGame(page: Page): Promise<void> {
-  await page.route(/localhost:(8280|9299)/, (route) => route.abort())
-  await page.goto('/')
-  const form = page.locator('form').filter({ hasText: 'New game' })
-  await form.getByLabel('Your name', { exact: true }).fill('Host')
-  await form.getByRole('button', { name: 'Add player' }).click()
-  await form.getByLabel('Player 1 name').fill('Maiju')
-  await form.getByRole('button', { name: 'Start game' }).click()
+async function startHostAndMaiju(page: Page): Promise<void> {
+  await startLocalGame(page, 'Host', ['Maiju'])
   await expect(
     page.getByText(
       "Playing a local game on this device. Others can't join, and photo count is off.",
@@ -54,7 +49,7 @@ async function typeMaijuScore(page: Page, points: string): Promise<void> {
 test.describe('score entry on a card', () => {
   test.beforeEach(async ({ page }) => {
     await countLocalGameWrites(page)
-    await startLocalGame(page)
+    await startHostAndMaiju(page)
   })
 
   test('the Next bar stops sticking while a field has focus, so it never covers the field', async ({
@@ -134,7 +129,7 @@ test.describe('score entry on a touch screen', () => {
     })
     try {
       const page = await context.newPage()
-      await startLocalGame(page)
+      await startHostAndMaiju(page)
 
       await maijuCard(page).tap()
 

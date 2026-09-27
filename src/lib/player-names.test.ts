@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  cleanPlayerName,
-  duplicateNameIndexes,
-  isNameTaken,
-  NameTakenError,
-  playerNameKey,
-} from './player-names'
+import { cleanPlayerName, isNameTaken, NameTakenError, playerNameKey } from './player-names'
 
 describe('cleanPlayerName', () => {
   it('trims the ends and collapses extra spaces in between', () => {
@@ -52,12 +46,6 @@ describe('isNameTaken', () => {
   it('finds a name already in use, ignoring case and spaces', () => {
     expect(isNameTaken(' JUHO', ['Ripa', 'Juho'])).toBe(true)
     expect(isNameTaken('Jani', ['Ripa', 'Juho'])).toBe(false)
-  })
-})
-
-describe('duplicateNameIndexes', () => {
-  it('marks every name that repeats an earlier one, and skips empty fields', () => {
-    expect([...duplicateNameIndexes(['Juho', 'Ripa', ' juho', '', '', 'RIPA'])]).toEqual([2, 5])
   })
 })
 

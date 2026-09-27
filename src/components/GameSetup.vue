@@ -1,23 +1,15 @@
 <script setup lang="ts">
 /**
- * The home-screen "host" form: name your game and start it. On submit, probes backend
- * reachability (see `useGameConnectivity`/`lib/game-mode.ts`) and picks the repository — online
- * (Firestore, a real room code others join with) when reachable, local single-device otherwise.
- * Repositories are chosen here, in JoinGame and in PlayAgain (the next room after a finished
- * game); everything else talks only to the store.
- *
- * The "other players" fields are players without a phone of their own: the host scores for them.
- * Online they become guest seats in the new room (players with a phone join with the room code
- * instead); in a local game every other player is one. Which path we're on isn't known until the
- * probe resolves, so "at least one other player" is enforced only once we learn we're local, never
- * blocking an online host from starting solo and waiting for joiners.
+ * Home's "Uusi peli": start a game under your name. On submit, probes backend reachability and
+ * picks the repository — an online room others join with its code when reachable, a local
+ * single-device game otherwise (see `useGameConnectivity`/`lib/game-mode.ts`). Everyone else is
+ * added in the room with "Lisää pelaaja", so the form is just the name, which Home shares with
+ * "Liity" (`v-model:name`). A bare form: Home provides the card around it.
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { Plus, X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
@@ -25,15 +17,11 @@ import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { hasUnfinishedPersistedGame } from '@/lib/local-repository'
-import { playAgainNamesFrom } from '@/lib/navigation'
-import { duplicateNameIndexes } from '@/lib/player-names'
+import { cleanPlayerName } from '@/lib/player-names'
 import type { HostGameMode } from '@/lib/game-mode'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
 
-interface OtherPlayerField {
-  id: string
-  name: string
-}
+const name = defineModel<string>('name', { required: true })
 
 const { t } = useI18n()
 const router = useRouter()
@@ -41,18 +29,7 @@ const identity = useIdentityStore()
 const game = useGameStore()
 const { hostRepository, localRepository } = useGameConnectivity()
 
-// Play again after a local game opens this form with that game's names, host first.
-const playAgainNames = playAgainNamesFrom(router.options.history.state)
-const playAgainOthers = playAgainNames?.slice(1) ?? []
-const hostName = ref(playAgainNames?.[0] ?? identity.displayName)
-const otherPlayers = ref<OtherPlayerField[]>(
-  (playAgainOthers.length > 0 ? playAgainOthers : ['']).map((name) => ({
-    id: crypto.randomUUID(),
-    name,
-  })),
-)
 const attemptedSubmit = ref(false)
-const areOtherPlayersInvalid = ref(false)
 const isSubmitting = ref(false)
 const isCheckingConnection = ref(false)
 const submitError = ref('')
@@ -62,44 +39,15 @@ const pendingReplaceMode = ref<HostGameMode | null>(null)
 let hasConfirmedReplace = false
 const keepPlayingButton = useTemplateRef<InstanceType<typeof Button>>('keepPlaying')
 
-const trimmedHostName = computed(() => hostName.value.trim())
-const namedOtherPlayers = computed(() =>
-  otherPlayers.value.map((field) => field.name.trim()).filter((name) => name.length > 0),
-)
-const isHostNameInvalid = computed(() => attemptedSubmit.value && trimmedHostName.value === '')
-/** Positions of names that repeat an earlier one (0 is the host), ignoring case and extra spaces.
- * Checked here before anything is created, online too. Shown after a start was refused, then
- * live, so fixing a field clears its message. */
-const repeatedNameIndexes = computed(() =>
-  duplicateNameIndexes([hostName.value, ...otherPlayers.value.map((field) => field.name)]),
-)
-const areRepeatedNamesShown = ref(false)
-
-function isRepeatedName(otherPlayerIndex: number): boolean {
-  return areRepeatedNamesShown.value && repeatedNameIndexes.value.has(otherPlayerIndex + 1)
-}
-
-function addPlayerField(): void {
-  otherPlayers.value.push({ id: crypto.randomUUID(), name: '' })
-}
-
-function removePlayerField(id: string): void {
-  otherPlayers.value = otherPlayers.value.filter((field) => field.id !== id)
-}
-
-/** The offline fallback is a single device with no remote join, so it needs at least one other
- * named player up front; online hosting doesn't (see the file-level comment above). */
-function isMissingRequiredOtherPlayers(mode: HostGameMode): boolean {
-  return mode.kind === 'offline' && namedOtherPlayers.value.length === 0
-}
+const hostName = computed(() => cleanPlayerName(name.value))
+const isNameInvalid = computed(() => attemptedSubmit.value && hostName.value === '')
 
 async function startGame(mode: HostGameMode): Promise<void> {
-  identity.setDisplayName(trimmedHostName.value)
+  identity.setDisplayName(hostName.value)
   await game.start(mode.repository, {
     hostDeviceUuid: identity.deviceUuid,
-    hostDisplayName: trimmedHostName.value,
+    hostDisplayName: hostName.value,
   })
-  for (const name of namedOtherPlayers.value) await game.addGuest({ name })
   const roomCodeParam =
     mode.kind === 'online' ? (game.roomCode ?? LOCAL_GAME_ROUTE_CODE) : LOCAL_GAME_ROUTE_CODE
   await router.push({ name: 'room', params: { code: roomCodeParam } })
@@ -108,14 +56,6 @@ async function startGame(mode: HostGameMode): Promise<void> {
 /** Starts the chosen game. If the online room can't be created (the check passed, then the write
  * failed or timed out), play locally instead, exactly like an unreachable backend. */
 async function startOrFallBack(mode: HostGameMode): Promise<void> {
-  if (isMissingRequiredOtherPlayers(mode)) {
-    areOtherPlayersInvalid.value = true
-    return
-  }
-  if (repeatedNameIndexes.value.size > 0) {
-    areRepeatedNamesShown.value = true
-    return
-  }
   if (mode.kind === 'offline' && !hasConfirmedReplace && hasUnfinishedPersistedGame()) {
     pendingReplaceMode.value = mode
     await nextTick()
@@ -153,8 +93,7 @@ async function replaceLocalGame(): Promise<void> {
 
 async function handleSubmit(): Promise<void> {
   attemptedSubmit.value = true
-  areOtherPlayersInvalid.value = false
-  if (isHostNameInvalid.value || isSubmitting.value) return
+  if (isNameInvalid.value || isSubmitting.value) return
 
   isSubmitting.value = true
   isCheckingConnection.value = true
@@ -174,125 +113,64 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <form class="flex flex-col gap-4" novalidate @submit.prevent="handleSubmit">
-    <Card>
-      <CardHeader>
-        <CardTitle>{{ t('home.form.heading') }}</CardTitle>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-4">
-        <div class="flex flex-col gap-1.5">
-          <Label for="host-name">{{ t('home.form.hostNameLabel') }}</Label>
-          <Input
-            id="host-name"
-            v-model="hostName"
-            :maxlength="MAX_PLAYER_NAME_LENGTH"
-            type="text"
-            autocomplete="name"
-            enterkeyhint="next"
-            class="h-11 text-base"
-            :aria-invalid="isHostNameInvalid"
-            :aria-describedby="isHostNameInvalid ? 'host-name-error' : undefined"
-          />
-          <p v-if="isHostNameInvalid" id="host-name-error" class="text-destructive text-sm">
-            {{ t('home.errors.hostNameRequired') }}
-          </p>
-        </div>
+    <div class="flex flex-col gap-1.5">
+      <Label for="host-name">{{ t('home.form.hostNameLabel') }}</Label>
+      <Input
+        id="host-name"
+        v-model="name"
+        :maxlength="MAX_PLAYER_NAME_LENGTH"
+        type="text"
+        autocomplete="name"
+        enterkeyhint="go"
+        class="h-11 text-base"
+        :aria-invalid="isNameInvalid"
+        :aria-describedby="isNameInvalid ? 'host-name-error' : undefined"
+      />
+      <p v-if="isNameInvalid" id="host-name-error" class="text-destructive text-sm">
+        {{ t('home.errors.hostNameRequired') }}
+      </p>
+    </div>
+    <p class="text-muted-foreground text-sm">{{ t('home.form.hint') }}</p>
 
-        <fieldset class="flex flex-col gap-2">
-          <legend class="text-sm font-medium">{{ t('home.form.otherPlayersHeading') }}</legend>
-          <p class="text-muted-foreground text-sm">{{ t('home.form.otherPlayersHint') }}</p>
-
-          <p v-if="otherPlayers.length === 0" class="text-muted-foreground text-sm">
-            {{ t('home.form.otherPlayersEmpty') }}
-          </p>
-
-          <div v-for="(field, index) in otherPlayers" :key="field.id" class="flex items-end gap-2">
-            <div class="flex flex-1 flex-col gap-1.5">
-              <Label :for="`player-name-${field.id}`">
-                {{ t('home.form.nameLabel', { number: index + 1 }) }}
-              </Label>
-              <Input
-                :id="`player-name-${field.id}`"
-                v-model="field.name"
-                :maxlength="MAX_PLAYER_NAME_LENGTH"
-                type="text"
-                class="h-11 text-base"
-                :aria-invalid="isRepeatedName(index)"
-                :aria-describedby="
-                  isRepeatedName(index) ? `player-name-${field.id}-error` : undefined
-                "
-              />
-              <p
-                v-if="isRepeatedName(index)"
-                :id="`player-name-${field.id}-error`"
-                class="text-destructive text-sm"
-              >
-                {{ t('home.errors.duplicateName') }}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              class="size-11 shrink-0"
-              :aria-label="t('home.form.removeLabel', { number: index + 1 })"
-              @click="removePlayerField(field.id)"
-            >
-              <X aria-hidden="true" class="size-4" />
-            </Button>
-          </div>
-
-          <p v-if="areOtherPlayersInvalid" role="alert" class="text-destructive text-sm">
-            {{ t('home.errors.otherPlayersRequired') }}
-          </p>
-
-          <Button type="button" variant="outline" class="h-11 self-start" @click="addPlayerField">
-            <Plus aria-hidden="true" class="size-4" />
-            {{ t('home.form.addPlayerButton') }}
-          </Button>
-        </fieldset>
-      </CardContent>
-      <CardFooter class="flex flex-col gap-2">
-        <p v-if="isCheckingConnection" role="status" class="text-muted-foreground text-sm">
-          {{ t('home.form.checkingConnection') }}
-        </p>
-        <p v-if="submitError" role="alert" class="text-destructive text-sm">{{ submitError }}</p>
-        <div
-          v-if="pendingReplaceMode"
-          role="group"
-          :aria-label="t('home.form.replaceConfirm')"
-          class="flex w-full flex-col gap-2"
-        >
-          <p class="text-foreground text-sm">{{ t('home.form.replaceConfirm') }}</p>
-          <div class="flex gap-2">
-            <Button
-              ref="keepPlaying"
-              type="button"
-              variant="outline"
-              class="h-11 flex-1"
-              @click="keepPlaying"
-            >
-              {{ t('home.form.replaceKeep') }}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              class="text-destructive border-destructive h-11 flex-1"
-              @click="replaceLocalGame"
-            >
-              {{ t('home.form.replaceStart') }}
-            </Button>
-          </div>
-        </div>
+    <p v-if="isCheckingConnection" role="status" class="text-muted-foreground text-sm">
+      {{ t('home.form.checkingConnection') }}
+    </p>
+    <p v-if="submitError" role="alert" class="text-destructive text-sm">{{ submitError }}</p>
+    <div
+      v-if="pendingReplaceMode"
+      role="group"
+      :aria-label="t('home.form.replaceConfirm')"
+      class="flex w-full flex-col gap-2"
+    >
+      <p class="text-foreground text-sm">{{ t('home.form.replaceConfirm') }}</p>
+      <div class="flex gap-2">
         <Button
-          v-else
-          type="submit"
-          class="h-11 w-full"
-          :disabled="isSubmitting"
-          :aria-busy="isSubmitting"
+          ref="keepPlaying"
+          type="button"
+          variant="outline"
+          class="h-11 flex-1"
+          @click="keepPlaying"
         >
-          {{ t('home.form.startButton') }}
+          {{ t('home.form.replaceKeep') }}
         </Button>
-      </CardFooter>
-    </Card>
+        <Button
+          type="button"
+          variant="outline"
+          class="text-destructive border-destructive h-11 flex-1"
+          @click="replaceLocalGame"
+        >
+          {{ t('home.form.replaceStart') }}
+        </Button>
+      </div>
+    </div>
+    <Button
+      v-else
+      type="submit"
+      class="h-11 w-full"
+      :disabled="isSubmitting"
+      :aria-busy="isSubmitting"
+    >
+      {{ t('home.form.startButton') }}
+    </Button>
   </form>
 </template>

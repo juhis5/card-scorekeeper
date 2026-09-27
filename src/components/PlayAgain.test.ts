@@ -17,13 +17,14 @@ import type {
 } from '@/lib/repository'
 import type { GameResult, GameState } from '@/lib/types'
 
-const { joinRepository, nextRoomRepository } = vi.hoisted(() => ({
+const { joinRepository, localRepository, nextRoomRepository } = vi.hoisted(() => ({
   joinRepository: vi.fn(),
+  localRepository: vi.fn(),
   nextRoomRepository: vi.fn(),
 }))
 
 vi.mock('@/composables/useGameConnectivity', () => ({
-  useGameConnectivity: () => ({ joinRepository, nextRoomRepository }),
+  useGameConnectivity: () => ({ joinRepository, localRepository, nextRoomRepository }),
 }))
 
 const FINISHED_CODE = 'ABCDE'
@@ -121,19 +122,23 @@ beforeEach(() => {
   setActivePinia(createPinia())
   localStorage.clear()
   joinRepository.mockReset()
+  localRepository.mockReset()
   nextRoomRepository.mockReset()
 })
 
 describe('PlayAgain after a local game', () => {
-  it("opens the setup form with this game's names, host first", async () => {
+  it('starts the next local game at once, with the same players', async () => {
     await finishedHostedGame(null)
+    const next = new FakeRoom(null)
+    localRepository.mockReturnValue({ kind: 'offline', repository: next })
     const router = await renderPlayAgain({ myName: 'Juho', otherNames: ['Jani', 'Ripa'] })
 
     await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
     await flushPromises()
 
-    expect(router.currentRoute.value.name).toBe('home')
-    expect(router.options.history.state.playAgainNames).toEqual(['Juho', 'Jani', 'Ripa'])
+    expect(next.seatedNames).toEqual(['Juho', 'Jani (guest)', 'Ripa (guest)'])
+    expect(useGameStore().status).toBe('waiting')
+    expect(router.currentRoute.value.name).toBe('room')
     expect(nextRoomRepository).not.toHaveBeenCalled()
   })
 })

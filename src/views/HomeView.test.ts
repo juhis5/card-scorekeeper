@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/vue'
+import { fireEvent, render, screen } from '@testing-library/vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import HomeView from './HomeView.vue'
@@ -9,7 +9,8 @@ import { LocalGameRepository } from '@/lib/local-repository'
 
 const blank = { template: '<div />' }
 
-async function renderHome() {
+/** The forms are stubbed unless a test is about them; nothing here submits, so no network. */
+async function renderHome({ withForms = false } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -20,7 +21,10 @@ async function renderHome() {
   })
   await router.push('/')
   render(HomeView, {
-    global: { plugins: [i18n, router], stubs: { GameSetup: true, JoinGame: true } },
+    global: {
+      plugins: [i18n, router],
+      stubs: withForms ? {} : { GameSetup: true, JoinGame: true },
+    },
   })
 }
 
@@ -58,5 +62,27 @@ describe('HomeView, a game in progress', () => {
     await renderHome()
 
     expect(screen.queryByRole('heading', { name: 'Game in progress' })).toBeNull()
+  })
+})
+
+describe('HomeView, joining or starting', () => {
+  it('opens on Join, with the name and the room code', async () => {
+    await renderHome({ withForms: true })
+
+    expect(screen.getByRole('button', { name: 'Join', pressed: true })).toBeTruthy()
+    expect(screen.getByLabelText('Room code')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Join game' })).toBeTruthy()
+  })
+
+  it('keeps the typed name when switching to New game, which needs no code', async () => {
+    await renderHome({ withForms: true })
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.click(screen.getByRole('button', { name: 'New game' }))
+
+    expect(screen.getByRole('button', { name: 'New game', pressed: true })).toBeTruthy()
+    expect((screen.getByLabelText('Your name') as HTMLInputElement).value).toBe('Juho')
+    expect(screen.queryByLabelText('Room code')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy()
   })
 })

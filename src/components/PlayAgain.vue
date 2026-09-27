@@ -2,8 +2,8 @@
 /**
  * Single job: what a finished game offers next (tester note 7).
  *
- * - Local: Play again opens the setup form with this game's names, host first, so the host can
- *   add or remove players before starting.
+ * - Local: Play again starts the next game at once with the same players; the host adds or
+ *   removes players in the room.
  * - Online host: Play again creates the next room, points this one at it and moves there. Never a
  *   local game when the server can't be reached: the other phones wait for that room, so the host
  *   gets an error and a retry instead.
@@ -28,7 +28,7 @@ const {
 } = defineProps<{
   /** This device's name in the finished game. */
   myName: string
-  /** Everyone else's, in seat order: the local setup form gets them back. */
+  /** Everyone else's, in seat order: a local Play again seats them again. */
   otherNames: string[]
   /** Online guests (players without a phone), seated in the next room along with the host. */
   guestNames?: string[]
@@ -41,7 +41,7 @@ const router = useRouter()
 const game = useGameStore()
 const identity = useIdentityStore()
 const { isHost, isOnline, nextRoomCode } = storeToRefs(game)
-const { joinRepository, nextRoomRepository } = useGameConnectivity()
+const { joinRepository, localRepository, nextRoomRepository } = useGameConnectivity()
 
 const isBusy = ref(false)
 const error = ref<PlayAgainError | null>(null)
@@ -58,8 +58,13 @@ const nextGameStatus = computed(() => {
   return isHost.value ? t('room.playAgain.youStarted') : t('room.playAgain.hostStarted')
 })
 
+/** Local: the next game at once, with the same players; the host adds or removes in the room. */
 async function playLocalAgain(): Promise<void> {
-  await router.push({ name: 'home', state: { playAgainNames: [myName, ...otherNames] } })
+  await game.playAgain(
+    localRepository().repository,
+    { hostDeviceUuid: identity.deviceUuid, hostDisplayName: myName },
+    otherNames,
+  )
 }
 
 async function startNextRoom(): Promise<void> {

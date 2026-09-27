@@ -3,7 +3,7 @@
  * a game in progress, and Back must never leave the app, even from a page opened directly.
  */
 import { expect, test, type Page } from '@playwright/test'
-import { openFromMenu } from './helpers'
+import { openFromMenu, startLocalGame } from './helpers'
 
 function homeHeading(page: Page) {
   return page.getByRole('heading', { level: 1, name: 'Rommi Scorekeeper' })
@@ -46,14 +46,7 @@ test.describe('Back and Continue game', () => {
   })
 
   test('a local game left with Back can be continued from Home', async ({ page }) => {
-    await page.route(/localhost:(8280|9299)/, (route) => route.abort())
-    await page.goto('/')
-    const form = page.locator('form').filter({ hasText: 'New game' })
-    await form.getByLabel('Your name', { exact: true }).fill('Host')
-    await form.getByRole('button', { name: 'Add player' }).click()
-    await form.getByLabel('Player 1 name').fill('Maiju')
-    await form.getByRole('button', { name: 'Start game' }).click()
-    await expect(page.getByRole('heading', { name: 'Round 1 scores' })).toBeVisible()
+    await startLocalGame(page, 'Host', ['Maiju'])
 
     await backButton(page).click()
     await expect(homeHeading(page)).toBeVisible()
