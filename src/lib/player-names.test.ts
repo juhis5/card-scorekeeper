@@ -31,6 +31,17 @@ describe('playerNameKey', () => {
     expect(playerNameKey('Mari Anne')).not.toBe(playerNameKey('Marianne'))
   })
 
+  it('folds Finnish and other Nordic capitals, which the rules can match', () => {
+    expect(playerNameKey('ÄIJÄLÄ Östman')).toBe(playerNameKey('äijälä östman'))
+    expect(playerNameKey('Åsa Øberg Æsir Über Émile')).toBe(
+      playerNameKey('åsa øberg æsir über émile'),
+    )
+  })
+
+  it("leaves other non-ASCII capitals as typed, since the rules can't lowercase them", () => {
+    expect(playerNameKey('Ωmega')).toBe('n_Ωmega')
+  })
+
   it('matches the key firestore.rules derives from a stored name', () => {
     // firestore.rules: 'n_' + name.lower().replace('/', '_'), on the already cleaned name.
     expect(playerNameKey('Äijä/Pete')).toBe('n_äijä_pete')

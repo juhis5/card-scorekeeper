@@ -5,7 +5,11 @@
  * `cleanPlayerName` is the form every name is stored in. `playerNameKey` is what uniqueness is
  * checked on, locally and online: an online seat is created together with a
  * `room/{code}/names/{key}` doc, and firestore.rules derives the same key from the stored name
- * ('n_' + lower, with '/' made safe for a document id), so the two must stay in step.
+ * ('n_' + lowercase, with '/' made safe for a document id), so the two must stay in step.
+ *
+ * Lowercasing is limited to what the rules can do: their lower() only changes A to Z, so the rules
+ * fold the capitals in FOLDED_CAPITALS one by one and the key does exactly the same. Any other
+ * capital is kept as typed, so "Ωmega" and "ωmega" count as two names.
  */
 
 /** NFC so an accent typed two ways is one name; every whitespace run becomes one space. */
@@ -13,8 +17,12 @@ export function cleanPlayerName(name: string): string {
   return name.normalize('NFC').replace(/\s+/g, ' ').trim()
 }
 
+/** A to Z plus the Nordic capitals firestore.rules folds in nameKeyOf. Change both together. */
+const FOLDED_CAPITALS = /[A-ZÄÖÅÜÉØÆ]/g
+
 export function playerNameKey(name: string): string {
-  return `n_${cleanPlayerName(name).toLowerCase().replaceAll('/', '_')}`
+  const lowered = cleanPlayerName(name).replace(FOLDED_CAPITALS, (letter) => letter.toLowerCase())
+  return `n_${lowered.replaceAll('/', '_')}`
 }
 
 export function isNameTaken(name: string, existingNames: readonly string[]): boolean {

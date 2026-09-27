@@ -502,6 +502,11 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     name (`'n_' + lower`, '/' made id-safe) and refuse unclean names. Owner's call: strict from
     day one, no lenient phase for old clients, because the current data is test data that gets
     deleted before launch.
+  - The rules' `lower()` only changes A to Z (found on the emulator: "Äimä" couldn't join, since
+    the app keyed it "n_äimä" and the rules "n_Äimä"). So both sides lowercase A to Z plus a
+    fixed list of Nordic capitals (Ä Ö Å Ü É Ø Æ) that the rules fold one by one. Any other
+    capital is kept as typed: "Ωmega" and "ωmega" are two names. A rules test checks the app's
+    key against the rules for each folded letter.
   - Consequences: players can no longer rename their seat (nothing did), the host's removal
     deletes the name record so the name is free again, and anyone signed in may read one name
     record, so a refusal can say "name taken" instead of a generic error.

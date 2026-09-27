@@ -66,9 +66,12 @@ service cloud.firestore {
       return isValidPlayerName(name) && name == name.trim() && !name.matches('.*\\s\\s.*');
     }
 
-    /** A name's unique-name record id, the same as playerNameKey in src/lib/player-names.ts. */
+    /** A name's unique-name record id, the same as playerNameKey in src/lib/player-names.ts.
+     * lower() only changes A to Z, so the Nordic capitals are folded here one by one, before it:
+     * keep this list and FOLDED_CAPITALS in player-names.ts the same. */
     function nameKeyOf(name) {
-      return 'n_' + name.lower().replace('/', '_');
+      return 'n_' + name.replace('Ä', 'ä').replace('Ö', 'ö').replace('Å', 'å').replace('Ü', 'ü')
+        .replace('É', 'é').replace('Ø', 'ø').replace('Æ', 'æ').lower().replace('/', '_');
     }
 
     /** Room-scoped read gate (not just "any authed user"): true only for someone already

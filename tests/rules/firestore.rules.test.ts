@@ -37,6 +37,7 @@ import {
   ROUND_SCORE_STEP,
   TOTAL_ROUNDS,
 } from '@/lib/rules'
+import { playerNameKey } from '@/lib/player-names'
 
 const RULES_PATH = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -74,10 +75,15 @@ function playerFixture(ownerUid: string, overrides: Partial<Record<string, unkno
   }
 }
 
-/** The name-record id firestore.rules derives from a stored name (mirrors playerNameKey in
- * src/lib/player-names.ts for a clean name). */
+/** The name-record id exactly as firestore.rules derives it from a stored name: the rules' lower()
+ * only lowercases ASCII, and the rules then fold a fixed set of Nordic capitals. Written out here,
+ * not imported, so drift between the rules and playerNameKey (src/lib/player-names.ts) shows. */
 function rulesNameKey(name: string): string {
-  return `n_${name.toLowerCase().replaceAll('/', '_')}`
+  const folds: Record<string, string> = { Ä: 'ä', Ö: 'ö', Å: 'å', Ü: 'ü', É: 'é', Ø: 'ø', Æ: 'æ' }
+  const lowered = name
+    .replace(/[A-Z]/g, (letter) => letter.toLowerCase())
+    .replace(/[ÄÖÅÜÉØÆ]/g, (letter) => folds[letter] ?? letter)
+  return `n_${lowered.replaceAll('/', '_')}`
 }
 
 type TestFirestore = ReturnType<
@@ -588,6 +594,26 @@ describe('unique player names', () => {
       ),
     )
   })
+
+  it('keys Finnish letters and slashes the same way the app does', async () => {
+    const name = 'Äimä/Öhman'
+    expect(rulesNameKey(name)).toBe(playerNameKey(name))
+
+    // Succeeds only if the rules fold Ä and Ö exactly as the app's key does.
+    await assertSucceeds(seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name })))
+    const bob = testEnv.authenticatedContext('bob-uid').firestore()
+    await assertFails(
+      seatWithName(bob, 'bob-uid', playerFixture('bob-uid', { name: 'ÄIMÄ/ÖHMAN' })),
+    )
+  })
+
+  it.each(['Åsa', 'Über', 'Émile', 'Øyvind', 'Æsir', 'Ωmega'])(
+    'seats %s: the rules and the app agree on its key',
+    async (name) => {
+      expect(rulesNameKey(name)).toBe(playerNameKey(name))
+      await assertSucceeds(seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name })))
+    },
+  )
 
   it("denies a name record that doesn't match the seat's name", async () => {
     await assertFails(
