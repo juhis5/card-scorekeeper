@@ -85,6 +85,12 @@
       "cardLabelScored": "Edit {name}'s score (scored)",
       "cancel": "Cancel"
     },
+    "saveError": {
+      "score": "Couldn't save {name}'s score. Check your connection and enter it again.",
+      "nextRound": "Couldn't start the next round. Try again.",
+      "finish": "Couldn't finish the game. Try again.",
+      "closed": "This room isn't accepting changes anymore. It may have expired."
+    },
     "photoCount": {
       "trigger": "Snap cards",
       "title": "Count your cards",

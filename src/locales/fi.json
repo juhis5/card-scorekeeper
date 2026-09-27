@@ -85,6 +85,12 @@
       "cardLabelScored": "Muokkaa pisteitä: {name} (syötetty)",
       "cancel": "Peruuta"
     },
+    "saveError": {
+      "score": "Pelaajan {name} pisteitä ei voitu tallentaa. Tarkista yhteys ja syötä pisteet uudelleen.",
+      "nextRound": "Seuraavaa kierrosta ei voitu aloittaa. Yritä uudelleen.",
+      "finish": "Peliä ei voitu päättää. Yritä uudelleen.",
+      "closed": "Tähän huoneeseen ei voi enää tallentaa. Se on ehkä vanhentunut."
+    },
     "photoCount": {
       "trigger": "Kuvaa kortit",
       "title": "Laske korttisi",
