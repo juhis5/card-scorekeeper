@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { cleanPlayerName, NameTakenError } from '@/lib/player-names'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
 import { isPermissionDenied } from '@/lib/write-errors'
+import { useKeepInView } from '@/composables/useKeepInView'
 import { useGameStore } from '@/stores/game'
 
 const emit = defineEmits<{ added: [name: string] }>()
@@ -29,15 +30,17 @@ const errorMessage = ref('')
 const isAdding = ref(false)
 const openButton = useTemplateRef<HTMLButtonElement>('openButton')
 const cardElement = useTemplateRef<HTMLLIElement>('card')
+const { reveal } = useKeepInView(cardElement, isOpen)
 
 const hasError = computed(() => errorMessage.value !== '')
 
 async function open(): Promise<void> {
   isOpen.value = true
   await nextTick()
-  // Like an open score card: the whole form, Peru included, comes into view above the Next bar.
-  document.getElementById('add-player-name')?.focus({ preventScroll: true })
-  cardElement.value?.scrollIntoView({ block: 'nearest' })
+  // Like an open score card: a plain focus, then the whole form clear of the header, the Next bar
+  // and the keyboard.
+  document.getElementById('add-player-name')?.focus()
+  reveal()
 }
 
 /** The form unmounts, so hand focus back to the button that opened it: when focus was in the
@@ -82,7 +85,7 @@ async function add(): Promise<void> {
 </script>
 
 <template>
-  <li ref="card" class="bg-card border-border scroll-mb-20 rounded-lg border">
+  <li ref="card" class="bg-card border-border rounded-lg border">
     <button
       v-if="!isOpen"
       ref="openButton"

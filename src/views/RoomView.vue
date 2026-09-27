@@ -527,12 +527,20 @@ onMounted(async () => {
         {{ t('room.next.waiting', { names: waitingForNames }) }}
       </p>
 
-      <div v-if="isFinished" class="bg-background sticky bottom-0 mt-auto pt-2 pb-2">
+      <div
+        v-if="isFinished"
+        data-bottom-bar
+        class="bg-background sticky bottom-0 mt-auto pt-2 pb-2"
+      >
         <PlayAgain :my-name="myName" :other-names="otherNames" :guest-names="guestNames" />
       </div>
       <!-- aria-disabled rather than disabled: the tap must still reach the handler, which waits
            for a score saved by that same tap before deciding. -->
-      <div v-else-if="isHost" class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2">
+      <div
+        v-else-if="isHost"
+        data-bottom-bar
+        class="bg-background sticky bottom-0 mt-auto flex gap-2 pt-2 pb-2"
+      >
         <Button
           v-if="!isFinalRound"
           class="h-11 flex-1 aria-disabled:opacity-50"
