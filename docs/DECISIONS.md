@@ -596,3 +596,12 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     drawn as one SVG path from its module grid, dark on white in both themes. Copying uses the
     Clipboard API with a hidden-textarea fallback (`useCopyText`), not VueUse's useClipboard,
     which only tries the Clipboard API after a permission query Firefox and Safari lack.
+- 2026-09-27 — The top bar stays on screen (second playtest: "the scroll should target the
+  players list … keep the table and header always visible"):
+  - Tried first: the round banner and the scoreboard pinned under the header while only the cards
+    scrolled. The owner found that a mistake: only the top bar with the menu stays; everything
+    else, board included, scrolls with the page.
+  - The app header is sticky on every page. `html { scroll-padding-top }` equals its height
+    (`--app-header-height`), so anything scrolled or focused into view lands below it.
+  - Kept from the attempt: the round banner is one small line and the board's rows are tighter,
+    so more of the game fits on a phone.

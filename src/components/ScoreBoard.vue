@@ -46,18 +46,18 @@ function isLeader(row: BoardRow): boolean {
     </colgroup>
     <TableHeader>
       <TableRow>
-        <TableHead scope="col">{{ t('room.table.player') }}</TableHead>
+        <TableHead scope="col" class="h-8">{{ t('room.table.player') }}</TableHead>
         <TableHead
           v-for="round in rounds"
           :key="round"
           scope="col"
-          class="px-0 text-center text-xs tabular-nums"
+          class="h-8 px-0 text-center text-xs tabular-nums"
           :class="round === roundInProgress ? 'text-primary' : 'text-muted-foreground'"
         >
           <span aria-hidden="true">{{ n(round) }}</span>
           <span class="sr-only">{{ t('room.table.roundHeader', { round: n(round) }) }}</span>
         </TableHead>
-        <TableHead scope="col" class="pl-0 text-right">
+        <TableHead scope="col" class="h-8 pl-0 text-right">
           <span aria-hidden="true">{{ t('room.table.totalShort') }}</span>
           <span class="sr-only">{{ t('room.table.total') }}</span>
         </TableHead>
@@ -69,7 +69,7 @@ function isLeader(row: BoardRow): boolean {
         :key="row.player.id"
         :class="isLeader(row) ? 'bg-muted' : undefined"
       >
-        <th scope="row" class="p-2 text-left align-middle font-normal">
+        <th scope="row" class="px-2 py-1.5 text-left align-middle font-normal">
           <div class="flex min-w-0 items-center gap-2">
             <Crown v-if="isLeader(row)" aria-hidden="true" class="text-primary size-4 shrink-0" />
             <span class="truncate">{{ row.player.name }}</span>
@@ -85,7 +85,7 @@ function isLeader(row: BoardRow): boolean {
         <TableCell
           v-for="(cell, index) in row.cells"
           :key="index"
-          class="text-muted-foreground px-0 text-center text-xs tabular-nums"
+          class="text-muted-foreground px-0 py-1.5 text-center text-xs tabular-nums"
         >
           <template v-if="cell.kind === 'points'">
             {{ n(cell.points, { useGrouping: false }) }}
@@ -99,7 +99,7 @@ function isLeader(row: BoardRow): boolean {
             <span class="sr-only">{{ t('room.table.noScore') }}</span>
           </template>
         </TableCell>
-        <TableCell class="pl-0 text-right font-semibold tabular-nums">
+        <TableCell class="py-1.5 pl-0 text-right font-semibold tabular-nums">
           <Transition name="board-total" mode="out-in">
             <span :key="row.total" class="inline-block">{{ n(row.total) }}</span>
           </Transition>
