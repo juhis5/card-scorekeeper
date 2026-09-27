@@ -22,13 +22,15 @@
  * now, at flush time, can satisfy the rule.
  */
 import { browserLocalStorage } from './key-value-storage'
-import { flushPendingResults } from './pending-results'
+import { flushPendingResults, readPendingResults } from './pending-results'
 
 /** Best-effort: any failure (still offline after all, a broken config, a write rejected) just
  * means the queued result(s) stay queued for the next launch — never surfaced to the user, never
  * allowed to block or delay app startup (see the offline-capable host golden rule). */
 export async function flushPendingResultsOnLaunch(): Promise<void> {
   try {
+    // Most launches have nothing queued: don't download and initialise Firebase for nothing.
+    if (readPendingResults(browserLocalStorage()).length === 0) return
     const [{ getDb, getFirebaseAuth, ensureSignedIn }, { writeGameResult }] = await Promise.all([
       import('./firebase'),
       import('./firestore-stats'),
