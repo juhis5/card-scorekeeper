@@ -9,11 +9,11 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
-import { ChevronRight, Menu, X } from '@lucide/vue'
+import { ChevronRight, Menu, RefreshCw, X } from '@lucide/vue'
 import InstallAppRow from '@/components/menu/InstallAppRow.vue'
 import LocaleToggle from '@/components/menu/LocaleToggle.vue'
 import { MENU_ROW_CLASS } from '@/components/menu/menu-row'
-import ThemeToggle from '@/components/menu/ThemeToggle.vue'
+import ThemePicker from '@/components/menu/ThemePicker.vue'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -24,10 +24,12 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useAppUpdateStore } from '@/stores/app-update'
 import { useInstallStore } from '@/stores/install'
 
 const { t } = useI18n()
 const install = useInstallStore()
+const appUpdate = useAppUpdateStore()
 const isOpen = ref(false)
 
 const pages = [
@@ -73,8 +75,17 @@ function close(): void {
       </nav>
 
       <ul role="list" :aria-label="t('app.menu.settings')">
+        <li v-if="appUpdate.needRefresh" class="border-border border-b">
+          <button type="button" :class="MENU_ROW_CLASS" @click="appUpdate.reload">
+            <span class="flex flex-col">
+              {{ t('app.update.menuRow') }}
+              <span class="text-muted-foreground text-sm">{{ t('app.update.menuHint') }}</span>
+            </span>
+            <RefreshCw aria-hidden="true" class="text-primary size-4" />
+          </button>
+        </li>
         <li class="border-border border-b"><LocaleToggle /></li>
-        <li class="border-border border-b"><ThemeToggle /></li>
+        <li class="border-border border-b"><ThemePicker /></li>
         <li v-if="install.isAvailable" class="border-border border-b"><InstallAppRow /></li>
       </ul>
     </SheetContent>

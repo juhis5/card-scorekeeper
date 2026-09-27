@@ -2,7 +2,15 @@
   "app": {
     "title": "Rommi",
     "theme": {
-      "label": "Tumma tila"
+      "label": "Teema",
+      "names": {
+        "dark": "Tumma",
+        "light": "Vaalea",
+        "jani": "Jani",
+        "nord": "Nord",
+        "dracula": "Dracula",
+        "solarized": "Solarized"
+      }
     },
     "locale": {
       "name": "Suomi",
@@ -11,7 +19,9 @@
     "update": {
       "available": "Uusi versio on saatavilla.",
       "reload": "Lataa uudelleen",
-      "dismiss": "Sulje"
+      "dismiss": "Sulje",
+      "menuRow": "Päivitä sovellus",
+      "menuHint": "Uusi versio on valmis"
     },
     "menu": {
       "open": "Valikko",

@@ -1,81 +1,58 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { useTheme } from './useTheme'
+import { applyStoredTheme, useTheme } from './useTheme'
 
-/** Asserts the exact contract with index.html's inline no-flash script:
- * `(localStorage.getItem('theme') ?? 'dark') === 'dark'`. */
-function hasDarkClass(): boolean {
-  return document.documentElement.classList.contains('dark')
+function rootClasses(): string[] {
+  return [...document.documentElement.classList]
 }
 
 beforeEach(() => {
   localStorage.clear()
-  document.documentElement.classList.remove('dark')
+  document.documentElement.className = ''
+  document.head.innerHTML = '<meta name="theme-color" content="#000000" />'
 })
 
 describe('useTheme', () => {
-  it('defaults to dark when nothing is stored, matching the no-flash script', () => {
+  it('defaults to dark when nothing is stored, like the no-flash script', () => {
     const { theme } = useTheme()
 
     expect(theme.value).toBe('dark')
-    expect(hasDarkClass()).toBe(true)
+    expect(rootClasses()).toEqual(['dark'])
   })
 
-  it('reads a stored light preference and does not apply the dark class', () => {
-    localStorage.setItem('theme', 'light')
-
-    const { theme } = useTheme()
-
-    expect(theme.value).toBe('light')
-    expect(hasDarkClass()).toBe(false)
-  })
-
-  it('reads a stored dark preference and applies the dark class', () => {
-    localStorage.setItem('theme', 'dark')
-
-    const { theme } = useTheme()
-
-    expect(theme.value).toBe('dark')
-    expect(hasDarkClass()).toBe(true)
-  })
-
-  it('treats an unexpected stored value as light, exactly like the no-flash script', () => {
+  it('treats an unknown stored value as the default, like the no-flash script', () => {
     localStorage.setItem('theme', 'banana')
 
-    const { theme } = useTheme()
-
-    expect(theme.value).toBe('light')
-    expect(hasDarkClass()).toBe(false)
+    expect(useTheme().theme.value).toBe('dark')
   })
 
-  it('toggleTheme flips dark to light, updates the class, and persists the choice', () => {
-    localStorage.setItem('theme', 'dark')
-    const { theme, toggleTheme } = useTheme()
-
-    toggleTheme()
-
-    expect(theme.value).toBe('light')
-    expect(hasDarkClass()).toBe(false)
-    expect(localStorage.getItem('theme')).toBe('light')
-  })
-
-  it('toggleTheme flips light to dark, updates the class, and persists the choice', () => {
+  it('applies a light theme without the dark class', () => {
     localStorage.setItem('theme', 'light')
-    const { theme, toggleTheme } = useTheme()
 
-    toggleTheme()
+    useTheme()
 
-    expect(theme.value).toBe('dark')
-    expect(hasDarkClass()).toBe(true)
-    expect(localStorage.getItem('theme')).toBe('dark')
+    expect(rootClasses()).toEqual([])
   })
 
-  it('setTheme sets an explicit value regardless of the current one', () => {
+  it('switches to a named palette, persists it, and drops the one before', () => {
     const { theme, setTheme } = useTheme()
 
-    setTheme('light')
+    setTheme('solarized')
+    expect(rootClasses()).toEqual(['theme-solarized'])
 
-    expect(theme.value).toBe('light')
-    expect(hasDarkClass()).toBe(false)
-    expect(localStorage.getItem('theme')).toBe('light')
+    setTheme('jani')
+    expect(theme.value).toBe('jani')
+    expect(rootClasses().sort()).toEqual(['dark', 'theme-jani'])
+    expect(localStorage.getItem('theme')).toBe('jani')
+  })
+
+  it("gives the browser's theme color the theme's own background", () => {
+    document.documentElement.style.setProperty('--background', '#2d2d2d')
+
+    applyStoredTheme()
+
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
+      '#2d2d2d',
+    )
+    document.documentElement.style.removeProperty('--background')
   })
 })

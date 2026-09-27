@@ -42,8 +42,10 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Dark is the default identity for this app; light is a supported alternative. See design-system skill. */
-:root {
+/* Dark is the default identity for this app; light is a supported alternative. See design-system skill.
+   `.theme-light` repeats the light tokens for the theme picker's swatches inside a dark page. */
+:root,
+.theme-light {
   --background: #f7f9fb;
   --foreground: #0b0f14;
   --card: #ffffff;
@@ -110,6 +112,96 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* Named palettes (fourth round): each is checked for AA contrast, text and primary on every surface.
+   The dark ones also get `.dark` (see lib/platform/themes.ts), so they come after it here. */
+/* Jani: charcoal and orange, after wingnet (#2D2D2D, #43413F, #BB5500, #DB8B31), the orange lifted to pass AA as text. */
+.theme-jani {
+  --background: #2d2d2d;
+  --foreground: #f5f1ec;
+  --card: #3a3836;
+  --card-foreground: #f5f1ec;
+  --popover: #3a3836;
+  --popover-foreground: #f5f1ec;
+  --primary: #eea453;
+  --primary-foreground: #1f1609;
+  --secondary: #43413f;
+  --secondary-foreground: #f5f1ec;
+  --muted: #43413f;
+  --muted-foreground: #c9c1b8;
+  --accent: #43413f;
+  --accent-foreground: #f5f1ec;
+  --destructive: #ff8f80;
+  --border: #57534e;
+  --input: #57534e;
+  --ring: #eea453;
+}
+
+/* Nord: polar night with frost accents; the red lightened to pass AA. */
+.theme-nord {
+  --background: #2e3440;
+  --foreground: #eceff4;
+  --card: #3b4252;
+  --card-foreground: #eceff4;
+  --popover: #3b4252;
+  --popover-foreground: #eceff4;
+  --primary: #96cbd9;
+  --primary-foreground: #2e3440;
+  --secondary: #434c5e;
+  --secondary-foreground: #eceff4;
+  --muted: #434c5e;
+  --muted-foreground: #d0d6e0;
+  --accent: #434c5e;
+  --accent-foreground: #eceff4;
+  --destructive: #f2a1a7;
+  --border: #4c566a;
+  --input: #4c566a;
+  --ring: #96cbd9;
+}
+
+/* Dracula: purple on deep blue-grey; the comment grey lightened to pass AA. */
+.theme-dracula {
+  --background: #282a36;
+  --foreground: #f8f8f2;
+  --card: #343746;
+  --card-foreground: #f8f8f2;
+  --popover: #343746;
+  --popover-foreground: #f8f8f2;
+  --primary: #cdaafb;
+  --primary-foreground: #1e1f29;
+  --secondary: #44475a;
+  --secondary-foreground: #f8f8f2;
+  --muted: #44475a;
+  --muted-foreground: #c9cbe0;
+  --accent: #44475a;
+  --accent-foreground: #f8f8f2;
+  --destructive: #ff9494;
+  --border: #50536a;
+  --input: #50536a;
+  --ring: #cdaafb;
+}
+
+/* Solarized light: base3 paper with a deepened blue and red, for AA. */
+.theme-solarized {
+  --background: #fdf6e3;
+  --foreground: #073642;
+  --card: #fffcf2;
+  --card-foreground: #073642;
+  --popover: #fffcf2;
+  --popover-foreground: #073642;
+  --primary: #1f6aa3;
+  --primary-foreground: #fdf6e3;
+  --secondary: #eee8d5;
+  --secondary-foreground: #073642;
+  --muted: #eee8d5;
+  --muted-foreground: #4a5d64;
+  --accent: #eee8d5;
+  --accent-foreground: #073642;
+  --destructive: #b3261e;
+  --border: #d9d2bd;
+  --input: #d9d2bd;
+  --ring: #1f6aa3;
 }
 
 /* Motion tokens — shared across themes; gate non-essential motion on `motion-reduce:`. */

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { RouterView, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import AppMenu from '@/components/menu/AppMenu.vue'
 import BackButton from '@/components/header/BackButton.vue'
 import RoomCodeBar from '@/components/header/RoomCodeBar.vue'
-import { useServiceWorker } from '@/composables/useServiceWorker'
+import { useAppUpdateStore } from '@/stores/app-update'
 import { useGameStore } from '@/stores/game'
 
 const route = useRoute()
@@ -25,10 +26,9 @@ const headerRoomCode = computed(() =>
 // focus" channel.
 const routeAnnouncement = computed(() => (route.meta.announceKey ? t(route.meta.announceKey) : ''))
 
-// New-deploy update prompt (see the `pwa` skill + vite.config.ts's `registerType: 'prompt'`): a
-// card table shouldn't lose a round to an SW-driven reload mid-game, so this only ever surfaces
-// a dismissible banner — reloading is always the player's own choice.
-const { needRefresh, reload, dismiss } = useServiceWorker()
+// A new version waiting: a dismissible banner, never an automatic reload (see stores/app-update).
+const appUpdate = useAppUpdateStore()
+const { needRefresh } = storeToRefs(appUpdate)
 // A live-region announcement is only reliable when the region already exists in the DOM before
 // its content changes (screen readers watch existing regions for mutations; inserting a whole
 // new role="status" node with text already inside it is not consistently announced) — same
@@ -70,13 +70,15 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
       class="bg-muted text-foreground border-border mx-auto flex max-w-md items-center gap-2 rounded-lg border px-4 py-2 text-sm shadow-sm"
     >
       <span class="flex-1">{{ t('app.update.available') }}</span>
-      <Button size="sm" class="h-11 px-4" @click="reload">{{ t('app.update.reload') }}</Button>
+      <Button size="sm" class="h-11 px-4" @click="appUpdate.reload">{{
+        t('app.update.reload')
+      }}</Button>
       <Button
         variant="ghost"
         size="icon"
         class="size-11"
         :aria-label="t('app.update.dismiss')"
-        @click="dismiss"
+        @click="appUpdate.dismiss"
       >
         <X aria-hidden="true" class="size-4" />
       </Button>

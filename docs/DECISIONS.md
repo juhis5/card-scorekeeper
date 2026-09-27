@@ -738,3 +738,21 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     and focusing it again after the save's network wait no longer counts as the tap. ✓ and Skip
     now hand focus straight back while the tap is handled; `mousedown.prevent` keeps it there
     with a mouse.
+- 2026-09-28 — Themes and app updates (fourth round):
+  - Teema replaces Tumma tila: Tumma (default), Vaalea, Jani, Nord, Dracula, Solarized. Jani is
+    charcoal and orange after wingnet (#2D2D2D, #43413F, #BB5500, #DB8B31), with the orange lifted
+    to #EEA453 so it passes AA as text. Nord, Dracula and Solarized keep their character but
+    lighten or deepen what failed AA (Dracula's comment grey, the reds, Solarized's blue).
+    `theme-contrast.test.ts` checks every palette.
+  - Each palette is a `.theme-<id>` class after `.dark` in main.css. The dark ones also carry
+    `dark`, so Tailwind's `dark:` styles apply. The list lives in `lib/platform/themes.ts`, and
+    index.html's no-flash script repeats it (a test keeps the two the same). An unknown stored
+    value now means the default, dark. The CSP's script hash changed with the script. The
+    browser's `theme-color` follows the theme's background.
+  - The picker is a menu row naming the current theme, which opens a radio list with a swatch of
+    each theme; a swatch wears its theme's class, so it shows that palette's own tokens.
+  - Updates: the browser only looks for a new service worker on a navigation, and an installed app
+    left open at the table may not navigate for hours. It now checks every 30 minutes and
+    whenever the app comes back to the screen (while visible and online). A waiting version shows
+    as "Päivitä sovellus" in the menu, as well as in the banner. `useServiceWorker` became the
+    `app-update` store, since App and the menu both need it.
