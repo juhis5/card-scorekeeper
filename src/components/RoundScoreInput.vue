@@ -15,6 +15,7 @@ const {
   describedBy,
   isInvalid = false,
   isLabelHidden = false,
+  placeholder,
 } = defineProps<{
   id: string
   label: string
@@ -23,6 +24,7 @@ const {
   /** Keeps the label for screen readers only, for rows where something visible already says
    * what the field is (the photo-count card list). */
   isLabelHidden?: boolean
+  placeholder?: string
 }>()
 
 /** `commit` fires on Enter. `blur` passes the focus event so the parent decides whether leaving
@@ -52,6 +54,7 @@ const rawValue = computed<string | number>({
         enterkeyhint="done"
         min="0"
         class="h-11 min-w-0 flex-1 text-base"
+        :placeholder="placeholder"
         :aria-invalid="isInvalid"
         :aria-describedby="describedBy"
         @blur="emit('blur', $event)"

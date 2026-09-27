@@ -2,9 +2,10 @@
 /**
  * Single job: one player's round-score entry card. Collapsed by default (name + saved points, or
  * just "scored" when the number isn't this device's to see); tapping the header expands it inline
- * to reveal the numeric input with its Save button, and the photo-count affordance. Save is the
- * way to save on a phone: the iPhone number keypad has no Enter key. Enter and leaving the field
- * still save too. A non-host player's own card reads "Enter
+ * into two rows: the name row gains the card's icons (photo count, and the parent's remove), and
+ * below it the points field with ✓ (save) and ✕ (cancel). ✓ is the way to save on a phone: the
+ * iPhone number keypad has no Enter key. Enter and leaving the field still save too. The field's
+ * label is for screen readers only; the name row already says whose points they are. A non-host player's own card reads "Enter
  * your points" instead of their name.
  * Presentation + local draft value only; persisting the score is the parent's job (it owns the
  * store call), this just emits the validated number on commit.
@@ -17,7 +18,7 @@
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check } from '@lucide/vue'
+import { Check, X } from '@lucide/vue'
 import PhotoCountSheet from '@/components/PhotoCountSheet.vue'
 import RoundScoreInput from '@/components/RoundScoreInput.vue'
 import { Button } from '@/components/ui/button'
@@ -62,7 +63,7 @@ const points = ref<number | null>(null)
 const savedPoints = ref<number | null>(null)
 const errorMessage = ref('')
 const isExpanded = ref(false)
-/** Pressing a control inside the card (Save, Cancel, Snap cards) blurs the input before that control's
+/** Pressing a control inside the card (✓, ✕, the camera, the trash) blurs the input before that control's
  * click lands. The blur must not save, but iOS Safari doesn't focus a tapped button, so the blur's
  * relatedTarget can't tell us where focus is going. Remember the press instead. */
 let isPressInsidePanel = false
@@ -149,11 +150,11 @@ function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
   void collapse({ restoreFocus })
 }
 
-function markPressInsidePanel(): void {
+function markPressInsideCard(): void {
   isPressInsidePanel = true
 }
 
-function clearPressInsidePanel(): void {
+function clearPressInsideCard(): void {
   isPressInsidePanel = false
 }
 
@@ -204,79 +205,90 @@ function handleKeyDown(event: KeyboardEvent): void {
     class="bg-card border-border scroll-mb-20 rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
     :class="isExpanded ? 'ring-ring ring-2' : 'hover:bg-muted'"
     @keydown="handleKeyDown"
+    @pointerdown="markPressInsideCard"
+    @click="clearPressInsideCard"
   >
-    <button
-      ref="header"
-      type="button"
-      class="flex min-h-11 w-full items-center justify-between gap-3 p-4 text-left"
-      :aria-expanded="isExpanded"
-      :aria-label="headerLabel"
-      @click="expand"
-    >
-      <span class="flex min-w-0 items-center gap-2">
-        <span class="text-foreground truncate text-base font-medium">{{ title }}</span>
-        <span
-          v-if="player.isGuest"
-          aria-hidden="true"
-          class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 text-xs"
-        >
-          {{ t('room.guest') }}
+    <!-- The name row. While the card is open it also holds the card's own actions (photo count,
+         the parent's remove), which wrap onto a line of their own when they need one. -->
+    <div class="flex flex-wrap items-center pr-1">
+      <button
+        ref="header"
+        type="button"
+        class="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 p-4 text-left"
+        :aria-expanded="isExpanded"
+        :aria-label="headerLabel"
+        @click="expand"
+      >
+        <span class="flex min-w-0 items-center gap-2">
+          <span class="text-foreground truncate text-base font-medium">{{ title }}</span>
+          <span
+            v-if="player.isGuest"
+            aria-hidden="true"
+            class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 text-xs"
+          >
+            {{ t('room.guest') }}
+          </span>
         </span>
-      </span>
-      <span v-if="isMissedRound" class="text-muted-foreground shrink-0 text-sm">
-        {{ t('room.score.missedRoundLabel', { round }) }}
-      </span>
-      <span v-if="isScored" class="text-primary flex shrink-0 items-center gap-1 text-sm">
-        <Check aria-hidden="true" class="size-4" />
-        {{
-          visiblePoints === null
-            ? t('room.score.scoredLabel')
-            : t('room.score.scoredPoints', { points: n(visiblePoints) })
-        }}
-      </span>
-    </button>
+        <span v-if="isMissedRound" class="text-muted-foreground shrink-0 text-sm">
+          {{ t('room.score.missedRoundLabel', { round }) }}
+        </span>
+        <span v-if="isScored" class="text-primary flex shrink-0 items-center gap-1 text-sm">
+          <Check aria-hidden="true" class="size-4" />
+          {{
+            visiblePoints === null
+              ? t('room.score.scoredLabel')
+              : t('room.score.scoredPoints', { points: n(visiblePoints) })
+          }}
+        </span>
+      </button>
+      <template v-if="isExpanded">
+        <PhotoCountSheet
+          v-if="canSnapCards"
+          :id="photoCountId"
+          :room-code="roomCode ?? ''"
+          @confirm="handlePhotoConfirm"
+        />
+        <!-- Seat-level actions the parent owns, e.g. the host removing a player. -->
+        <slot name="actions" />
+      </template>
+    </div>
 
-    <div
-      v-if="isExpanded"
-      class="border-border flex flex-col gap-3 border-t px-4 pt-3 pb-4"
-      @pointerdown="markPressInsidePanel"
-      @click="clearPressInsidePanel"
-    >
+    <div v-if="isExpanded" class="flex flex-col gap-2 px-4 pb-4">
       <RoundScoreInput
         :id="inputId"
         v-model="points"
         :label="label"
+        is-label-hidden
+        :placeholder="t('room.score.placeholder')"
         :is-invalid="hasError"
         :described-by="hasError ? errorId : undefined"
         @commit="handleSave"
         @blur="handleInputBlur"
       >
-        <Button type="button" class="h-11 shrink-0 px-5" @click="handleSave">
-          {{ t('room.score.save') }}
+        <Button
+          type="button"
+          size="icon"
+          class="size-11 shrink-0"
+          :aria-label="t('room.score.save')"
+          @click="handleSave"
+        >
+          <Check aria-hidden="true" class="size-5" />
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          class="size-11 shrink-0"
+          :aria-label="t('room.score.cancel')"
+          @click="discardDraft"
+        >
+          <X aria-hidden="true" class="size-5" />
         </Button>
       </RoundScoreInput>
-
-      <PhotoCountSheet
-        v-if="canSnapCards"
-        :id="photoCountId"
-        :room-code="roomCode ?? ''"
-        @confirm="handlePhotoConfirm"
-      />
 
       <p v-if="hasError" :id="errorId" role="alert" class="text-destructive text-sm">
         {{ errorMessage }}
       </p>
-
-      <!-- Seat-level actions the parent owns, e.g. the host removing a player. -->
-      <slot name="actions" />
-
-      <button
-        type="button"
-        class="text-muted-foreground hover:text-foreground h-11 text-sm"
-        @click="discardDraft"
-      >
-        {{ t('room.score.cancel') }}
-      </button>
     </div>
   </li>
 </template>

@@ -233,9 +233,15 @@ function handleOpenChange(open: boolean): void {
       @change="handleFileChange"
     />
 
-    <Button type="button" variant="secondary" class="h-11" @click="openSheet">
-      <Camera aria-hidden="true" class="size-4" />
-      {{ t('room.photoCount.trigger') }}
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      class="size-11"
+      :aria-label="t('room.photoCount.trigger')"
+      @click="openSheet"
+    >
+      <Camera aria-hidden="true" class="size-5" />
     </Button>
 
     <Sheet :open="isOpen" @update:open="handleOpenChange">
