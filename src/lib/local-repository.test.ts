@@ -6,6 +6,7 @@ import {
   STORAGE_KEY,
 } from './local-repository'
 import type { KeyValueStorage } from './local-repository'
+import { NameTakenError } from './player-names'
 import { readPendingResults } from './pending-results'
 import type { ContractRoundNumber, GameState } from './types'
 
@@ -121,6 +122,29 @@ describe('LocalGameRepository.addPlayer', () => {
     const emissions = recordEmissions(repository)
     expect(emissions[0]?.players).toHaveLength(2)
     expect(emissions[0]?.players).toContainEqual({ id: playerId, name: 'Alice', totalScore: 0 })
+  })
+
+  it('stores the name cleaned of extra spaces', async () => {
+    const repository = makeRepository()
+    await repository.createGame({ ...HOST_CONFIG, hostDisplayName: '  Host ' })
+
+    await repository.addPlayer({ name: ' Mari   Anne ', deviceUuid: 'device-m' })
+
+    const emissions = recordEmissions(repository)
+    expect(emissions[0]?.players.map((p) => p.name)).toEqual(['Host', 'Mari Anne'])
+  })
+
+  it('refuses a name already in the game, ignoring case and spaces', async () => {
+    const repository = makeRepository()
+    await repository.createGame(HOST_CONFIG)
+    await repository.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+
+    const error = await repository
+      .addPlayer({ name: ' ALICE ', deviceUuid: 'device-a2' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(NameTakenError)
+    expect(recordEmissions(repository)[0]?.players).toHaveLength(2)
   })
 
   it('adds multiple players in join order, after the host', async () => {

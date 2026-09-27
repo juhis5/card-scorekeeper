@@ -14,6 +14,7 @@
 import { TOTAL_ROUNDS, contractForRound, placements as placementsFor, runningTotal } from './rules'
 import { bestAndWorstRound } from './stats'
 import { appendPendingResult } from './pending-results'
+import { cleanPlayerName, isNameTaken, NameTakenError } from './player-names'
 import { browserLocalStorage } from './key-value-storage'
 import type { KeyValueStorage } from './key-value-storage'
 import type { GamePlayer, GameResult, GameState, Player, RoundScore } from './types'
@@ -169,7 +170,11 @@ export class LocalGameRepository implements GameRepository {
   async createGame(config: GameConfig): Promise<CreatedGame> {
     const gameId = this.newId()
     const hostPlayerId = this.newId()
-    const hostPlayer: Player = { id: hostPlayerId, name: config.hostDisplayName, totalScore: 0 }
+    const hostPlayer: Player = {
+      id: hostPlayerId,
+      name: cleanPlayerName(config.hostDisplayName),
+      totalScore: 0,
+    }
     this.game = {
       gameId,
       hostDeviceUuid: config.hostDeviceUuid,
@@ -193,12 +198,15 @@ export class LocalGameRepository implements GameRepository {
   }
 
   async addPlayer(input: AddPlayerInput): Promise<PlayerId> {
+    const name = cleanPlayerName(input.name)
+    const existingNames = this.game.state.players.map((player) => player.name)
+    if (isNameTaken(name, existingNames)) throw new NameTakenError(name)
     const playerId = this.newId()
     this.game = {
       ...this.game,
       state: {
         ...this.game.state,
-        players: [...this.game.state.players, { id: playerId, name: input.name, totalScore: 0 }],
+        players: [...this.game.state.players, { id: playerId, name, totalScore: 0 }],
       },
     }
     this.persistAndNotify()

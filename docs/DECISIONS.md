@@ -491,3 +491,25 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     silently overwrote it. Online games never touch the saved local game, so they don't ask.
   - At 360px the header is full, so the Stats link is an icon on phones (still named "Stats") and
     the title truncates.
+- 2026-09-27 — Unique player names (tester note 6):
+  - A name is unique within a game, compared without regard to case or extra spaces: "Juho",
+    "juho" and " Juho " are the same, "Mari Anne" and "Marianne" are not (owner's call). Names
+    are stored cleaned (`cleanPlayerName`: NFC, whitespace runs collapsed, trimmed).
+  - Online the check is on the server, because a joiner can't read the room's names before being
+    seated. Every seat is created in one batch with `room/{code}/names/{key}`, owned by the same
+    player; a second record under the same key is an update, which the rules never allow, so two
+    people can't take one name even at the same moment. The rules derive the key from the stored
+    name (`'n_' + lower`, '/' made id-safe) and refuse unclean names. Owner's call: strict from
+    day one, no lenient phase for old clients, because the current data is test data that gets
+    deleted before launch.
+  - The rules' `lower()` only changes A to Z (found on the emulator: "Äimä" couldn't join, since
+    the app keyed it "n_äimä" and the rules "n_Äimä"). So both sides lowercase A to Z plus a
+    fixed list of Nordic capitals (Ä Ö Å Ü É Ø Æ) that the rules fold one by one. Any other
+    capital is kept as typed: "Ωmega" and "ωmega" are two names. A rules test checks the app's
+    key against the rules for each folded letter.
+  - Consequences: players can no longer rename their seat (nothing did), the host's removal
+    deletes the name record so the name is free again, and anyone signed in may read one name
+    record, so a refusal can say "name taken" instead of a generic error.
+  - Local games check the same keys in the setup form and in `LocalGameRepository.addPlayer`.
+  - A failed join now resets the store, so Home never offers to continue a room this device
+    never got into.

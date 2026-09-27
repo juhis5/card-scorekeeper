@@ -6,7 +6,7 @@
  * `lib/game-mode.ts`'s `createJoinRepository` doc comment), so an unreachable backend here is a
  * friendly error, not a silent local game.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ import { isValidRoomCode, normalizeRoomCode } from '@/lib/room-code'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
+import { NameTakenError } from '@/lib/player-names'
 import { isPermanentWriteError } from '@/lib/write-errors'
 
 const { t } = useI18n()
@@ -40,12 +41,23 @@ const trimmedName = computed(() => joinerName.value.trim())
 const isCodeInvalid = computed(
   () => attemptedSubmit.value && !isValidRoomCode(normalizedCode.value),
 )
-const isNameInvalid = computed(() => attemptedSubmit.value && trimmedName.value === '')
+const isNameMissing = computed(() => attemptedSubmit.value && trimmedName.value === '')
+/** The room already has a player with this name (ignoring case and extra spaces). */
+const isNameTaken = ref(false)
+const isNameInvalid = computed(() => isNameMissing.value || isNameTaken.value)
+const nameError = computed(() =>
+  isNameMissing.value ? t('home.errors.hostNameRequired') : t('home.join.errors.nameTaken'),
+)
+
+watch(joinerName, () => {
+  isNameTaken.value = false
+})
 
 async function handleSubmit(): Promise<void> {
   attemptedSubmit.value = true
   // Validate the code's shape before ever calling the backend (see the error-ux skill).
-  if (isCodeInvalid.value || isNameInvalid.value || isSubmitting.value) return
+  isNameTaken.value = false
+  if (isCodeInvalid.value || isNameMissing.value || isSubmitting.value) return
 
   isSubmitting.value = true
   isCheckingConnection.value = true
@@ -66,8 +78,12 @@ async function handleSubmit(): Promise<void> {
     })
     await router.push({ name: 'room', params: { code: normalizedCode.value } })
   } catch (error) {
-    // The rules refusing the seat means a wrong or expired code; anything else (a timeout, a
-    // dropped connection) means we couldn't reach the game. Never a raw error (see error-ux).
+    if (error instanceof NameTakenError) {
+      isNameTaken.value = true
+      return
+    }
+    // Otherwise the rules refusing the seat means a wrong or expired code; anything else (a
+    // timeout, a dropped connection) means we couldn't reach the game. Never a raw error.
     submitError.value = isPermanentWriteError(error)
       ? t('home.join.errors.joinFailed')
       : t('home.join.errors.unreachable')
@@ -120,7 +136,7 @@ async function handleSubmit(): Promise<void> {
             :aria-describedby="isNameInvalid ? 'join-name-error' : undefined"
           />
           <p v-if="isNameInvalid" id="join-name-error" class="text-destructive text-sm">
-            {{ t('home.errors.hostNameRequired') }}
+            {{ nameError }}
           </p>
         </div>
       </CardContent>
