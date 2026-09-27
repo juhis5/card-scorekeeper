@@ -12,10 +12,16 @@
     <meta name="theme-color" content="#0b0f14" />
     <title>Rommi</title>
     <script>
-      document.documentElement.classList.toggle(
-        'dark',
-        (localStorage.getItem('theme') ?? 'dark') === 'dark',
-      )
+      // Same lists as src/lib/platform/themes.ts: the theme is on before the first paint.
+      ;(function () {
+        var themes = ['dark', 'light', 'jani', 'nord', 'dracula', 'solarized']
+        var lightThemes = ['light', 'solarized']
+        var stored = localStorage.getItem('theme')
+        var theme = themes.indexOf(stored) >= 0 ? stored : 'dark'
+        var root = document.documentElement
+        root.classList.toggle('dark', lightThemes.indexOf(theme) < 0)
+        if (theme !== 'dark' && theme !== 'light') root.classList.add('theme-' + theme)
+      })()
     </script>
   </head>
   <body>

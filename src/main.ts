@@ -9,6 +9,7 @@ import router from './router'
 import { i18n } from './i18n'
 import { useIdentityStore } from './stores/identity'
 import { useInstallStore } from './stores/install'
+import { applyStoredTheme } from './composables/useTheme'
 import { flushPendingResultsOnLaunch } from './lib/data/reconnect-flush'
 
 const app = createApp(App)
@@ -27,6 +28,7 @@ app.use(router)
 app.use(i18n)
 
 app.mount('#app')
+applyStoredTheme()
 
 // Best-effort reconnect flush (see docs/PLAN.md "Reconnect = push final result only"): push any
 // locally-queued finished-game results up to Firestore now that we're launching online. Never

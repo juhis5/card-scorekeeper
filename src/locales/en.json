@@ -2,7 +2,15 @@
   "app": {
     "title": "Rommi",
     "theme": {
-      "label": "Dark mode"
+      "label": "Theme",
+      "names": {
+        "dark": "Dark",
+        "light": "Light",
+        "jani": "Jani",
+        "nord": "Nord",
+        "dracula": "Dracula",
+        "solarized": "Solarized"
+      }
     },
     "locale": {
       "name": "English",
@@ -11,7 +19,9 @@
     "update": {
       "available": "A new version is available.",
       "reload": "Reload",
-      "dismiss": "Dismiss"
+      "dismiss": "Dismiss",
+      "menuRow": "Update the app",
+      "menuHint": "A new version is ready"
     },
     "menu": {
       "open": "Menu",

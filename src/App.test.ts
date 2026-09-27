@@ -8,8 +8,13 @@ import App from './App.vue'
 import { i18n } from '@/i18n'
 import { useGameStore } from '@/stores/game'
 
-vi.mock('@/composables/useServiceWorker', () => ({
-  useServiceWorker: () => ({ needRefresh: ref(false), reload: vi.fn(), dismiss: vi.fn() }),
+// The service worker's virtual module only exists inside a Vite-built app.
+vi.mock('virtual:pwa-register/vue', () => ({
+  useRegisterSW: () => ({
+    needRefresh: ref(false),
+    offlineReady: ref(false),
+    updateServiceWorker: vi.fn(),
+  }),
 }))
 
 describe('App', () => {

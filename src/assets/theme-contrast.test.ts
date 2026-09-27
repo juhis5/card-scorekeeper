@@ -1,6 +1,6 @@
 // @vitest-environment node
 /**
- * Enforces WCAG AA contrast for the theme tokens in main.css, in both themes: 4.5:1 for text,
+ * Enforces WCAG AA contrast for the theme tokens in main.css, in every theme: 4.5:1 for text,
  * 3:1 for the focus ring (a non-text indicator). Reads the real stylesheet, so a token edit that
  * breaks contrast fails here instead of shipping.
  */
@@ -19,7 +19,8 @@ function tokensOf(selector: string): Record<string, string> {
   const uncommented = css.replace(/\/\*[\s\S]*?\*\//g, '')
   const blocks = [...uncommented.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
   const block = blocks.find(
-    ([, head, body]) => head?.trim() === selector && body?.includes('--primary:'),
+    ([, head, body]) =>
+      head?.replace(/\s+/g, ' ').trim() === selector && body?.includes('--primary:'),
   )
   if (!block?.[2]) throw new Error(`no theme block for ${selector} in main.css`)
   return Object.fromEntries(
@@ -75,8 +76,12 @@ const TEXT_PAIRS: [text: string, surface: string][] = [
 ]
 
 describe.each([
-  ['light', ':root'],
+  ['light', ':root, .theme-light'],
   ['dark', '.dark'],
+  ['jani', '.theme-jani'],
+  ['nord', '.theme-nord'],
+  ['dracula', '.theme-dracula'],
+  ['solarized', '.theme-solarized'],
 ])('%s theme contrast', (_theme, selector) => {
   const tokens = tokensOf(selector)
   const token = (name: string): string => {

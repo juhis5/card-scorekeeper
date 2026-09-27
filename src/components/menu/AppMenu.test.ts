@@ -1,10 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import AppMenu from './AppMenu.vue'
 import { i18n, setLocale } from '@/i18n'
+
+// The service worker's virtual module only exists inside a Vite-built app.
+const needRefresh = ref(false)
+vi.mock('virtual:pwa-register/vue', () => ({
+  useRegisterSW: () => ({ needRefresh, offlineReady: ref(false), updateServiceWorker: vi.fn() }),
+}))
 
 function makeRouter() {
   return createRouter({
@@ -48,7 +55,19 @@ describe('AppMenu', () => {
     expect(screen.getByRole('link', { name: 'Stats' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Rules' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Language/ })).toBeTruthy()
-    expect(screen.getByRole('switch', { name: 'Dark mode' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /^Theme/ })).toBeTruthy()
+  })
+
+  it('offers the waiting new version as a row, only while there is one', async () => {
+    await renderMenu()
+    await openMenu()
+    expect(screen.queryByRole('button', { name: /Update the app/ })).toBeNull()
+
+    needRefresh.value = true
+    await flushPromises()
+
+    expect(screen.getByRole('button', { name: /Update the app/ })).toBeTruthy()
+    needRefresh.value = false
   })
 
   it('goes to the page and closes when a link is followed', async () => {
