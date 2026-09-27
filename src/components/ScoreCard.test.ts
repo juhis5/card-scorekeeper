@@ -37,6 +37,28 @@ async function expandCard(): Promise<void> {
   await fireEvent.click(screen.getByRole('button', { name: /^(enter|edit) .+'s score/i }))
 }
 
+function scoreInput(): HTMLInputElement {
+  return screen.getByLabelText("Alice's round 1 score") as HTMLInputElement
+}
+
+/** What a real browser does when a control inside the card is pressed while the input has focus:
+ * pointerdown, then the input blurs, then the click. iOS Safari doesn't focus a tapped button,
+ * so the blur carries no relatedTarget. */
+async function pressInsideCard(control: HTMLElement): Promise<void> {
+  await fireEvent.pointerDown(control)
+  scoreInput().blur()
+  await fireEvent.click(control)
+}
+
+/** Chromium blurs a focused input when it's removed from the DOM. Collapsing the card removes it,
+ * so dispatch that blur synchronously right after the key event, before Vue patches the DOM. */
+async function keyThenRemovalBlur(sendKey: () => Promise<unknown>): Promise<void> {
+  const input = scoreInput()
+  const pending = sendKey()
+  input.dispatchEvent(new FocusEvent('blur'))
+  await pending
+}
+
 function headerButton(): HTMLElement {
   return screen.getByRole('button', { name: /^(enter|edit) alice's score/i })
 }
@@ -198,6 +220,73 @@ describe('ScoreCard', () => {
   })
 })
 
+describe('ScoreCard, discarding and saving a draft', () => {
+  it('discards the typed score when Cancel is pressed', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    await pressInsideCard(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(emitted().commit).toBeUndefined()
+    expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
+    await expandCard()
+    expect(scoreInput().value).toBe('')
+  })
+
+  it('keeps the draft when Tab moves focus to Cancel, then discards it on Cancel', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    await fireEvent.blur(scoreInput(), { relatedTarget: cancel })
+
+    expect(emitted().commit).toBeUndefined()
+    expect(scoreInput().value).toBe('25')
+
+    await fireEvent.click(cancel)
+    expect(emitted().commit).toBeUndefined()
+  })
+
+  it('discards the typed score on Escape even when the browser then blurs the removed input', async () => {
+    const { emitted, container } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '40')
+    await keyThenRemovalBlur(() =>
+      fireEvent.keyDown(container.firstElementChild!, { key: 'Escape' }),
+    )
+
+    expect(emitted().commit).toBeUndefined()
+  })
+
+  it('saves once on Enter even when the browser then blurs the removed input', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    await keyThenRemovalBlur(() => fireEvent.keyUp(scoreInput(), { key: 'Enter' }))
+
+    expect(emitted().commit).toEqual([[ALICE.id, 25]])
+  })
+
+  it('restores the last saved score when a later edit is cancelled', async () => {
+    const { emitted, container } = renderCard()
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '10')
+    await fireEvent.blur(scoreInput())
+    await expandCard()
+    await fireEvent.update(scoreInput(), '20')
+    await fireEvent.keyDown(container.firstElementChild!, { key: 'Escape' })
+    await expandCard()
+
+    expect(scoreInput().value).toBe('10')
+    expect(emitted().commit).toEqual([[ALICE.id, 10]])
+  })
+})
+
 describe('ScoreCard photo-count affordance', () => {
   it('is hidden by default (offline / not this device own row)', () => {
     renderCard()
@@ -225,6 +314,19 @@ describe('ScoreCard photo-count affordance', () => {
 
     await expandCard()
     expect(screen.getByRole('button', { name: 'Snap cards' })).toBeTruthy()
+  })
+})
+
+describe('ScoreCard photo-count after typing', () => {
+  it('opens the photo sheet instead of saving when Snap cards is pressed after typing', async () => {
+    const { emitted } = renderCard({ canUsePhotoCount: true, roomCode: 'ABCDE' })
+
+    await expandCard()
+    await fireEvent.update(scoreInput(), '25')
+    await pressInsideCard(screen.getByRole('button', { name: 'Snap cards' }))
+
+    expect(emitted().commit).toBeUndefined()
+    expect(screen.getByRole('button', { name: 'Take or choose a photo' })).toBeTruthy()
   })
 })
 

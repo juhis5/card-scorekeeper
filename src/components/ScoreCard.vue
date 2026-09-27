@@ -40,8 +40,14 @@ const emit = defineEmits<{ commit: [playerId: string, points: number] }>()
 
 const { t, n } = useI18n()
 const points = ref<number | null>(null)
+/** The last score this card saved, so Cancel/Escape can restore the input to it. */
+const savedPoints = ref<number | null>(null)
 const errorMessage = ref('')
 const isExpanded = ref(false)
+/** Pressing a control inside the card (Cancel, Snap cards) blurs the input before that control's
+ * click lands. The blur must not save, but iOS Safari doesn't focus a tapped button, so the blur's
+ * relatedTarget can't tell us where focus is going. Remember the press instead. */
+let isPressInsidePanel = false
 const cardElement = useTemplateRef<HTMLLIElement>('card')
 const headerButton = useTemplateRef<HTMLButtonElement>('header')
 
@@ -60,6 +66,7 @@ const headerLabel = computed(() =>
 
 async function expand(): Promise<void> {
   if (isExpanded.value) return
+  isPressInsidePanel = false
   isExpanded.value = true
   await nextTick()
   document.getElementById(inputId.value)?.focus()
@@ -75,8 +82,8 @@ async function collapse({ restoreFocus }: { restoreFocus: boolean }): Promise<vo
   headerButton.value?.focus()
 }
 
-function focusIsInsideCard(): boolean {
-  return cardElement.value?.contains(document.activeElement) ?? false
+function isInsideCard(target: EventTarget | null): boolean {
+  return target instanceof Node && (cardElement.value?.contains(target) ?? false)
 }
 
 function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
@@ -89,14 +96,39 @@ function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
     errorMessage.value = t('room.score.invalidError', { max: n(MAX_ROUND_SCORE) })
     return
   }
+  savedPoints.value = points.value
   emit('commit', player.id, points.value)
   void collapse({ restoreFocus })
 }
 
-/** Enter keeps focus in the input, so reclaim it for the header. A blur commit means focus is
- * already moving elsewhere (Tab, tapping another card) — don't yank it back. */
-function handleCommit(): void {
-  commitPoints({ restoreFocus: focusIsInsideCard() })
+function markPressInsidePanel(): void {
+  isPressInsidePanel = true
+}
+
+function clearPressInsidePanel(): void {
+  isPressInsidePanel = false
+}
+
+function discardDraft(): void {
+  points.value = savedPoints.value
+  void collapse({ restoreFocus: true })
+}
+
+/** Enter keeps focus in the input, so hand it to the header once the input is gone. */
+function handleEnter(): void {
+  commitPoints({ restoreFocus: true })
+}
+
+/** A blur saves only when focus is leaving the card (Tab out, tapping another card), and then
+ * leaves focus where the user sent it. */
+function handleInputBlur(event: FocusEvent): void {
+  const wasPressInsidePanel = isPressInsidePanel
+  isPressInsidePanel = false
+  // Collapsing removes the focused input and Chromium blurs it on removal. That blur comes after
+  // Enter already saved, or after Cancel/Escape discarded, so it must do nothing.
+  if (!isExpanded.value) return
+  if (wasPressInsidePanel || isInsideCard(event.relatedTarget)) return
+  commitPoints({ restoreFocus: false })
 }
 
 /** The photo is only ever a SUGGESTION (see CLAUDE.md) — confirming feeds the number through the
@@ -109,7 +141,7 @@ function handlePhotoConfirm(total: number): void {
 }
 
 function handleKeyDown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && isExpanded.value) void collapse({ restoreFocus: true })
+  if (event.key === 'Escape' && isExpanded.value) discardDraft()
 }
 </script>
 
@@ -135,14 +167,20 @@ function handleKeyDown(event: KeyboardEvent): void {
       </span>
     </button>
 
-    <div v-if="isExpanded" class="border-border flex flex-col gap-3 border-t px-4 pt-3 pb-4">
+    <div
+      v-if="isExpanded"
+      class="border-border flex flex-col gap-3 border-t px-4 pt-3 pb-4"
+      @pointerdown="markPressInsidePanel"
+      @click="clearPressInsidePanel"
+    >
       <RoundScoreInput
         :id="inputId"
         v-model="points"
         :label="label"
         :is-invalid="hasError"
         :described-by="hasError ? errorId : undefined"
-        @commit="handleCommit"
+        @commit="handleEnter"
+        @blur="handleInputBlur"
       />
 
       <PhotoCountSheet
@@ -159,7 +197,7 @@ function handleKeyDown(event: KeyboardEvent): void {
       <button
         type="button"
         class="text-muted-foreground hover:text-foreground h-11 text-sm"
-        @click="collapse({ restoreFocus: true })"
+        @click="discardDraft"
       >
         {{ t('room.score.cancel') }}
       </button>
