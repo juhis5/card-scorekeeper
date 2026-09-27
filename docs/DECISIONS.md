@@ -367,3 +367,14 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     closed on permission-denied. Listener (onSnapshot) errors are still silent; that's round 3.
   - Light `--primary`/`--ring` moved to #047857 and focus rings to 80% opacity for WCAG AA;
     `src/assets/theme-contrast.test.ts` enforces the token pairs.
+- 2026-09-27 — Review round 3a, owner decisions:
+  - **Late joiners fill in the rounds they missed** (owner's rule, instead of closing joins or a
+    penalty). `missingRounds`/`isEveryRoundScored` in `rules.ts`; Next/Finish check every round
+    so far, so nobody is ranked on fewer rounds. Joining stays open for the room's life.
+  - **Host powers, online too:** the host enters or fixes anyone's score (this supersedes the
+    "host-editing-others online is deferred" notes above) and can remove another player's seat
+    with its scores. Rules: players/roundScores `delete` for the host only, never their own seat,
+    only while the room is live. A removed player can rejoin by code (accepted for now).
+  - **Seat validation in rules:** exact keys, name 1–40 chars (`MAX_PLAYER_NAME_LENGTH`), starting
+    total 0, integer `joinOrder`; updates keep name valid and total a non-negative int.
+  - Players without a phone in online rooms: deferred to its own round.
