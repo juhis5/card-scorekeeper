@@ -230,7 +230,16 @@
       "nameRequired": "Syötä pelaajan nimi.",
       "failed": "Pelaajaa {name} ei voitu lisätä. Yritä uudelleen."
     },
-    "guest": "vieras"
+    "guest": "vieras",
+    "enterAll": {
+      "button": "Syötä kaikki",
+      "title": "Syötä pisteet · {position}/{total}",
+      "close": "Sulje",
+      "description": "Kierroksen pisteet pelaaja kerrallaan.",
+      "saveAndNext": "Tallenna ja seuraava",
+      "skip": "Ohita {name}",
+      "next": "Seuraavana: {name}"
+    }
   },
   "notFound": {
     "heading": "Sivua ei löytynyt",

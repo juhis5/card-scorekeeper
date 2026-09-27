@@ -1066,6 +1066,32 @@ describe('RoomView late joiners', () => {
   })
 })
 
+describe("RoomView entering everyone's points at once", () => {
+  it('lets the host go through everyone missing a score, after which Next is ready', async () => {
+    const game = useGameStore()
+    await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await game.addPlayer({ name: 'Bob', deviceUuid: 'device-b' })
+    await renderRoom()
+    await enterScore('Host', 1, 20)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Enter all' }))
+    await flushPromises()
+    expect(screen.getByRole('dialog', { name: 'Enter points · 1/2' })).toBeTruthy()
+    for (const points of ['10', '5']) {
+      await fireEvent.update(screen.getByRole('spinbutton'), points)
+      await fireEvent.click(screen.getByRole('button', { name: 'Save and next' }))
+      await flushPromises()
+    }
+
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enter all' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Next round' }).getAttribute('aria-disabled')).toBe(
+      'false',
+    )
+  })
+})
+
 describe('RoomView players the host adds', () => {
   const ROOM_CODE = '7K4RQ'
 
@@ -1112,7 +1138,7 @@ describe('RoomView players the host adds', () => {
     expect(screen.getByRole('row', { name: /Mummo/ }).textContent).toContain('guest')
   })
 
-  it('offers Add player to the host only', async () => {
+  it('offers Add player and Enter all to the host only', async () => {
     const repository = new FakeOnlineRepository(ROOM_CODE)
     const hostPinia = createPinia()
     setActivePinia(hostPinia)
@@ -1131,6 +1157,7 @@ describe('RoomView players the host adds', () => {
     })
 
     expect(screen.queryByRole('button', { name: 'Add player' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Enter all' })).toBeNull()
   })
 })
 

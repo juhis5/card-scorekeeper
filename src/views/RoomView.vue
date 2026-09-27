@@ -15,9 +15,10 @@ import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
-import { WifiOff } from '@lucide/vue'
+import { ListChecks, WifiOff } from '@lucide/vue'
 import AddPlayerCard from '@/components/AddPlayerCard.vue'
 import ContractBanner from '@/components/ContractBanner.vue'
+import EnterAllScoresSheet from '@/components/EnterAllScoresSheet.vue'
 import PlayAgain from '@/components/PlayAgain.vue'
 import RemovePlayerControl from '@/components/RemovePlayerControl.vue'
 import ScoreCard from '@/components/ScoreCard.vue'
@@ -108,6 +109,14 @@ const otherNames = computed(() =>
 const guestNames = computed(() =>
   seatedStandings.value.filter(({ player }) => player.isGuest).map(({ player }) => player.name),
 )
+
+/** Players the host can still enter this round's score for: what "Syötä kaikki" goes through. */
+const missingThisRound = computed(() =>
+  entryStandings.value
+    .map(({ player }) => player)
+    .filter((player) => pointsFor(player.id, currentRound.value, roundScores.value) === null),
+)
+const isEnterAllOpen = ref(false)
 
 /** Earlier rounds an editable player has no score for: a late joiner fills these in, so nobody is
  * ranked on fewer rounds than the others. */
@@ -247,21 +256,22 @@ function describeSaveFailure(error: unknown, retryMessage: string): string {
   return isPermissionDenied(error) ? t('room.saveError.closed') : retryMessage
 }
 
+/** Resolves false when the score didn't save (the reason is in `saveError`). */
 async function handleScoreCommit(
   playerId: PlayerId,
   round: ContractRoundNumber,
   points: number,
-): Promise<void> {
+): Promise<boolean> {
   const saving = saveScore(playerId, round, points)
-  pendingSave = saving
-  await saving
+  pendingSave = saving.then(() => undefined)
+  return saving
 }
 
 async function saveScore(
   playerId: PlayerId,
   round: ContractRoundNumber,
   points: number,
-): Promise<void> {
+): Promise<boolean> {
   const player = standings.value.find((standing) => standing.player.id === playerId)?.player
   isLocalChangeInFlight = true
   try {
@@ -271,17 +281,18 @@ async function saveScore(
       error,
       t('room.saveError.score', { name: player?.name ?? '' }),
     )
-    return
+    return false
   } finally {
     isLocalChangeInFlight = false
   }
   saveError.value = ''
   scoresEnteredHere.value.add(scoreKey(playerId, round))
-  if (!player) return
+  if (!player) return true
 
   // No ranking here: numbers stay hidden from the board until the round is revealed.
   const saved = t('room.live.scoreSaved', { name: player.name, points: n(points) })
   void announce(isHost.value && allPlayersScored.value ? `${saved} ${allScoredMessage()}` : saved)
+  return true
 }
 
 function handlePlayerAdded(name: string): void {
@@ -486,14 +497,32 @@ onMounted(async () => {
       </section>
 
       <section v-if="!isFinished" aria-labelledby="score-entry-heading" class="flex flex-col gap-2">
-        <h2
-          id="score-entry-heading"
-          ref="scoreEntryHeading"
-          tabindex="-1"
-          class="focus-visible:ring-ring rounded-sm text-lg font-semibold focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {{ t('room.score.sectionHeading', { round: n(currentRound) }) }}
-        </h2>
+        <div class="flex items-center justify-between gap-2">
+          <h2
+            id="score-entry-heading"
+            ref="scoreEntryHeading"
+            tabindex="-1"
+            class="focus-visible:ring-ring rounded-sm text-lg font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {{ t('room.score.sectionHeading', { round: n(currentRound) }) }}
+          </h2>
+          <Button
+            v-if="isHost && missingThisRound.length > 0"
+            variant="outline"
+            class="h-11 shrink-0"
+            @click="isEnterAllOpen = true"
+          >
+            <ListChecks aria-hidden="true" class="size-4" />
+            {{ t('room.enterAll.button') }}
+          </Button>
+        </div>
+        <EnterAllScoresSheet
+          v-if="isHost"
+          v-model:open="isEnterAllOpen"
+          :players="missingThisRound"
+          :round="currentRound"
+          :save="handleScoreCommit"
+        />
         <!-- role="list": Tailwind's list reset makes Safari/VoiceOver drop <ul> semantics. -->
         <ul role="list" class="flex flex-col gap-3">
           <ScoreCard

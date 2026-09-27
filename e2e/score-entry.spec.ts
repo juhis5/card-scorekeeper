@@ -68,6 +68,26 @@ test.describe('score entry on a card', () => {
     await expect(nextBar).toHaveCSS('position', 'static')
   })
 
+  test("Enter all takes the host through everyone's points, one field for all", async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: 'Enter all' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Enter points · 1/2' })
+    await expect(sheet.getByLabel("Host's round 1 score")).toBeFocused()
+
+    await page.getByRole('spinbutton').fill('20')
+    await page.getByRole('button', { name: 'Save and next' }).click()
+    await expect(page.getByLabel("Maiju's round 1 score")).toBeFocused()
+    await page.getByRole('spinbutton').fill('10')
+    await page.getByRole('button', { name: 'Save and next' }).click()
+
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Next round' })).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    )
+  })
+
   test('tapping another card saves the open one and opens the one tapped', async ({ page }) => {
     await page.getByRole('button', { name: "Enter Host's score" }).click()
     await page.getByLabel("Host's round 1 score").fill('20')
