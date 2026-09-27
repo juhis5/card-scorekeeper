@@ -14,10 +14,11 @@
  *      "does this device have any finished games at all" (the empty state) and to learn which
  *      `gameId`s to look at next.
  *   2. Every OTHER row from those same games (`where('gameId', 'in', <chunk>)`, chunked to stay
- *      under Firestore's `in`-clause limit) — this is what gives head-to-head its opponents. The
- *      matching `game_result` docs (`documentId() in <chunk>`) are fetched alongside for their
- *      `finishedAt`, the only way to pick the "most recent" `displayName` per opponent uid
- *      (`game_player` itself carries no timestamp). Both stay bounded by "games THIS device
+ *      under Firestore's `in`-clause limit) — this is what gives head-to-head its opponents. This
+ *      device's `game_result` docs (`participantUids array-contains uid`) are fetched alongside for
+ *      their `finishedAt`, the only way to pick the "most recent" `displayName` per opponent uid
+ *      (`game_player` itself carries no timestamp). Not `documentId() in <chunk>`: production
+ *      Firestore refuses that combined with the participant filter, though the emulator allows it. Both stay bounded by "games THIS device
  *      played", never the whole collection — the one accepted inefficiency is that step 2
  *      re-reads this device's own rows too (querying by `gameId` returns every participant); for
  *      a hobby-scale game count that's still tiny, and avoiding it would need a compound filter
@@ -38,10 +39,8 @@ import { headToHead, playerStats } from '@/lib/stats'
 import type { HeadToHeadRecord, PlayerStats } from '@/lib/stats'
 import type { GamePlayer, GameResult } from '@/lib/types'
 
-/** Firestore's `in` operator caps how many values one query can compare against. The documented
- * ceiling has moved over time (10, then 30) — chunk well under either rather than assume the
- * current one. */
-const IN_QUERY_CHUNK_SIZE = 10
+/** Firestore's `in` operator compares against at most 30 values per query. */
+const IN_QUERY_CHUNK_SIZE = 30
 
 export type StatsStatus = 'loading' | 'loaded' | 'empty' | 'error'
 
@@ -117,7 +116,7 @@ export const useStatsStore = defineStore('stats', () => {
     try {
       const [
         { getDb, getFirebaseAuth, ensureSignedIn, checkBackendReachable },
-        { collection, query, where, getDocs, documentId },
+        { collection, query, where, getDocs },
       ] = await Promise.all([import('@/lib/firebase'), import('firebase/firestore')])
 
       const db = getDb()
@@ -151,7 +150,7 @@ export const useStatsStore = defineStore('stats', () => {
         IN_QUERY_CHUNK_SIZE,
       )
 
-      const [playerSnapshots, resultSnapshots] = await Promise.all([
+      const [playerSnapshots, resultSnapshot] = await Promise.all([
         Promise.all(
           gameIdChunks.map((ids) =>
             getDocs(
@@ -159,13 +158,7 @@ export const useStatsStore = defineStore('stats', () => {
             ),
           ),
         ),
-        Promise.all(
-          gameIdChunks.map((ids) =>
-            getDocs(
-              query(collection(db, 'game_result'), where(documentId(), 'in', ids), asParticipant),
-            ),
-          ),
-        ),
+        getDocs(query(collection(db, 'game_result'), asParticipant)),
       ])
 
       const rowsByDocId = new Map<string, GamePlayer>()
@@ -177,10 +170,8 @@ export const useStatsStore = defineStore('stats', () => {
       const allRows = [...rowsByDocId.values()]
 
       const finishedAtByGameId = new Map<string, string>()
-      for (const snapshot of resultSnapshots) {
-        for (const snapshotDoc of snapshot.docs) {
-          finishedAtByGameId.set(snapshotDoc.id, (snapshotDoc.data() as GameResult).finishedAt)
-        }
+      for (const snapshotDoc of resultSnapshot.docs) {
+        finishedAtByGameId.set(snapshotDoc.id, (snapshotDoc.data() as GameResult).finishedAt)
       }
 
       stats.value = playerStats(uid, allRows)

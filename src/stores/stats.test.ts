@@ -26,19 +26,23 @@ const whereMock = vi.fn((field: string, op: string, value: unknown): WhereClause
   value,
 }))
 const collectionMock = vi.fn((_db: unknown, path: string) => ({ collectionPath: path }))
-const queryMock = vi.fn((base: { collectionPath: string }, clause: WhereClause) => ({
-  collectionPath: base.collectionPath,
-  clause,
-}))
-const documentIdMock = vi.fn(() => '__name__')
+interface FakeQuery {
+  collectionPath: string
+  clauses: WhereClause[]
+}
+const queryMock = vi.fn(
+  (base: { collectionPath: string }, ...clauses: WhereClause[]): FakeQuery => ({
+    collectionPath: base.collectionPath,
+    clauses,
+  }),
+)
 const getDocsMock = vi.fn()
 
 vi.mock('firebase/firestore', () => ({
   collection: (db: unknown, path: string) => collectionMock(db, path),
-  query: (base: unknown, clause: unknown) =>
-    queryMock(base as { collectionPath: string }, clause as WhereClause),
+  query: (base: unknown, ...clauses: unknown[]) =>
+    queryMock(base as { collectionPath: string }, ...(clauses as WhereClause[])),
   where: (field: string, op: string, value: unknown) => whereMock(field, op, value),
-  documentId: () => documentIdMock(),
   getDocs: (ref: unknown) => getDocsMock(ref),
 }))
 
@@ -117,22 +121,31 @@ function resultDocsFor(gameIds: string[]) {
   }
 }
 
-/** Dispatches a mocked getDocs call by inspecting the fake query's collection path + where clause
+function clauseOn(query: FakeQuery, field: string): WhereClause | undefined {
+  return query.clauses.find((clause) => clause.field === field)
+}
+
+/** Dispatches a mocked getDocs call by inspecting the fake query's collection path + where clauses
  * — robust to call order/chunking, unlike a fixed mockResolvedValueOnce chain. */
 function installFixtureGetDocs(rows: GamePlayer[] = ALL_ROWS): void {
-  getDocsMock.mockImplementation(async (ref: { collectionPath: string; clause: WhereClause }) => {
-    const { collectionPath, clause } = ref
-    if (collectionPath === 'game_player' && clause.field === 'deviceUuid') {
-      return docsFor(rows.filter((row) => row.deviceUuid === clause.value))
+  getDocsMock.mockImplementation(async (query: FakeQuery) => {
+    const byDevice = clauseOn(query, 'deviceUuid')
+    const byGame = clauseOn(query, 'gameId')
+    const byParticipant = clauseOn(query, 'participantUids')
+    if (query.collectionPath === 'game_player' && byDevice) {
+      return docsFor(rows.filter((row) => row.deviceUuid === byDevice.value))
     }
-    if (collectionPath === 'game_player' && clause.field === 'gameId') {
-      const ids = clause.value as string[]
+    if (query.collectionPath === 'game_player' && byGame) {
+      const ids = byGame.value as string[]
       return docsFor(rows.filter((row) => ids.includes(row.gameId)))
     }
-    if (collectionPath === 'game_result') {
-      return resultDocsFor(clause.value as string[])
+    if (query.collectionPath === 'game_result' && byParticipant && query.clauses.length === 1) {
+      const playedGameIds = rows
+        .filter((row) => row.deviceUuid === byParticipant.value)
+        .map((row) => row.gameId)
+      return resultDocsFor(playedGameIds)
     }
-    throw new Error(`unexpected query: ${collectionPath} / ${clause.field}`)
+    throw new Error(`unexpected query: ${JSON.stringify(query)}`)
   })
 }
 
@@ -214,9 +227,27 @@ describe('useStatsStore.load — success', () => {
     expect(statsStore.opponents.at(0)?.displayName).toBe('Bob (game 2)')
   })
 
+  it('loads game results by participant, never by document id', async () => {
+    // Production Firestore refuses `documentId() in [...]` combined with the participant filter
+    // (permission-denied), although the emulator allows it.
+    ensureSignedInMock.mockResolvedValue(ME)
+    installFixtureGetDocs()
+    const statsStore = useStatsStore()
+
+    await statsStore.load()
+
+    expect(statsStore.status).toBe('loaded')
+    const clauses = whereMock.mock.results.map((result) => result.value as WhereClause)
+    expect(clauses.some((clause) => clause.field === '__name__')).toBe(false)
+    expect(queryMock).toHaveBeenCalledWith(
+      { collectionPath: 'game_result' },
+      { field: 'participantUids', op: 'array-contains', value: ME },
+    )
+  })
+
   it('chunks gameId queries so a device with more games than the `in`-clause limit still loads all of them', async () => {
     ensureSignedInMock.mockResolvedValue(ME)
-    const manyGames: GamePlayer[] = Array.from({ length: 12 }, (_, index) => ({
+    const manyGames: GamePlayer[] = Array.from({ length: 35 }, (_, index) => ({
       gameId: `many-${index}`,
       deviceUuid: ME,
       displayName: 'Me',
@@ -231,14 +262,14 @@ describe('useStatsStore.load — success', () => {
     await statsStore.load()
 
     expect(statsStore.status).toBe('loaded')
-    expect(statsStore.stats?.gamesPlayed).toBe(12)
-    // Every `in` query (game_player-by-gameId and game_result) stayed within the chunk size.
+    expect(statsStore.stats?.gamesPlayed).toBe(35)
+    // Two game_player-by-gameId queries, each within Firestore's 30-value `in` limit.
     const inCalls = whereMock.mock.results
       .map((result) => result.value as WhereClause)
       .filter((clause) => clause.op === 'in')
-    expect(inCalls.length).toBeGreaterThan(0)
+    expect(inCalls).toHaveLength(2)
     for (const call of inCalls) {
-      expect((call.value as string[]).length).toBeLessThanOrEqual(10)
+      expect((call.value as string[]).length).toBeLessThanOrEqual(30)
     }
   })
 })

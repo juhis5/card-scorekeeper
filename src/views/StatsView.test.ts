@@ -29,16 +29,20 @@ interface WhereClause {
   value: unknown
 }
 
+interface FakeQuery {
+  collectionPath: string
+  clauses: WhereClause[]
+}
+
 const getDocsMock = vi.fn()
 
 vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, path: string) => ({ collectionPath: path }),
-  query: (base: { collectionPath: string }, clause: WhereClause) => ({
+  query: (base: { collectionPath: string }, ...clauses: WhereClause[]): FakeQuery => ({
     collectionPath: base.collectionPath,
-    clause,
+    clauses,
   }),
   where: (field: string, op: string, value: unknown): WhereClause => ({ field, op, value }),
-  documentId: () => '__name__',
   getDocs: (ref: unknown) => getDocsMock(ref),
 }))
 
@@ -71,19 +75,19 @@ function docsFor(rows: GamePlayer[]) {
 }
 
 function installFixtureGetDocs(rows: GamePlayer[]): void {
-  getDocsMock.mockImplementation(async (ref: { collectionPath: string; clause: WhereClause }) => {
-    const { collectionPath, clause } = ref
-    if (collectionPath === 'game_player' && clause.field === 'deviceUuid') {
+  getDocsMock.mockImplementation(async ({ collectionPath, clauses }: FakeQuery) => {
+    const [clause] = clauses
+    if (collectionPath === 'game_player' && clause?.field === 'deviceUuid') {
       return docsFor(rows.filter((row) => row.deviceUuid === clause.value))
     }
-    if (collectionPath === 'game_player' && clause.field === 'gameId') {
+    if (collectionPath === 'game_player' && clause?.field === 'gameId') {
       const ids = clause.value as string[]
       return docsFor(rows.filter((row) => ids.includes(row.gameId)))
     }
-    if (collectionPath === 'game_result') {
-      const ids = clause.value as string[]
+    if (collectionPath === 'game_result' && clause?.field === 'participantUids') {
+      const gameIds = rows.filter((row) => row.deviceUuid === clause.value).map((row) => row.gameId)
       return {
-        docs: ids.map((gameId) => ({
+        docs: gameIds.map((gameId) => ({
           id: gameId,
           data: () => ({ finishedAt: '2026-01-01T00:00:00.000Z' }),
         })),
