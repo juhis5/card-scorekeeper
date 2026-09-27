@@ -9,46 +9,37 @@ beforeEach(() => {
 })
 
 describe('ThemeToggle', () => {
-  it('reflects the dark default as pressed, with a stable accessible name', () => {
+  it('is a switch named by its row, on for the dark default', () => {
     render(ThemeToggle, { global: { plugins: [i18n] } })
 
-    const button = screen.getByRole('button', { name: 'Dark mode' })
-    expect(button.getAttribute('aria-pressed')).toBe('true')
+    const toggle = screen.getByRole('switch', { name: 'Dark mode' })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
   })
 
-  it('reflects a stored light preference as not pressed', () => {
+  it('is off for a stored light preference', () => {
     localStorage.setItem('theme', 'light')
 
     render(ThemeToggle, { global: { plugins: [i18n] } })
 
-    const button = screen.getByRole('button', { name: 'Dark mode' })
-    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(screen.getByRole('switch', { name: 'Dark mode' }).getAttribute('aria-checked')).toBe(
+      'false',
+    )
   })
 
-  it('toggles the dark class, persists the choice, and flips the pressed state on click', async () => {
+  it('flips the theme and persists it when the row is tapped, not only the switch', async () => {
     render(ThemeToggle, { global: { plugins: [i18n] } })
-    const button = screen.getByRole('button', { name: 'Dark mode' })
+    const toggle = screen.getByRole('switch', { name: 'Dark mode' })
 
-    await fireEvent.click(button)
+    await fireEvent.click(screen.getByText('Dark mode'))
 
-    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(document.documentElement.classList.contains('dark')).toBe(false)
     expect(localStorage.getItem('theme')).toBe('light')
 
-    await fireEvent.click(button)
+    await fireEvent.click(toggle)
 
-    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
     expect(document.documentElement.classList.contains('dark')).toBe(true)
     expect(localStorage.getItem('theme')).toBe('dark')
-  })
-
-  it('is keyboard-operable as a native button (no custom key handling needed)', () => {
-    render(ThemeToggle, { global: { plugins: [i18n] } })
-
-    const button = screen.getByRole('button', { name: 'Dark mode' })
-    // A real <button> gets Enter/Space activation and focus for free — assert the element is
-    // actually a native button rather than a styled div standing in for one.
-    expect(button.tagName).toBe('BUTTON')
-    expect(button.getAttribute('type')).toBe('button')
   })
 })

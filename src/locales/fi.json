@@ -5,7 +5,8 @@
       "label": "Tumma tila"
     },
     "locale": {
-      "switchLabel": "{code} — vaihda kieltä napauttamalla"
+      "name": "Suomi",
+      "switchHint": "vaihda napauttamalla"
     },
     "update": {
       "available": "Uusi versio on saatavilla.",
@@ -18,7 +19,20 @@
       "description": "Sivut ja asetukset",
       "pages": "Sivut",
       "home": "Etusivu",
-      "language": "Kieli"
+      "language": "Kieli",
+      "settings": "Asetukset"
+    },
+    "install": {
+      "label": "Asenna sovellus",
+      "steps": {
+        "iosSafariShare": "Napauta Jaa-painiketta (neliö, josta nuoli ylös) näytön alareunassa tai ⋯-valikossa.",
+        "iosChromeShare": "Napauta Jaa-painiketta (neliö, josta nuoli ylös) osoiterivin oikeassa reunassa.",
+        "iosOtherShare": "Avaa selaimen valikko ja napauta Jaa.",
+        "iosAdd": "Valitse Lisää Koti-valikkoon.",
+        "androidMenu": "Avaa selaimen valikko (⋮).",
+        "androidAdd": "Valitse Asenna sovellus tai Lisää aloitusnäytölle."
+      },
+      "after": "Sen jälkeen Rommi aukeaa aloitusnäytöltä kuin sovellus."
     }
   },
   "nav": {

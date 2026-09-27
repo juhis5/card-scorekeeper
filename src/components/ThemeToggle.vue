@@ -1,31 +1,28 @@
 <script setup lang="ts">
 /**
- * Single job: an accessible dark/light toggle, in the app menu (deferred from slice 3 — see
- * docs/DECISIONS.md). A real `<button>` with `aria-pressed` (not a text-changing label) so the
- * accessible name stays stable ("Dark mode") while `aria-pressed` carries the on/off state — the
- * Moon/Sun icon swap is the visible, non-color-only echo of the same state (a11y-mobile: never
- * color alone).
+ * Single job: the app menu's dark mode row (third playtest: settings as whole tappable rows). The
+ * row is the switch's label, so a tap anywhere on it flips the theme; the switch itself carries the
+ * on/off state to screen readers (`role="switch"`) and shows it by the thumb's position, not by
+ * color alone (a11y-mobile).
  */
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Moon, Sun } from '@lucide/vue'
-import { Button } from '@/components/ui/button'
+import { MENU_ROW_CLASS } from '@/components/menu-row'
+import { Switch } from '@/components/ui/switch'
 import { useTheme } from '@/composables/useTheme'
 
 const { t } = useI18n()
-const { theme, toggleTheme } = useTheme()
+const { theme, setTheme } = useTheme()
+const switchId = useId()
+
+function handleChange(isDark: boolean): void {
+  setTheme(isDark ? 'dark' : 'light')
+}
 </script>
 
 <template>
-  <Button
-    type="button"
-    variant="ghost"
-    size="icon"
-    class="size-11"
-    :aria-pressed="theme === 'dark'"
-    :aria-label="t('app.theme.label')"
-    @click="toggleTheme"
-  >
-    <Moon v-if="theme === 'dark'" aria-hidden="true" class="size-4" />
-    <Sun v-else aria-hidden="true" class="size-4" />
-  </Button>
+  <label :for="switchId" :class="[MENU_ROW_CLASS, 'cursor-pointer']">
+    <span>{{ t('app.theme.label') }}</span>
+    <Switch :id="switchId" :model-value="theme === 'dark'" @update:model-value="handleChange" />
+  </label>
 </template>

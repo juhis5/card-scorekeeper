@@ -2,14 +2,17 @@
 /**
  * Single job: the app menu, a side panel from the right. The header has room only for Back, the
  * room code and this button, so everything else lives here: the app's name (nothing else on
- * screen names it), the pages (Home, Stats, Rules), and the language and theme settings. Reka's dialog traps focus
+ * screen names it), the pages (Home, Stats, Rules), the language and theme settings, and installing
+ * the app. Every row is one whole-width tap target (third playtest). Reka's dialog traps focus
  * while it's open and returns it to the menu button when it closes; following a link closes it.
  */
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { ChevronRight, Menu, X } from '@lucide/vue'
+import InstallAppRow from '@/components/InstallAppRow.vue'
 import LocaleToggle from '@/components/LocaleToggle.vue'
+import { MENU_ROW_CLASS } from '@/components/menu-row'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,8 +24,10 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useInstallStore } from '@/stores/install'
 
 const { t } = useI18n()
+const install = useInstallStore()
 const isOpen = ref(false)
 
 const pages = [
@@ -59,11 +64,7 @@ function close(): void {
       <nav :aria-label="t('app.menu.pages')">
         <ul role="list">
           <li v-for="page in pages" :key="page.name" class="border-border border-b">
-            <RouterLink
-              :to="{ name: page.name }"
-              class="text-foreground hover:bg-muted focus-visible:ring-ring flex h-12 items-center justify-between px-4 text-base focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
-              @click="close"
-            >
+            <RouterLink :to="{ name: page.name }" :class="MENU_ROW_CLASS" @click="close">
               {{ t(page.labelKey) }}
               <ChevronRight aria-hidden="true" class="text-muted-foreground size-4" />
             </RouterLink>
@@ -71,14 +72,11 @@ function close(): void {
         </ul>
       </nav>
 
-      <div class="border-border flex items-center justify-between border-b py-1 pr-1 pl-4">
-        <span class="text-base">{{ t('app.menu.language') }}</span>
-        <LocaleToggle />
-      </div>
-      <div class="border-border flex items-center justify-between border-b py-1 pr-1 pl-4">
-        <span class="text-base" aria-hidden="true">{{ t('app.theme.label') }}</span>
-        <ThemeToggle />
-      </div>
+      <ul role="list" :aria-label="t('app.menu.settings')">
+        <li class="border-border border-b"><LocaleToggle /></li>
+        <li class="border-border border-b"><ThemeToggle /></li>
+        <li v-if="install.isAvailable" class="border-border border-b"><InstallAppRow /></li>
+      </ul>
     </SheetContent>
   </Sheet>
 </template>

@@ -24,8 +24,8 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Card Scorekeeper',
-        short_name: 'Scores',
+        name: 'Rommi',
+        short_name: 'Rommi',
         description: 'Live scorekeeper for Rommi (Finnish Rummy)',
         theme_color: '#0b0f14',
         background_color: '#0b0f14',

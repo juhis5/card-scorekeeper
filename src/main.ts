@@ -8,6 +8,7 @@ import App from './App.vue'
 import router from './router'
 import { i18n } from './i18n'
 import { useIdentityStore } from './stores/identity'
+import { useInstallStore } from './stores/install'
 import { flushPendingResultsOnLaunch } from './lib/reconnect-flush'
 
 const app = createApp(App)
@@ -19,6 +20,8 @@ app.use(pinia)
 // Assign the per-device identity before the router's first navigation guard runs (it checks
 // `deviceUuid` for `requiresIdentity` routes) — see the identity store and routing skill.
 useIdentityStore().ensureDeviceUuid()
+// Before mount: the browser's install prompt can fire before the menu is ever opened.
+useInstallStore().listen(window)
 
 app.use(router)
 app.use(i18n)
