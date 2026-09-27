@@ -1,14 +1,20 @@
 /**
- * Moves an open card clear of the sticky header (`data-app-header`) and a room's bottom bar
- * (`data-bottom-bar`), once, when it opens. Call `reveal()` before focusing the card's field, so
- * the phone's own keyboard scrolling runs last and has the final say.
+ * Places a card as it opens, before its field is focused. On a touch screen it goes up to just
+ * under the sticky header (`data-app-header`): a phone doesn't scroll a field it focuses from code
+ * out from behind its keyboard (only one the finger tapped), and the keyboard only ever covers the
+ * lower part of the screen (third playtest, iPhone: the lowest cards' fields stayed hidden). With a
+ * mouse it just moves clear of the header and a room's bottom bar (`data-bottom-bar`).
  *
  * Deliberately not a resize listener. Following window.visualViewport while the keyboard was up
  * fought the player's own scrolling on an iPhone, whose visual viewport also resizes while
  * scrolling (the toolbars sliding in and out): the page jumped back mid-scroll (third playtest).
  */
 import type { Ref } from 'vue'
-import { scrollToReveal, type VerticalBox } from '@/lib/keep-in-view'
+import { scrollToReveal, scrollToTop, type VerticalBox } from '@/lib/keep-in-view'
+
+function isTouchScreen(): boolean {
+  return window.matchMedia?.('(pointer: coarse)').matches ?? false
+}
 
 function visibleArea(): VerticalBox {
   const viewport = window.visualViewport
@@ -30,7 +36,11 @@ export function useKeepInView(element: Ref<HTMLElement | null>) {
     const target = element.value
     if (!target) return
     const visible = visibleArea()
-    const distance = scrollToReveal(target.getBoundingClientRect(), visible, coveredEdges(visible))
+    const box = target.getBoundingClientRect()
+    const edges = coveredEdges(visible)
+    const distance = isTouchScreen()
+      ? scrollToTop(box, visible, edges)
+      : scrollToReveal(box, visible, edges)
     if (distance !== 0) window.scrollBy({ top: distance })
   }
 

@@ -22,3 +22,17 @@ export function scrollToReveal(
   if (element.bottom <= roomBottom) return 0
   return Math.min(element.bottom - roomBottom, element.top - roomTop)
 }
+
+/** A little air between the header and the element brought up under it, in px. */
+const GAP_UNDER_HEADER = 8
+
+/** How far to scroll so the element sits just under the header. On a phone an opening card goes
+ * there before its field is focused, so the keyboard, which only ever covers the lower part of
+ * the screen, never covers the field. */
+export function scrollToTop(
+  element: VerticalBox,
+  visible: VerticalBox,
+  margins: { top: number },
+): number {
+  return element.top - (visible.top + margins.top + GAP_UNDER_HEADER)
+}

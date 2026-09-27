@@ -103,3 +103,27 @@ test.describe('score entry on a card', () => {
     expect((await localGameWrites(page)) - writesBefore).toBe(1)
   })
 })
+
+test.describe('score entry on a touch screen', () => {
+  test("an opening card comes up to the top half, where the keyboard won't cover its field", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 740 },
+      hasTouch: true,
+    })
+    try {
+      const page = await context.newPage()
+      await startLocalGame(page)
+
+      await maijuCard(page).tap()
+
+      const field = page.getByLabel("Maiju's round 1 score")
+      await expect(field).toBeFocused()
+      const box = await field.boundingBox()
+      expect((box?.y ?? 740) + (box?.height ?? 0)).toBeLessThan(740 / 2)
+    } finally {
+      await context.close()
+    }
+  })
+})
