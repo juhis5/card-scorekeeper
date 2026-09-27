@@ -64,10 +64,6 @@ export interface GameResult {
   gameId: string
   finishedAt: string
   totalRounds: number
-  /** A single id, mirroring docs/PLAN.md's data model. When the game ends in a tie, every
-   * co-winner has `placement === 1` on their own `GamePlayer` row — that's the source of
-   * truth for ties, not this field. */
-  winnerUuid: string
 }
 
 /** One row per player per finished game — powers stats and head-to-head derivation. */

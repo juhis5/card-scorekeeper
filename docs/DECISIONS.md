@@ -393,3 +393,18 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     "Playing a local game on this device…" instead of claiming "You're offline".
   - Still open: a snapshot-metadata "not synced yet" indicator (sync-7) and showing the
     failed-results list.
+- 2026-09-27 — Review round 4, stats you can trust:
+  - Every `game_result`/`game_player` doc carries `participantUids` (the players' auth uids, from
+    the rows' `deviceUuid`). Only participants can get or list; the stats store filters
+    `array-contains uid` on every query. This replaces the "reads open to any authed user"
+    decision: that audience was anyone with the public config, not friends.
+  - Namespaces: room ids must be room codes, local game ids must be UUIDs, so neither can squat
+    the other's stats. A local result's participants must be exactly its writer, and only a
+    participant can add a row, which closes the head-to-head injection.
+  - Rooms: exact fields and a ≤7 h expiry on create; updates advance one round at a time, finish
+    only in round 5, never reopen. Round scores: seated writer, running game, started round; a
+    player may create a missed round but only the host updates an earlier one.
+  - `GameResult.winnerUuid` dropped (never read, wrong identity namespace); placement rules.
+  - Security headers in `vercel.json`; the CSP is Report-Only until a preview deploy is checked.
+  - Deferred to deploy time: App Check, and a room TTL. Online stats are keyed by room code, which
+    is safe only while rooms are never deleted; a TTL would need a per-game id first.

@@ -11,13 +11,7 @@
  * `pending-results.ts`'s `flushPendingResults` uploads them once the app is next online (see
  * docs/DECISIONS.md's "Reconnect = push final result only").
  */
-import {
-  TOTAL_ROUNDS,
-  contractForRound,
-  placements as placementsFor,
-  runningTotal,
-  winners as leadingPlayers,
-} from './rules'
+import { TOTAL_ROUNDS, contractForRound, placements as placementsFor, runningTotal } from './rules'
 import { bestAndWorstRound } from './stats'
 import { appendPendingResult } from './pending-results'
 import { browserLocalStorage } from './key-value-storage'
@@ -44,13 +38,10 @@ interface StoredGame {
   /** Not enforced in local mode (single device, single host) — kept so a future permission
    * model (or a shared-device edge case) has it available without a repository change. */
   hostDeviceUuid: string
-  /** The host's seated playerId — kept alongside (not inside) GameState, like
-   * `deviceUuidByPlayerId` below, so a resumed repository can report it back to the game store
-   * (see `getResumeInfo`) without `createGame()` having run in this process. */
+  /** The host's seated playerId — kept alongside (not inside) GameState, so a resumed repository
+   * can report it back to the game store (see `getResumeInfo`) without `createGame()` having run
+   * in this process. */
   hostPlayerId: PlayerId
-  /** playerId -> deviceUuid. Kept alongside (not inside) GameState so the pure Player type
-   * doesn't carry device identity — only this repository needs it, to report a winnerUuid. */
-  deviceUuidByPlayerId: Record<PlayerId, string>
   state: GameState
 }
 
@@ -63,7 +54,6 @@ function emptyStoredGame(): StoredGame {
     gameId: '',
     hostDeviceUuid: '',
     hostPlayerId: '',
-    deviceUuidByPlayerId: {},
     state: initialGameState(),
   }
 }
@@ -120,7 +110,6 @@ function isStoredGame(value: unknown): value is StoredGame {
     typeof value.gameId === 'string' &&
     typeof value.hostDeviceUuid === 'string' &&
     typeof value.hostPlayerId === 'string' &&
-    isRecord(value.deviceUuidByPlayerId) &&
     isGameState(value.state)
   )
 }
@@ -176,7 +165,6 @@ export class LocalGameRepository implements GameRepository {
       gameId,
       hostDeviceUuid: config.hostDeviceUuid,
       hostPlayerId,
-      deviceUuidByPlayerId: { [hostPlayerId]: config.hostDeviceUuid },
       state: { ...initialGameState(), players: [hostPlayer] },
     }
     this.persistAndNotify()
@@ -199,7 +187,6 @@ export class LocalGameRepository implements GameRepository {
     const playerId = this.newId()
     this.game = {
       ...this.game,
-      deviceUuidByPlayerId: { ...this.game.deviceUuidByPlayerId, [playerId]: input.deviceUuid },
       state: {
         ...this.game.state,
         players: [...this.game.state.players, { id: playerId, name: input.name, totalScore: 0 }],
@@ -238,13 +225,9 @@ export class LocalGameRepository implements GameRepository {
     if (playerId === this.game.hostPlayerId) {
       throw new Error("removePlayer: the host's own seat can't be removed")
     }
-    const deviceUuidByPlayerId = Object.fromEntries(
-      Object.entries(this.game.deviceUuidByPlayerId).filter(([id]) => id !== playerId),
-    )
     const { players, roundScores } = this.game.state
     this.game = {
       ...this.game,
-      deviceUuidByPlayerId,
       state: {
         ...this.game.state,
         players: players.filter((player) => player.id !== playerId),
@@ -275,13 +258,10 @@ export class LocalGameRepository implements GameRepository {
     this.game = { ...this.game, state: { ...this.game.state, status: 'finished' } }
     this.persistAndNotify()
 
-    const [leader] = leadingPlayers(this.game.state.players)
-    const winnerUuid = leader ? (this.game.deviceUuidByPlayerId[leader.player.id] ?? '') : ''
     const result: GameResult = {
       gameId: this.game.gameId,
       finishedAt: this.now(),
       totalRounds: TOTAL_ROUNDS,
-      winnerUuid,
     }
 
     // No network here (offline by construction): queue the permanent record for the reconnect

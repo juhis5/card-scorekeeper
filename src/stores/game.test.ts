@@ -84,7 +84,7 @@ class FakeGameRepository implements GameRepository {
 
   async finishGame(): Promise<GameResult> {
     this.emit({ ...this.state, status: 'finished' })
-    return { gameId: 'fake-game', finishedAt: 'now', totalRounds: 5, winnerUuid: 'device-a' }
+    return { gameId: 'fake-game', finishedAt: 'now', totalRounds: 5 }
   }
 
   leave(): void {
@@ -351,9 +351,8 @@ describe('useGameStore.finishGame', () => {
     const repository = new FakeGameRepository()
     await game.start(repository, HOST_CONFIG)
 
-    const result = await game.finishGame()
+    await game.finishGame()
 
-    expect(result.winnerUuid).toBe('device-a')
     expect(game.status).toBe('finished')
   })
 })
@@ -436,9 +435,8 @@ describe('useGameStore full game flow with LocalGameRepository', () => {
       if (round < 5) await game.advanceRound()
     }
 
-    const result = await game.finishGame()
+    await game.finishGame()
 
-    expect(result.winnerUuid).toBe('device-a')
     expect(game.standings.map((s) => s.player.name)).toEqual(['Alice', 'Carol', 'Bob', 'Host'])
     expect(game.winners.map((s) => s.player.name)).toEqual(['Alice'])
     expect(game.status).toBe('finished')

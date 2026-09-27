@@ -168,7 +168,7 @@ class FakeOnlineRepository implements GameRepository {
   async finishGame(): Promise<GameResult> {
     this.state = { ...this.state, status: 'finished' }
     this.emit()
-    return { gameId: this.roomCode, finishedAt: 'now', totalRounds: 5, winnerUuid: '' }
+    return { gameId: this.roomCode, finishedAt: 'now', totalRounds: 5 }
   }
 
   leave(): void {

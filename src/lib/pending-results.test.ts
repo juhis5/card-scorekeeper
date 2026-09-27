@@ -36,7 +36,6 @@ function pendingResult(gameId: string, deviceUuid = 'device-a'): PendingResult {
       gameId,
       finishedAt: '2026-01-01T00:00:00.000Z',
       totalRounds: 5,
-      winnerUuid: deviceUuid,
     },
     players: [
       {

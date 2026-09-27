@@ -26,7 +26,11 @@
 import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore'
 import type { GamePlayer, GameResult } from './types'
 
-async function ensureGameResultWritten(db: Firestore, result: GameResult): Promise<void> {
+async function ensureGameResultWritten(
+  db: Firestore,
+  result: GameResult,
+  participantUids: string[],
+): Promise<void> {
   const ref = doc(db, `game_result/${result.gameId}`)
   const existing = await getDoc(ref)
   if (existing.exists()) return
@@ -34,16 +38,21 @@ async function ensureGameResultWritten(db: Firestore, result: GameResult): Promi
     gameId: result.gameId,
     finishedAt: result.finishedAt,
     totalRounds: result.totalRounds,
-    winnerUuid: result.winnerUuid,
+    participantUids,
   })
 }
 
-async function ensureGamePlayerWritten(db: Firestore, player: GamePlayer): Promise<void> {
+async function ensureGamePlayerWritten(
+  db: Firestore,
+  player: GamePlayer,
+  participantUids: string[],
+): Promise<void> {
   const ref = doc(db, `game_player/${player.gameId}_${player.deviceUuid}`)
   const existing = await getDoc(ref)
   if (existing.exists()) return
   await setDoc(ref, {
     gameId: player.gameId,
+    participantUids,
     deviceUuid: player.deviceUuid,
     displayName: player.displayName,
     finalScore: player.finalScore,
@@ -62,6 +71,9 @@ export async function writeGameResult(
   result: GameResult,
   players: GamePlayer[],
 ): Promise<void> {
-  await ensureGameResultWritten(db, result)
-  await Promise.all(players.map((player) => ensureGamePlayerWritten(db, player)))
+  // Every doc names the game's players (their auth uids, which is what `deviceUuid` holds on
+  // these rows), so firestore.rules can show a result only to the people who played it.
+  const participantUids = players.map((player) => player.deviceUuid)
+  await ensureGameResultWritten(db, result, participantUids)
+  await Promise.all(players.map((player) => ensureGamePlayerWritten(db, player, participantUids)))
 }

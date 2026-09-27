@@ -151,14 +151,13 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
 
     const result = await hostRepo.finishGame()
     expect(result.gameId).toBe(roomCode)
-    expect(result.winnerUuid).toBe('device-a')
 
     const gameResultDoc = await getDoc(doc(host.db, `game_result/${roomCode}`))
     expect(gameResultDoc.exists()).toBe(true)
     expect(gameResultDoc.data()).toMatchObject({
       gameId: roomCode,
       totalRounds: 5,
-      winnerUuid: 'device-a',
+      participantUids: expect.arrayContaining([created.hostPlayerId, aliceUid]),
     })
 
     // deviceUuid on these permanent rows is each participant's own auth uid (room/{code}/players

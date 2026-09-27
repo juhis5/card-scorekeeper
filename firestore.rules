@@ -38,6 +38,23 @@ service cloud.firestore {
       return roomData(code).hostUid == request.auth.uid;
     }
 
+    /** A room code: 5 characters from src/lib/room-code.ts's alphabet (no 0/O/1/I). */
+    function isRoomCode(code) {
+      return code is string && code.matches('^[2-9A-HJ-NP-Z]{5}$');
+    }
+
+    /** A local game's id: a crypto.randomUUID(). Disjoint from room codes, so a local result can
+     * never squat a room code's stats, and a room can never be minted at a local game's id. */
+    function isLocalGameId(gameId) {
+      return gameId is string
+        && gameId.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+    }
+
+    /** A stats doc is visible only to the players it names (see the stats section below). */
+    function isParticipant() {
+      return request.auth.uid in resource.data.participantUids;
+    }
+
     /** 1..40 characters: MAX_PLAYER_NAME_LENGTH in src/lib/rules.ts (tests/rules pins the pair). */
     function isValidPlayerName(name) {
       return name is string && name.size() >= 1 && name.size() <= 40;
@@ -66,13 +83,19 @@ service cloud.firestore {
       // only ever fetches/subscribes a room by code — never lists the collection.
       allow get: if isSignedIn();
 
-      // Only the creator can mint a room, seeded at round 1 with an honest future expiry.
+      // Only the creator can mint a room, at a real room code, seeded at round 1 with an honest
+      // expiry: in the future, and no later than the 6 h lifetime plus an hour of client clock
+      // skew (an open-ended expiry would defeat "rooms auto-expire").
       allow create: if isSignedIn()
+        && isRoomCode(code)
+        && request.resource.data.keys().hasOnly(['code', 'status', 'currentRound', 'hostUid', 'createdAt', 'expiresAt'])
         && request.resource.data.code == code
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.currentRound == 1
         && request.resource.data.status == 'waiting'
-        && request.resource.data.expiresAt > request.time;
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.expiresAt > request.time
+        && request.resource.data.expiresAt <= request.time + duration.value(7, 'h');
 
       // Only the host advances rounds / finishes the game, and only while the room is live.
       // `resource` (not a get()) is enough here — we're already inside this exact document's
@@ -80,10 +103,20 @@ service cloud.firestore {
       // ever writes here (advanceRound/finishGame): status + currentRound. hostUid/code/
       // createdAt/expiresAt are immutable after create — an unbounded expiry extension would
       // undermine "rooms auto-expire" (docs/PLAN.md's Gemini free-tier protection).
+      // Values too, not just keys: a round outside 1..5 would crash every client's contract
+      // banner, and a finished room must never reopen (the /api photo gate trusts 'finished').
+      // Rounds only move forward one at a time, and the game finishes only in round 5.
       allow update: if isSignedIn()
         && resource.data.hostUid == request.auth.uid
         && resource.data.expiresAt > request.time
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentRound']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentRound'])
+        && resource.data.status != 'finished'
+        && request.resource.data.status in ['waiting', 'playing', 'finished']
+        && request.resource.data.currentRound is int
+        && request.resource.data.currentRound >= resource.data.currentRound
+        && request.resource.data.currentRound <= resource.data.currentRound + 1
+        && request.resource.data.currentRound <= 5
+        && (request.resource.data.status != 'finished' || request.resource.data.currentRound == 5);
 
       allow delete: if false;
 
@@ -132,6 +165,23 @@ service cloud.firestore {
       match /roundScores/{scoreId} {
         allow read: if isSignedIn() && isRoomMember(code);
 
+        function isValidRoundScore(code, scoreId) {
+          return isSignedIn()
+            && roomNotExpired(code)
+            && roomData(code).status != 'finished'
+            && (isRoomMember(code) || isHost(code))
+            && request.resource.data.playerId == request.resource.data.ownerUid
+            && (request.resource.data.ownerUid == request.auth.uid || isHost(code))
+            && request.resource.data.round is int
+            && request.resource.data.round >= 1
+            && request.resource.data.round <= 5
+            && request.resource.data.points is int
+            && request.resource.data.points >= 0
+            && request.resource.data.points <= 1000
+            && request.resource.data.points % 5 == 0
+            && scoreId == request.resource.data.ownerUid + '_' + string(request.resource.data.round);
+        }
+
         // Own-score-only trust model: a player writes their own score; the host may correct
         // anyone's. `playerId == ownerUid` keeps the two fields honest with each other so
         // nobody can write a score doc for a player they aren't, under either field. `points`/
@@ -143,18 +193,14 @@ service cloud.firestore {
         // `isValidRoundScore` in src/lib/rules.ts: `<= 1000` is MAX_ROUND_SCORE and `% 5` is
         // ROUND_SCORE_STEP (every card value is a multiple of 5). Change both sides together;
         // tests/rules pins the parity by importing those constants.
-        allow create, update: if isSignedIn()
-          && roomNotExpired(code)
-          && request.resource.data.playerId == request.resource.data.ownerUid
-          && (request.resource.data.ownerUid == request.auth.uid || isHost(code))
-          && request.resource.data.round is int
-          && request.resource.data.round >= 1
-          && request.resource.data.round <= 5
-          && request.resource.data.points is int
-          && request.resource.data.points >= 0
-          && request.resource.data.points <= 1000
-          && request.resource.data.points % 5 == 0
-          && scoreId == request.resource.data.ownerUid + '_' + string(request.resource.data.round);
+        // Only seated players (or the host) write, only while the game is running, and only for
+        // rounds that have started. A player may fill in a round they missed (create), but only
+        // the host may change an earlier round afterwards, so nobody quietly lowers round 1 in
+        // round 5.
+        allow create: if isValidRoundScore(code, scoreId)
+          && request.resource.data.round <= roomData(code).currentRound;
+        allow update: if isValidRoundScore(code, scoreId)
+          && (request.resource.data.round == roomData(code).currentRound || isHost(code));
 
         // Only as part of the host removing a seat (FirestoreGameRepository.removePlayer).
         allow delete: if isSignedIn() && isHost(code) && roomNotExpired(code);
@@ -166,12 +212,10 @@ service cloud.firestore {
     // and `delete` are always denied, so a written result can never be edited or removed
     // afterward, even by its own writer.
     //
-    // READS are open to any authed user (not room-scoped like players/roundScores above) — this
-    // is intentional, not an oversight: head-to-head derivation (`lib/stats.ts`) must read
-    // OPPONENTS' rows too, not just the caller's own, so a room-membership-style read gate would
-    // break the feature outright. This is safe because these are shared game outcomes among
-    // friends, not sensitive data (see docs/PLAN.md) — and, after the write-side fix below,
-    // forgery is closed at the CREATE rule, not by hiding reads.
+    // READS are limited to participants: every stats doc carries `participantUids` (the auth uids
+    // of the game's players, written by writeGameResult), and only those players can get or list
+    // it. Head-to-head still works because a player's opponents are participants in the same
+    // games. Queries must filter `participantUids array-contains <uid>` to be allowed.
     //
     // Create-authorization trade-off (see docs/DECISIONS.md): when a gameId corresponds to a
     // room that exists (an online game — the common case), only that room's host may write its
@@ -192,29 +236,43 @@ service cloud.firestore {
     // `game_player` additionally requires a matching `game_result` to already exist, so a row can
     // never be created as an orphan pointing at a game that was never (yet) finished.
     match /game_result/{gameId} {
-      allow read: if isSignedIn();
+      // Only the players a result names can read it. `get` of a result that doesn't exist yet is
+      // allowed, so a writer can check before writing (writeGameResult is idempotent).
+      allow get: if isSignedIn() && (resource == null || isParticipant());
+      allow list: if isSignedIn() && isParticipant();
 
       allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['gameId', 'finishedAt', 'totalRounds', 'participantUids'])
         && request.resource.data.gameId == gameId
         && request.resource.data.finishedAt is string
         && request.resource.data.totalRounds is int
         && request.resource.data.totalRounds == 5
-        && request.resource.data.winnerUuid is string
-        && (!roomExists(gameId) || isHost(gameId));
+        && request.resource.data.participantUids is list
+        && request.resource.data.participantUids.size() >= 1
+        && request.resource.data.participantUids.size() <= 50
+        && (
+          (roomExists(gameId) && isHost(gameId))
+          || (!roomExists(gameId)
+            && isLocalGameId(gameId)
+            && request.resource.data.participantUids == [request.auth.uid])
+        );
 
       allow update: if false;
       allow delete: if false;
     }
 
     match /game_player/{playerDocId} {
-      allow read: if isSignedIn();
+      allow get: if isSignedIn() && (resource == null || isParticipant());
+      allow list: if isSignedIn() && isParticipant();
 
       allow create: if isSignedIn()
         && request.resource.data.gameId is string
+        && request.resource.data.participantUids
+          == get(/databases/$(database)/documents/game_result/$(request.resource.data.gameId)).data.participantUids
         && request.resource.data.deviceUuid is string
         && playerDocId == request.resource.data.gameId + '_' + request.resource.data.deviceUuid
         && exists(/databases/$(database)/documents/game_result/$(request.resource.data.gameId))
-        && request.resource.data.displayName is string
+        && isValidPlayerName(request.resource.data.displayName)
         && request.resource.data.finalScore is int
         && request.resource.data.finalScore >= 0
         && request.resource.data.finalScore <= 5000 // TOTAL_ROUNDS * MAX_ROUND_SCORE
@@ -234,7 +292,8 @@ service cloud.firestore {
               /databases/$(database)/documents/room/$(request.resource.data.gameId)/players/$(request.resource.data.deviceUuid)
             ))
           || (!roomExists(request.resource.data.gameId)
-            && request.resource.data.deviceUuid == request.auth.uid)
+            && request.resource.data.deviceUuid == request.auth.uid
+            && request.auth.uid in request.resource.data.participantUids)
         );
 
       allow update: if false;

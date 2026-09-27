@@ -131,8 +131,11 @@ export const useStatsStore = defineStore('stats', () => {
 
       const uid = await ensureSignedIn()
 
+      // Every stats query filters on participantUids: firestore.rules only lets a player list
+      // rows of games they played, and a query must prove that to be allowed.
+      const asParticipant = where('participantUids', 'array-contains', uid)
       const ownSnapshot = await getDocs(
-        query(collection(db, 'game_player'), where('deviceUuid', '==', uid)),
+        query(collection(db, 'game_player'), where('deviceUuid', '==', uid), asParticipant),
       )
       const ownRows = ownSnapshot.docs.map((snapshotDoc) => snapshotDoc.data() as GamePlayer)
 
@@ -151,12 +154,16 @@ export const useStatsStore = defineStore('stats', () => {
       const [playerSnapshots, resultSnapshots] = await Promise.all([
         Promise.all(
           gameIdChunks.map((ids) =>
-            getDocs(query(collection(db, 'game_player'), where('gameId', 'in', ids))),
+            getDocs(
+              query(collection(db, 'game_player'), where('gameId', 'in', ids), asParticipant),
+            ),
           ),
         ),
         Promise.all(
           gameIdChunks.map((ids) =>
-            getDocs(query(collection(db, 'game_result'), where(documentId(), 'in', ids))),
+            getDocs(
+              query(collection(db, 'game_result'), where(documentId(), 'in', ids), asParticipant),
+            ),
           ),
         ),
       ])

@@ -24,6 +24,7 @@ SPA fallback for Vue Router without swallowing the API:
 ```
 
 - If you skip photo-count entirely, there's no `/api`, and a plain SPA rewrite (`/(.*) → /index.html`) is enough.
+- It also sets the security headers for every path: a CSP (Report-Only until a preview deploy is clean, see the last-mile steps), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy` and `Permissions-Policy`.
 
 ## Function runtime (only if photo-count is built)
 
@@ -57,6 +58,8 @@ We host the FE on Vercel (consistency with schedule-app; Firestore is host-agnos
 3. Vercel → Import Project → pick the repo (Vite preset).
 4. Add env vars: `VITE_FIREBASE_*` (all), and if photo-count is on, `GEMINI_API_KEY` + `FIREBASE_SERVICE_ACCOUNT`.
 5. Deploy → live URL. Pushes auto-deploy; PRs get previews.
+6. Open a preview deploy with the browser console open and play an online game. `vercel.json` ships the CSP as `Content-Security-Policy-Report-Only`; once no violations show up, rename it to `Content-Security-Policy` (the other security headers are already enforced). `src/security-headers.test.ts` keeps the inline theme script's hash in sync.
+7. Before a public launch: consider Firebase App Check (reCAPTCHA Enterprise) for Firestore, Auth and `/api`; anonymous sign-in plus open room creation can otherwise burn the Spark quota. If you add a Firestore TTL on `room.expiresAt`, read the note in DECISIONS first: online stats are keyed by room code.
 
 ## Notes
 
