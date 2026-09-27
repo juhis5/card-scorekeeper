@@ -25,6 +25,9 @@ const collectionMock = vi.fn((_db: unknown, path: string) => ({ path }))
 const docMock = vi.fn((_db: unknown, path: string) => ({ path }))
 const getDocsMock = vi.fn()
 const updateDocMock = vi.fn().mockResolvedValue(undefined)
+const batchDeleteMock = vi.fn()
+const batchCommitMock = vi.fn().mockResolvedValue(undefined)
+const writeBatchMock = vi.fn(() => ({ delete: batchDeleteMock, commit: batchCommitMock }))
 
 vi.mock('firebase/firestore', () => ({
   collection: (db: unknown, path: string) => collectionMock(db, path),
@@ -38,7 +41,7 @@ vi.mock('firebase/firestore', () => ({
   Timestamp: { fromMillis: (ms: number) => ({ toMillis: () => ms }) },
   updateDoc: (...args: unknown[]) => updateDocMock(...args),
   where: vi.fn(),
-  writeBatch: vi.fn(),
+  writeBatch: () => writeBatchMock(),
 }))
 
 const { FirestoreGameRepository } = await import('./firestore-repository')
@@ -69,6 +72,33 @@ beforeEach(() => {
   writeGameResultMock.mockResolvedValue(undefined)
   collectionMock.mockImplementation((_db: unknown, path: string) => ({ path }))
   docMock.mockImplementation((_db: unknown, path: string) => ({ path }))
+  batchCommitMock.mockResolvedValue(undefined)
+})
+
+describe('FirestoreGameRepository.removePlayer', () => {
+  function hostRepository() {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      roomCode: ROOM_CODE,
+    })
+  }
+
+  it("deletes the seat and every round's score doc in one batch", async () => {
+    await hostRepository().removePlayer(ALICE_UID)
+
+    const deletedPaths = batchDeleteMock.mock.calls.map(([ref]) => (ref as { path: string }).path)
+    expect(deletedPaths).toEqual([
+      `room/${ROOM_CODE}/players/${ALICE_UID}`,
+      ...[1, 2, 3, 4, 5].map((round) => `room/${ROOM_CODE}/roundScores/${ALICE_UID}_${round}`),
+    ])
+    expect(batchCommitMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("refuses to remove the host's own seat and writes nothing", async () => {
+    await expect(hostRepository().removePlayer(HOST_UID)).rejects.toThrow()
+    expect(batchCommitMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('FirestoreGameRepository.finishGame — stats-building', () => {

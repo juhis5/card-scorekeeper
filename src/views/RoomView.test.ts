@@ -126,6 +126,15 @@ class FakeOnlineRepository implements GameRepository {
     this.emit()
   }
 
+  async removePlayer(playerId: PlayerId): Promise<void> {
+    this.state = {
+      ...this.state,
+      players: this.state.players.filter((player) => player.id !== playerId),
+      roundScores: this.state.roundScores.filter((score) => score.playerId !== playerId),
+    }
+    this.emit()
+  }
+
   async advanceRound(): Promise<void> {
     const nextRound = Math.min(this.state.currentRound + 1, 5) as ContractRoundNumber
     this.state = { ...this.state, currentRound: nextRound }

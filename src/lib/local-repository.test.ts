@@ -185,6 +185,29 @@ describe('LocalGameRepository.setRoundScore', () => {
   })
 })
 
+describe('LocalGameRepository.removePlayer', () => {
+  it('removes the player and every score they had', async () => {
+    const repository = makeRepository()
+    const { hostPlayerId } = await repository.createGame(HOST_CONFIG)
+    const aliceId = await repository.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await repository.setRoundScore({ playerId: aliceId, round: 1, points: 10 })
+    await repository.setRoundScore({ playerId: hostPlayerId, round: 1, points: 20 })
+
+    await repository.removePlayer(aliceId)
+
+    const [state] = recordEmissions(repository)
+    expect(state?.players.map((player) => player.id)).toEqual([hostPlayerId])
+    expect(state?.roundScores).toEqual([{ playerId: hostPlayerId, round: 1, points: 20 }])
+  })
+
+  it("refuses to remove the host's own seat", async () => {
+    const repository = makeRepository()
+    const { hostPlayerId } = await repository.createGame(HOST_CONFIG)
+
+    await expect(repository.removePlayer(hostPlayerId)).rejects.toThrow()
+  })
+})
+
 describe('LocalGameRepository.advanceRound', () => {
   it('moves the current round forward one at a time, 1 through 5', async () => {
     const repository = makeRepository()

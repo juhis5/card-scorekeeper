@@ -5,7 +5,7 @@
  * The game is played with 2 (sometimes 3) decks shuffled together, so a hand can hold the same
  * card more than once. Nothing here assumes one copy per card — a hand is scored per physical card.
  */
-import type { Card, Contract, Player, RoundScore, Standing } from './types'
+import type { Card, Contract, ContractRoundNumber, Player, RoundScore, Standing } from './types'
 
 export const LOW_NUMBER_CARD_VALUE = 5
 export const TEN_VALUE = 10
@@ -45,6 +45,34 @@ export function contractForRound(round: number): Contract {
     throw new RangeError(`round must be between 1 and ${TOTAL_ROUNDS}, got ${round}`)
   }
   return contract
+}
+
+/**
+ * Rounds 1..`throughRound` a player has no score for. A late joiner must fill these in (they were
+ * at the table, just not in the app yet), so nobody is ranked on fewer rounds than the others.
+ */
+export function missingRounds(
+  playerId: string,
+  roundScores: RoundScore[],
+  throughRound: ContractRoundNumber,
+): ContractRoundNumber[] {
+  const scoredRounds = new Set(
+    roundScores.filter((score) => score.playerId === playerId).map((score) => score.round),
+  )
+  return CONTRACTS.map((contract) => contract.round).filter(
+    (round) => round <= throughRound && !scoredRounds.has(round),
+  )
+}
+
+/** True when every player has a score for every round so far: the gate for Next and Finish. */
+export function isEveryRoundScored(
+  playerIds: string[],
+  roundScores: RoundScore[],
+  throughRound: ContractRoundNumber,
+): boolean {
+  return playerIds.every(
+    (playerId) => missingRounds(playerId, roundScores, throughRound).length === 0,
+  )
 }
 
 /** A player's accumulated points across all recorded rounds so far. */
@@ -92,6 +120,9 @@ export function winners(players: Player[]): Standing[] {
 
 /** Every card value is a multiple of this, so any valid leftover-card total must also be one. */
 export const ROUND_SCORE_STEP = 5
+
+/** Longest display name, enforced identically by firestore.rules on player documents. */
+export const MAX_PLAYER_NAME_LENGTH = 40
 
 /** Sanity cap on one round's score (40 jokers), enforced identically by firestore.rules. */
 export const MAX_ROUND_SCORE = 1000

@@ -33,6 +33,7 @@ class FakeGameRepository implements GameRepository {
   leaveCalls = 0
   lastCreateGameConfig: GameConfig | null = null
   lastSetRoundScoreInput: SetRoundScoreInput | null = null
+  lastRemovedPlayerId: string | null = null
   /** Records the order `addPlayer`/`subscribe`/`createGame` are called in, so `join()` tests can
    * assert the store seats the joiner before subscribing (see the room-scoped read gate note in
    * firestore-realtime — subscribing first would hit a permission-denied `onSnapshot` never
@@ -65,6 +66,10 @@ class FakeGameRepository implements GameRepository {
   async setRoundScore(input: SetRoundScoreInput): Promise<void> {
     // Recorded only — these tests exercise standings via emit() directly, not this input.
     this.lastSetRoundScoreInput = input
+  }
+
+  async removePlayer(playerId: string): Promise<void> {
+    this.lastRemovedPlayerId = playerId
   }
 
   async advanceRound(): Promise<void> {
@@ -289,6 +294,18 @@ describe('useGameStore.roundScores', () => {
     })
 
     expect(game.roundScores).toEqual([{ round: 1, playerId: 'a', points: 12 }])
+  })
+})
+
+describe('useGameStore.removePlayer', () => {
+  it('forwards the removal to the repository', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+
+    await game.removePlayer('a')
+
+    expect(repository.lastRemovedPlayerId).toBe('a')
   })
 })
 

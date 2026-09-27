@@ -234,6 +234,26 @@ export class LocalGameRepository implements GameRepository {
     this.persistAndNotify()
   }
 
+  async removePlayer(playerId: PlayerId): Promise<void> {
+    if (playerId === this.game.hostPlayerId) {
+      throw new Error("removePlayer: the host's own seat can't be removed")
+    }
+    const deviceUuidByPlayerId = Object.fromEntries(
+      Object.entries(this.game.deviceUuidByPlayerId).filter(([id]) => id !== playerId),
+    )
+    const { players, roundScores } = this.game.state
+    this.game = {
+      ...this.game,
+      deviceUuidByPlayerId,
+      state: {
+        ...this.game.state,
+        players: players.filter((player) => player.id !== playerId),
+        roundScores: roundScores.filter((score) => score.playerId !== playerId),
+      },
+    }
+    this.persistAndNotify()
+  }
+
   async advanceRound(): Promise<void> {
     const nextRoundNumber = Math.min(this.game.state.currentRound + 1, TOTAL_ROUNDS)
     const nextRound = contractForRound(nextRoundNumber).round

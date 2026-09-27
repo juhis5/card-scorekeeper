@@ -30,6 +30,7 @@ import { ensureSignedIn } from './firebase'
 import { writeGameResult } from './firestore-stats'
 import { generateRoomCode as defaultGenerateRoomCode } from './room-code'
 import {
+  CONTRACTS,
   TOTAL_ROUNDS,
   placements as placementsFor,
   runningTotal,
@@ -255,6 +256,22 @@ export class FirestoreGameRepository implements GameRepository {
     })
     batch.update(doc(this.db, `room/${roomCode}/players/${input.playerId}`), {
       totalScore: runningTotal(input.playerId, roundScores),
+    })
+    await batch.commit()
+  }
+
+  async removePlayer(playerId: PlayerId): Promise<void> {
+    await ensureSignedIn(this.auth)
+    if (playerId === this.requireUid()) {
+      throw new Error("removePlayer: the host's own seat can't be removed")
+    }
+    const roomCode = this.requireRoomCode()
+    // One batch: the seat and every round's score doc (ids are `{playerId}_{round}`), so the
+    // removal is all-or-nothing. Deleting a score doc that was never written is a no-op.
+    const batch = writeBatch(this.db)
+    batch.delete(doc(this.db, `room/${roomCode}/players/${playerId}`))
+    CONTRACTS.forEach(({ round }) => {
+      batch.delete(doc(this.db, `room/${roomCode}/roundScores/${playerId}_${round}`))
     })
     await batch.commit()
   }

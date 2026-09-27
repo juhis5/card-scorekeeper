@@ -27,7 +27,12 @@ import {
   setDoc,
   updateDoc,
 } from 'firebase/firestore'
-import { MAX_ROUND_SCORE, ROUND_SCORE_STEP, TOTAL_ROUNDS } from '@/lib/rules'
+import {
+  MAX_PLAYER_NAME_LENGTH,
+  MAX_ROUND_SCORE,
+  ROUND_SCORE_STEP,
+  TOTAL_ROUNDS,
+} from '@/lib/rules'
 
 const RULES_PATH = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -453,6 +458,129 @@ describe('players field-level write restrictions (bonus coverage)', () => {
         totalScore: 42,
       }),
     )
+  })
+})
+
+// A seat is the room-membership key every other rule trusts, so its shape is validated: a doc
+// missing joinOrder would be invisible to the orderBy('joinOrder') subscription yet still count
+// as a member, and a non-string name crashes Intl.ListFormat in the winner banner.
+describe('players create validation', () => {
+  beforeEach(async () => {
+    await seed(async (db) => setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture()))
+  })
+
+  function seatAlice(fields: Record<string, unknown>) {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+    return setDoc(doc(alice, `room/${ROOM_CODE}/players/${ALICE_UID}`), fields)
+  }
+
+  it('lets a player seat themselves with a well-formed document', async () => {
+    await assertSucceeds(seatAlice(playerFixture(ALICE_UID)))
+  })
+
+  it('denies a seat without joinOrder', async () => {
+    const seat: Record<string, unknown> = playerFixture(ALICE_UID)
+    delete seat.joinOrder
+    await assertFails(seatAlice(seat))
+  })
+
+  it('denies a joinOrder that is not an integer', async () => {
+    await assertFails(seatAlice(playerFixture(ALICE_UID, { joinOrder: 'first' })))
+  })
+
+  it('denies a name that is not a string', async () => {
+    await assertFails(seatAlice(playerFixture(ALICE_UID, { name: 123 })))
+  })
+
+  it('denies an empty name', async () => {
+    await assertFails(seatAlice(playerFixture(ALICE_UID, { name: '' })))
+  })
+
+  it('allows a name at the length limit and denies one over it', async () => {
+    await assertSucceeds(
+      seatAlice(playerFixture(ALICE_UID, { name: 'x'.repeat(MAX_PLAYER_NAME_LENGTH) })),
+    )
+    await assertFails(
+      seatAlice(playerFixture(ALICE_UID, { name: 'x'.repeat(MAX_PLAYER_NAME_LENGTH + 1) })),
+    )
+  })
+
+  it('denies extra fields', async () => {
+    await assertFails(seatAlice(playerFixture(ALICE_UID, { isAdmin: true })))
+  })
+
+  it('denies a starting totalScore other than 0', async () => {
+    await assertFails(seatAlice(playerFixture(ALICE_UID, { totalScore: -999 })))
+  })
+})
+
+describe('players update validation', () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`), playerFixture(ALICE_UID))
+    })
+  })
+
+  function updateAlice(fields: Record<string, unknown>) {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+    return updateDoc(doc(alice, `room/${ROOM_CODE}/players/${ALICE_UID}`), fields)
+  }
+
+  it('denies renaming to a non-string', async () => {
+    await assertFails(updateAlice({ name: 123 }))
+  })
+
+  it('denies renaming past the length limit', async () => {
+    await assertFails(updateAlice({ name: 'x'.repeat(MAX_PLAYER_NAME_LENGTH + 1) }))
+  })
+
+  it('denies a negative totalScore', async () => {
+    await assertFails(updateAlice({ totalScore: -5 }))
+  })
+})
+
+describe('host removes a seat', () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${HOST_UID}`), playerFixture(HOST_UID))
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`), playerFixture(ALICE_UID))
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/bob-uid`), playerFixture('bob-uid'))
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
+        roundScoreFixture(ALICE_UID),
+      )
+    })
+  })
+
+  it("lets the host remove another player's seat and scores", async () => {
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertSucceeds(deleteDoc(doc(host, `room/${ROOM_CODE}/players/${ALICE_UID}`)))
+    await assertSucceeds(deleteDoc(doc(host, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`)))
+  })
+
+  it('denies another player removing a seat or its scores', async () => {
+    const bob = testEnv.authenticatedContext('bob-uid').firestore()
+
+    await assertFails(deleteDoc(doc(bob, `room/${ROOM_CODE}/players/${ALICE_UID}`)))
+    await assertFails(deleteDoc(doc(bob, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`)))
+  })
+
+  it('denies the host removing their own seat', async () => {
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(deleteDoc(doc(host, `room/${ROOM_CODE}/players/${HOST_UID}`)))
+  })
+
+  it('denies removal once the room has expired', async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ expiresAt: Timestamp.fromMillis(1) })),
+    )
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(deleteDoc(doc(host, `room/${ROOM_CODE}/players/${ALICE_UID}`)))
   })
 })
 

@@ -10,6 +10,8 @@ import {
   TOTAL_ROUNDS,
   cardValue,
   contractForRound,
+  isEveryRoundScored,
+  missingRounds,
   isValidRoundScore,
   placements,
   roundTotal,
@@ -234,5 +236,45 @@ describe('winners and placements', () => {
 
   it('returns no winners for an empty player list', () => {
     expect(winners([])).toEqual([])
+  })
+})
+
+describe('missingRounds', () => {
+  const scores: RoundScore[] = [
+    { playerId: 'alice', round: 1, points: 10 },
+    { playerId: 'alice', round: 2, points: 5 },
+    { playerId: 'bob', round: 2, points: 20 },
+  ]
+
+  it('lists the rounds up to the given round that a player has no score for', () => {
+    expect(missingRounds('bob', scores, 3)).toEqual([1, 3])
+  })
+
+  it('is empty for a player who has scored every round so far', () => {
+    expect(missingRounds('alice', scores, 2)).toEqual([])
+  })
+
+  it('lists every round for a player who joined without scoring', () => {
+    expect(missingRounds('carol', scores, 2)).toEqual([1, 2])
+  })
+})
+
+describe('isEveryRoundScored', () => {
+  const scores: RoundScore[] = [
+    { playerId: 'alice', round: 1, points: 10 },
+    { playerId: 'alice', round: 2, points: 5 },
+    { playerId: 'bob', round: 2, points: 20 },
+  ]
+
+  it('is true when every player has a score for every round so far', () => {
+    expect(isEveryRoundScored(['alice'], scores, 2)).toBe(true)
+  })
+
+  it('is false when a late joiner still has an earlier round to fill in', () => {
+    expect(isEveryRoundScored(['alice', 'bob'], scores, 2)).toBe(false)
+  })
+
+  it('is true for no players', () => {
+    expect(isEveryRoundScored([], scores, 2)).toBe(true)
   })
 })
