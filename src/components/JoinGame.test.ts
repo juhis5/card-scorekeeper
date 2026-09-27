@@ -6,6 +6,7 @@ import { flushPromises } from '@vue/test-utils'
 import JoinGame from './JoinGame.vue'
 import { useGameStore } from '@/stores/game'
 import { i18n } from '@/i18n'
+import { NameTakenError } from '@/lib/player-names'
 import type { GameRepository } from '@/lib/repository'
 import type { GameState } from '@/lib/types'
 
@@ -128,6 +129,37 @@ describe('JoinGame joining successfully', () => {
     expect(router.currentRoute.value.params.code).toBe('7K4RQ')
     expect(game.isHost).toBe(false)
     expect(game.myPlayerId).toBe('alice-uid')
+  })
+})
+
+describe('JoinGame with a name already in the room', () => {
+  it('says so next to the name field and stays put', async () => {
+    const repo = makeFakeOnlineRepository()
+    repo.addPlayer = vi.fn().mockRejectedValue(new NameTakenError('Juho'))
+    joinRepository.mockResolvedValue({ kind: 'online', repository: repo })
+    const router = renderJoinGame()
+
+    await fillAndSubmit('7K4RQ', 'Juho')
+
+    expect(
+      screen.getByText(
+        'Someone in this game already uses that name. Add an initial or a nickname.',
+      ),
+    ).toBeTruthy()
+    expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('true')
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('clears the message once the name is changed', async () => {
+    const repo = makeFakeOnlineRepository()
+    repo.addPlayer = vi.fn().mockRejectedValue(new NameTakenError('Juho'))
+    joinRepository.mockResolvedValue({ kind: 'online', repository: repo })
+    renderJoinGame()
+    await fillAndSubmit('7K4RQ', 'Juho')
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho L')
+
+    expect(screen.queryByText(/already uses that name/)).toBeNull()
   })
 })
 

@@ -159,6 +159,40 @@ describe('GameSetup hosting offline (backend unreachable)', () => {
   })
 })
 
+describe('GameSetup with repeated names in a local game', () => {
+  it('flags the repeated name, ignoring case and spaces, and starts nothing', async () => {
+    hostRepository.mockResolvedValue(offlineMode())
+    renderGameSetup()
+    const game = useGameStore()
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.update(screen.getByLabelText('Player 1 name'), ' juho ')
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+
+    expect(screen.getByText('Each player needs a different name.')).toBeTruthy()
+    expect(screen.getByLabelText('Player 1 name').getAttribute('aria-invalid')).toBe('true')
+    expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('false')
+    expect(game.gameId).toBeNull()
+  })
+
+  it('starts once the names differ', async () => {
+    hostRepository.mockResolvedValue(offlineMode())
+    const router = renderGameSetup()
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'juho')
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Jani')
+
+    expect(screen.queryByText('Each player needs a different name.')).toBeNull()
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+    expect(router.currentRoute.value.params.code).toBe('local')
+  })
+})
+
 describe('GameSetup with a local game already in progress', () => {
   async function startLocalGameInProgress(): Promise<void> {
     // The real browser storage: the game a new local game would overwrite lives there.

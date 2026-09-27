@@ -28,6 +28,8 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
+  type Firestore,
 } from 'firebase/firestore'
 import {
   MAX_PLAYER_NAME_LENGTH,
@@ -70,6 +72,35 @@ function playerFixture(ownerUid: string, overrides: Partial<Record<string, unkno
     joinOrder: 0,
     ...overrides,
   }
+}
+
+/** The name-record id firestore.rules derives from a stored name (mirrors playerNameKey in
+ * src/lib/player-names.ts for a clean name). */
+function rulesNameKey(name: string): string {
+  return `n_${name.toLowerCase().replaceAll('/', '_')}`
+}
+
+type TestFirestore = ReturnType<
+  ReturnType<RulesTestEnvironment['authenticatedContext']>['firestore']
+>
+
+/** Takes a seat the way the app does: the seat and its name record in one batch. */
+function seatWithName(
+  db: TestFirestore,
+  uid: string,
+  fields: Record<string, unknown>,
+  { nameRecordOwner = uid, nameKey }: { nameRecordOwner?: string; nameKey?: string } = {},
+) {
+  // The test context hands out the compat Firestore type; writeBatch accepts that instance at
+  // runtime but is typed for the modular one.
+  const batch = writeBatch(db as unknown as Firestore)
+  batch.set(doc(db, `room/${ROOM_CODE}/players/${uid}`), fields)
+  if (typeof fields.name === 'string') {
+    batch.set(doc(db, `room/${ROOM_CODE}/names/${nameKey ?? rulesNameKey(fields.name)}`), {
+      ownerUid: nameRecordOwner,
+    })
+  }
+  return batch.commit()
 }
 
 function roundScoreFixture(ownerUid: string, overrides: Partial<Record<string, unknown>> = {}) {
@@ -335,12 +366,7 @@ describe('expired room rejects writes', () => {
   it('rejects a join (player create) to an expired room', async () => {
     const joiner = testEnv.authenticatedContext('newplayer-uid').firestore()
 
-    await assertFails(
-      setDoc(
-        doc(joiner, `room/${ROOM_CODE}/players/newplayer-uid`),
-        playerFixture('newplayer-uid'),
-      ),
-    )
+    await assertFails(seatWithName(joiner, 'newplayer-uid', playerFixture('newplayer-uid')))
   })
 
   it('rejects a roundScore write to an expired room', async () => {
@@ -363,12 +389,7 @@ describe('ownerUid spoofing is rejected on create', () => {
   it('denies creating a player doc whose ownerUid is not the caller', async () => {
     const mallory = testEnv.authenticatedContext('mallory-uid').firestore()
 
-    await assertFails(
-      setDoc(
-        doc(mallory, `room/${ROOM_CODE}/players/mallory-uid`),
-        playerFixture('someone-else-uid'),
-      ),
-    )
+    await assertFails(seatWithName(mallory, 'mallory-uid', playerFixture('someone-else-uid')))
   })
 
   it('denies creating a roundScore doc whose ownerUid is not the caller (and not the host)', async () => {
@@ -453,14 +474,19 @@ describe('players field-level write restrictions (bonus coverage)', () => {
     )
   })
 
-  it('still lets a player update their own name and totalScore', async () => {
+  it('lets a player update their own totalScore', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
     await assertSucceeds(
-      updateDoc(doc(alice, `room/${ROOM_CODE}/players/${ALICE_UID}`), {
-        name: 'Alicia',
-        totalScore: 42,
-      }),
+      updateDoc(doc(alice, `room/${ROOM_CODE}/players/${ALICE_UID}`), { totalScore: 42 }),
+    )
+  })
+
+  it("denies renaming a seat, which would dodge the room's unique-name records", async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      updateDoc(doc(alice, `room/${ROOM_CODE}/players/${ALICE_UID}`), { name: 'Alicia' }),
     )
   })
 })
@@ -474,8 +500,7 @@ describe('players create validation', () => {
   })
 
   function seatAlice(fields: Record<string, unknown>) {
-    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
-    return setDoc(doc(alice, `room/${ROOM_CODE}/players/${ALICE_UID}`), fields)
+    return seatWithName(testEnv.authenticatedContext(ALICE_UID).firestore(), ALICE_UID, fields)
   }
 
   it('lets a player seat themselves with a well-formed document', async () => {
@@ -515,6 +540,108 @@ describe('players create validation', () => {
 
   it('denies a starting totalScore other than 0', async () => {
     await assertFails(seatAlice(playerFixture(ALICE_UID, { totalScore: -999 })))
+  })
+})
+
+// A name is unique within a room, ignoring case and extra spaces. Every seat is created together
+// with a names/{key} record owned by the same player; a second record under the same key is an
+// update, which is never allowed, so two people can't take one name even at the same moment.
+describe('unique player names', () => {
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${HOST_UID}`),
+        playerFixture(HOST_UID, { name: 'Juho' }),
+      )
+      await setDoc(doc(db(), `room/${ROOM_CODE}/names/n_juho`), { ownerUid: HOST_UID })
+    })
+  })
+
+  const alice = () => testEnv.authenticatedContext(ALICE_UID).firestore()
+  const host = () => testEnv.authenticatedContext(HOST_UID).firestore()
+
+  it('lets a player take a seat under a name nobody uses', async () => {
+    await assertSucceeds(
+      seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name: 'Alice' })),
+    )
+  })
+
+  it('denies a seat without its name record', async () => {
+    await assertFails(
+      setDoc(
+        doc(alice(), `room/${ROOM_CODE}/players/${ALICE_UID}`),
+        playerFixture(ALICE_UID, { name: 'Alice' }),
+      ),
+    )
+  })
+
+  it('denies a name someone already uses, whatever its case', async () => {
+    await assertFails(seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name: 'JUHO' })))
+  })
+
+  it("denies a seat that leans on someone else's name record", async () => {
+    await assertFails(
+      setDoc(
+        doc(alice(), `room/${ROOM_CODE}/players/${ALICE_UID}`),
+        playerFixture(ALICE_UID, { name: 'Juho' }),
+      ),
+    )
+  })
+
+  it("denies a name record that doesn't match the seat's name", async () => {
+    await assertFails(
+      seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name: 'Alice' }), {
+        nameKey: 'n_bob',
+      }),
+    )
+  })
+
+  it('denies a name record with no seat', async () => {
+    await assertFails(
+      setDoc(doc(alice(), `room/${ROOM_CODE}/names/n_alice`), { ownerUid: ALICE_UID }),
+    )
+  })
+
+  it('denies names with spaces at the ends or doubled, which would dodge the check', async () => {
+    await assertFails(seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name: 'Juho ' })))
+    await assertFails(
+      seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name: 'Mari  Anne' })),
+    )
+    await assertSucceeds(
+      seatWithName(alice(), ALICE_UID, playerFixture(ALICE_UID, { name: 'Mari Anne' })),
+    )
+  })
+
+  it('lets anyone signed in check whether a name is taken, but not list the names', async () => {
+    await assertSucceeds(getDoc(doc(alice(), `room/${ROOM_CODE}/names/n_juho`)))
+    await assertFails(getDocs(collection(alice(), `room/${ROOM_CODE}/names`)))
+  })
+
+  it('denies changing a name record, and deleting one unless you are the host', async () => {
+    await assertFails(
+      updateDoc(doc(alice(), `room/${ROOM_CODE}/names/n_juho`), { ownerUid: ALICE_UID }),
+    )
+    await assertFails(deleteDoc(doc(alice(), `room/${ROOM_CODE}/names/n_juho`)))
+    await assertSucceeds(deleteDoc(doc(host(), `room/${ROOM_CODE}/names/n_juho`)))
+  })
+
+  it("frees a removed player's name once the host deletes its record with the seat", async () => {
+    await seed(async (db) => {
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`),
+        playerFixture(ALICE_UID, { name: 'Alice' }),
+      )
+      await setDoc(doc(db(), `room/${ROOM_CODE}/names/n_alice`), { ownerUid: ALICE_UID })
+    })
+    const hostDb = host()
+    const removal = writeBatch(hostDb as unknown as Firestore)
+    removal.delete(doc(hostDb, `room/${ROOM_CODE}/players/${ALICE_UID}`))
+    removal.delete(doc(hostDb, `room/${ROOM_CODE}/names/n_alice`))
+    await assertSucceeds(removal.commit())
+
+    const bob = testEnv.authenticatedContext('bob-uid').firestore()
+    await assertSucceeds(seatWithName(bob, 'bob-uid', playerFixture('bob-uid', { name: 'Alice' })))
   })
 })
 

@@ -148,7 +148,16 @@ export const useGameStore = defineStore('game', () => {
     gameId.value = code
     roomCode.value = code
     isHost.value = false
-    const playerId = await repo.addPlayer(player)
+    let playerId: PlayerId
+    try {
+      playerId = await repo.addPlayer(player)
+    } catch (error) {
+      // Not seated, so not in this room: Home mustn't offer to continue it.
+      leave()
+      gameId.value = null
+      roomCode.value = null
+      throw error
+    }
     myPlayerId.value = playerId
     rememberRoom(code)
     // The host rejoining their own room by code is still its host.

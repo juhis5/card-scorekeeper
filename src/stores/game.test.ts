@@ -222,6 +222,24 @@ describe('useGameStore.join', () => {
   })
 })
 
+describe('useGameStore.join when the seat is refused', () => {
+  it('leaves the store as if nothing had been joined, and passes the error on', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    const refusal = new Error('name taken')
+    repository.addPlayer = () => Promise.reject(refusal)
+
+    const error = await game
+      .join(repository, 'FGHJK', { name: 'Juho', deviceUuid: 'device-a' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBe(refusal)
+    expect(game.gameId).toBeNull()
+    expect(game.roomCode).toBeNull()
+    expect(lastRoom()).toBeNull()
+  })
+})
+
 describe('useGameStore standings', () => {
   it('maps a subscribed state update to standings sorted ascending by total', async () => {
     const game = useGameStore()

@@ -28,9 +28,14 @@ const updateDocMock = vi.fn().mockResolvedValue(undefined)
 const setDocMock = vi.fn().mockResolvedValue(undefined)
 const onSnapshotMock = vi.fn<(...args: unknown[]) => () => void>(() => () => undefined)
 const getDocMock = vi.fn()
+const batchSetMock = vi.fn()
 const batchDeleteMock = vi.fn()
 const batchCommitMock = vi.fn().mockResolvedValue(undefined)
-const writeBatchMock = vi.fn(() => ({ delete: batchDeleteMock, commit: batchCommitMock }))
+const writeBatchMock = vi.fn(() => ({
+  set: batchSetMock,
+  delete: batchDeleteMock,
+  commit: batchCommitMock,
+}))
 
 vi.mock('firebase/firestore', () => ({
   collection: (db: unknown, path: string) => collectionMock(db, path),
@@ -48,6 +53,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 const { FirestoreGameRepository } = await import('./firestore-repository')
+const { NameTakenError } = await import('./player-names')
 
 const ROOM_CODE = 'ABCDE'
 const HOST_UID = 'host-uid'
@@ -153,6 +159,77 @@ describe('FirestoreGameRepository.addPlayer when already seated', () => {
 
     await expect(repo.addPlayer({ name: 'Alice', deviceUuid: 'd' })).resolves.toBe(ALICE_UID)
     expect(setDocMock).not.toHaveBeenCalled()
+    expect(batchCommitMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('FirestoreGameRepository unique names', () => {
+  function aliceRepository() {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: ALICE_UID } } as never,
+      roomCode: ROOM_CODE,
+    })
+  }
+
+  function batchSetPaths(): string[] {
+    return batchSetMock.mock.calls.map(([ref]) => (ref as { path: string }).path)
+  }
+
+  it('takes the seat and its name record in one batch, with the name cleaned', async () => {
+    await aliceRepository().addPlayer({ name: ' Mari   Anne ', deviceUuid: 'd' })
+
+    expect(batchSetPaths()).toEqual([
+      `room/${ROOM_CODE}/players/${ALICE_UID}`,
+      `room/${ROOM_CODE}/names/n_mari anne`,
+    ])
+    expect(batchSetMock.mock.calls[0]?.[1]).toMatchObject({ name: 'Mari Anne' })
+    expect(batchSetMock.mock.calls[1]?.[1]).toEqual({ ownerUid: ALICE_UID })
+    expect(batchCommitMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports a name someone else in the room uses as NameTakenError', async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path === `room/${ROOM_CODE}/names/n_juho`
+          ? snapshot({ ownerUid: BOB_UID })
+          : snapshot(undefined),
+      ),
+    )
+
+    const error = await aliceRepository()
+      .addPlayer({ name: 'JUHO', deviceUuid: 'd' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(NameTakenError)
+  })
+
+  it('passes on a refusal that has nothing to do with the name, such as an expired room', async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+
+    const error = await aliceRepository()
+      .addPlayer({ name: 'Alice', deviceUuid: 'd' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBe(permissionDenied)
+  })
+
+  it('seats the host with its name record, after writing the room', async () => {
+    const repo = new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      generateRoomCode: () => ROOM_CODE,
+    })
+
+    await repo.createGame({ hostDeviceUuid: 'd', hostDisplayName: 'Juho ' })
+
+    expect(setDocMock).toHaveBeenCalledTimes(1)
+    expect(batchSetPaths()).toEqual([
+      `room/${ROOM_CODE}/players/${HOST_UID}`,
+      `room/${ROOM_CODE}/names/n_juho`,
+    ])
+    expect(batchSetMock.mock.calls[0]?.[1]).toMatchObject({ name: 'Juho' })
   })
 })
 
@@ -180,6 +257,7 @@ describe('FirestoreGameRepository write timeouts', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     setDocMock.mockReturnValue(new Promise(() => undefined))
+    batchCommitMock.mockReturnValue(new Promise(() => undefined))
   })
 
   afterEach(() => {
@@ -224,12 +302,15 @@ describe('FirestoreGameRepository.removePlayer', () => {
     })
   }
 
-  it("deletes the seat and every round's score doc in one batch", async () => {
+  it("deletes the seat, its name record and every round's score doc in one batch", async () => {
+    getDocMock.mockResolvedValue(snapshot({ name: 'Alice', ownerUid: ALICE_UID, joinOrder: 1 }))
+
     await hostRepository().removePlayer(ALICE_UID)
 
     const deletedPaths = batchDeleteMock.mock.calls.map(([ref]) => (ref as { path: string }).path)
     expect(deletedPaths).toEqual([
       `room/${ROOM_CODE}/players/${ALICE_UID}`,
+      `room/${ROOM_CODE}/names/n_alice`,
       ...[1, 2, 3, 4, 5].map((round) => `room/${ROOM_CODE}/roundScores/${ALICE_UID}_${round}`),
     ])
     expect(batchCommitMock).toHaveBeenCalledTimes(1)

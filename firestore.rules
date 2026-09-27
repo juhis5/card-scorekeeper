@@ -60,6 +60,17 @@ service cloud.firestore {
       return name is string && name.size() >= 1 && name.size() <= 40;
     }
 
+    /** Stored the way cleanPlayerName (src/lib/player-names.ts) leaves it: no spaces at the ends
+     * and none doubled, so " Juho" can't dodge the unique-name check for "Juho". */
+    function isCleanPlayerName(name) {
+      return isValidPlayerName(name) && name == name.trim() && !name.matches('.*\\s\\s.*');
+    }
+
+    /** A name's unique-name record id, the same as playerNameKey in src/lib/player-names.ts. */
+    function nameKeyOf(name) {
+      return 'n_' + name.lower().replace('/', '_');
+    }
+
     /** Room-scoped read gate (not just "any authed user"): true only for someone already
      * seated as a player in this room. */
     function isRoomMember(code) {
@@ -127,30 +138,31 @@ service cloud.firestore {
         // and nobody may claim an ownerUid that isn't their own uid. The shape is exact: this doc
         // is the membership key every other rule trusts, and a seat missing joinOrder would be
         // invisible to the app's orderBy('joinOrder') subscription while still counting as a
-        // member.
+        // member. The seat's name must be clean and come with this player's own record under
+        // names/ (written in the same batch), which is what keeps names unique in the room.
         allow create: if isSignedIn()
           && playerUid == request.auth.uid
           && request.resource.data.ownerUid == request.auth.uid
           && roomNotExpired(code)
           && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
           && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
-          && isValidPlayerName(request.resource.data.name)
+          && isCleanPlayerName(request.resource.data.name)
+          && getAfter(
+            /databases/$(database)/documents/room/$(code)/names/$(nameKeyOf(request.resource.data.name))
+          ).data.ownerUid == request.auth.uid
           && request.resource.data.deviceUuid is string
           && request.resource.data.deviceUuid.size() <= 64
           && request.resource.data.totalScore == 0
           && request.resource.data.joinOrder is int;
 
-        // A player corrects their own row; the host may correct anyone's in their room. Field-
-        // restricted to name/totalScore only — deviceUuid is the slice-6 stats trust anchor
-        // (a player rewriting it to someone else's key could steal/corrupt that device's
-        // persistent stats), and ownerUid must stay pinned to whoever created this doc.
+        // A player's own running total, or any seat's for the host. Only totalScore may change:
+        // deviceUuid is the stats trust anchor (a player rewriting it to someone else's key could
+        // steal or corrupt that device's stats), ownerUid stays pinned to whoever created the
+        // seat, and a rename would slip past the room's unique-name records.
         allow update: if isSignedIn()
           && (playerUid == request.auth.uid || isHost(code))
           && roomNotExpired(code)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'totalScore'])
-          && request.resource.data.ownerUid == resource.data.ownerUid
-          && request.resource.data.deviceUuid == resource.data.deviceUuid
-          && isValidPlayerName(request.resource.data.name)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalScore'])
           && request.resource.data.totalScore is int
           && request.resource.data.totalScore >= 0;
 
@@ -160,6 +172,24 @@ service cloud.firestore {
           && isHost(code)
           && roomNotExpired(code)
           && playerUid != request.auth.uid;
+      }
+
+      // One record per name in use, keyed by nameKeyOf(name): created together with its seat, and
+      // never updated, so a second player can't take the same name even at the same moment (their
+      // write would be an update). Anyone signed in may check a name, to say "taken" clearly;
+      // listing is refused. The host deletes a removed player's record with the seat.
+      match /names/{nameKey} {
+        allow get: if isSignedIn();
+        allow list: if false;
+        allow create: if isSignedIn()
+          && roomNotExpired(code)
+          && request.resource.data.keys().hasOnly(['ownerUid'])
+          && request.resource.data.ownerUid == request.auth.uid
+          && nameKey == nameKeyOf(
+            getAfter(/databases/$(database)/documents/room/$(code)/players/$(request.auth.uid)).data.name
+          );
+        allow update: if false;
+        allow delete: if isSignedIn() && isHost(code) && roomNotExpired(code);
       }
 
       match /roundScores/{scoreId} {

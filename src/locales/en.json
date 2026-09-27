@@ -53,13 +53,15 @@
       "errors": {
         "invalidCode": "Enter the 5-character room code exactly as shown.",
         "unreachable": "Couldn't reach the game — check your connection and try again.",
-        "joinFailed": "Couldn't join that room. Check the code and try again."
+        "joinFailed": "Couldn't join that room. Check the code and try again.",
+        "nameTaken": "Someone in this game already uses that name. Add an initial or a nickname."
       }
     },
     "errors": {
       "hostNameRequired": "Enter your name to continue.",
       "otherPlayersRequired": "Add at least one other player.",
-      "startFailed": "Couldn't start the game. Try again."
+      "startFailed": "Couldn't start the game. Try again.",
+      "duplicateName": "Each player needs a different name."
     },
     "continue": {
       "heading": "Game in progress",

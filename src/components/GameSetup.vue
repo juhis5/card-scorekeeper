@@ -27,6 +27,7 @@ import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { hasUnfinishedPersistedGame } from '@/lib/local-repository'
+import { duplicateNameIndexes } from '@/lib/player-names'
 import type { HostGameMode } from '@/lib/game-mode'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
 
@@ -59,6 +60,17 @@ const namedOtherPlayers = computed(() =>
   otherPlayers.value.map((field) => field.name.trim()).filter((name) => name.length > 0),
 )
 const isHostNameInvalid = computed(() => attemptedSubmit.value && trimmedHostName.value === '')
+/** Positions of names that repeat an earlier one (0 is the host), ignoring case and extra spaces:
+ * a local game has no server to check, so this form does. Shown after a local start was refused,
+ * then live, so fixing a field clears its message. */
+const repeatedNameIndexes = computed(() =>
+  duplicateNameIndexes([hostName.value, ...otherPlayers.value.map((field) => field.name)]),
+)
+const areRepeatedNamesShown = ref(false)
+
+function isRepeatedName(otherPlayerIndex: number): boolean {
+  return areRepeatedNamesShown.value && repeatedNameIndexes.value.has(otherPlayerIndex + 1)
+}
 
 function addPlayerField(): void {
   otherPlayers.value.push({ id: crypto.randomUUID(), name: '' })
@@ -97,6 +109,10 @@ async function startGame(mode: HostGameMode): Promise<void> {
 async function startOrFallBack(mode: HostGameMode): Promise<void> {
   if (isMissingRequiredOtherPlayers(mode)) {
     areOtherPlayersInvalid.value = true
+    return
+  }
+  if (mode.kind === 'offline' && repeatedNameIndexes.value.size > 0) {
+    areRepeatedNamesShown.value = true
     return
   }
   if (mode.kind === 'offline' && !hasConfirmedReplace && hasUnfinishedPersistedGame()) {
@@ -199,7 +215,18 @@ async function handleSubmit(): Promise<void> {
                 :maxlength="MAX_PLAYER_NAME_LENGTH"
                 type="text"
                 class="h-11 text-base"
+                :aria-invalid="isRepeatedName(index)"
+                :aria-describedby="
+                  isRepeatedName(index) ? `player-name-${field.id}-error` : undefined
+                "
               />
+              <p
+                v-if="isRepeatedName(index)"
+                :id="`player-name-${field.id}-error`"
+                class="text-destructive text-sm"
+              >
+                {{ t('home.errors.duplicateName') }}
+              </p>
             </div>
             <Button
               type="button"

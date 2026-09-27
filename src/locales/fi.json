@@ -53,13 +53,15 @@
       "errors": {
         "invalidCode": "Anna 5-merkkinen huonekoodi täsmälleen näytetyn mukaisena.",
         "unreachable": "Peliä ei tavoitettu — tarkista yhteytesi ja yritä uudelleen.",
-        "joinFailed": "Huoneeseen ei voitu liittyä. Tarkista koodi ja yritä uudelleen."
+        "joinFailed": "Huoneeseen ei voitu liittyä. Tarkista koodi ja yritä uudelleen.",
+        "nameTaken": "Joku pelissä käyttää jo tätä nimeä. Lisää esimerkiksi sukunimen alkukirjain tai lempinimi."
       }
     },
     "errors": {
       "hostNameRequired": "Anna nimesi jatkaaksesi.",
       "otherPlayersRequired": "Lisää vähintään yksi muu pelaaja.",
-      "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen."
+      "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen.",
+      "duplicateName": "Jokaisella pelaajalla pitää olla eri nimi."
     },
     "continue": {
       "heading": "Peli kesken",

@@ -28,6 +28,7 @@ import {
 import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
 import { writeGameResult } from './firestore-stats'
+import { cleanPlayerName, NameTakenError, playerNameKey } from './player-names'
 import { generateRoomCode as defaultGenerateRoomCode, ROOM_TTL_MS } from './room-code'
 import { CONTRACTS, TOTAL_ROUNDS, placements as placementsFor, runningTotal } from './rules'
 import { bestAndWorstRound } from './stats'
@@ -146,16 +147,13 @@ export class FirestoreGameRepository implements ResumableGameRepository {
           }),
           this.writeTimeoutMs,
         )
-        // Sequential, not batched: the player-create rule's roomNotExpired() reads the room
-        // doc via get(), which does not see a sibling write in the same batch/transaction — so
-        // the room doc must already be committed before this write is sent (see
-        // docs/DECISIONS.md's trust-model entry and firestore.rules).
+        // After the room, not batched with it: the player-create rule's roomNotExpired() reads
+        // the room doc via get(), which does not see a sibling write in the same batch — so the
+        // room doc must already be committed (see docs/DECISIONS.md's trust-model entry).
         await withTimeout(
-          setDoc(doc(this.db, `room/${roomCode}/players/${hostUid}`), {
-            name: config.hostDisplayName,
-            ownerUid: hostUid,
+          this.takeSeat(roomCode, hostUid, {
+            name: cleanPlayerName(config.hostDisplayName),
             deviceUuid: config.hostDeviceUuid,
-            totalScore: 0,
             joinOrder: 0,
           }),
           this.writeTimeoutMs,
@@ -181,17 +179,49 @@ export class FirestoreGameRepository implements ResumableGameRepository {
     // Rejoining after a reload: keep the seat. Rewriting it would change joinOrder, which the
     // rules refuse, and would reorder the player.
     if (await this.isSeated(uid)) return uid
-    await withTimeout(
-      setDoc(doc(this.db, `room/${roomCode}/players/${uid}`), {
-        name: input.name,
-        ownerUid: uid,
-        deviceUuid: input.deviceUuid,
-        totalScore: 0,
-        joinOrder: this.now(),
-      }),
-      this.writeTimeoutMs,
-    )
+    const name = cleanPlayerName(input.name)
+    try {
+      await withTimeout(
+        this.takeSeat(roomCode, uid, { name, deviceUuid: input.deviceUuid, joinOrder: this.now() }),
+        this.writeTimeoutMs,
+      )
+    } catch (error) {
+      if (isPermissionDenied(error) && (await this.isNameTakenByOther(roomCode, name, uid))) {
+        throw new NameTakenError(name)
+      }
+      throw error
+    }
     return uid
+  }
+
+  /** The seat and its name record in one batch: the rules only accept a seat together with its
+   * own record under names/, and refuse a second record for the same name, which is how names
+   * stay unique in a room (see lib/player-names.ts). */
+  private takeSeat(
+    roomCode: string,
+    uid: string,
+    seat: { name: string; deviceUuid: string; joinOrder: number },
+  ): Promise<void> {
+    const batch = writeBatch(this.db)
+    batch.set(doc(this.db, `room/${roomCode}/players/${uid}`), {
+      name: seat.name,
+      ownerUid: uid,
+      deviceUuid: seat.deviceUuid,
+      totalScore: 0,
+      joinOrder: seat.joinOrder,
+    })
+    batch.set(doc(this.db, `room/${roomCode}/names/${playerNameKey(seat.name)}`), {
+      ownerUid: uid,
+    })
+    return batch.commit()
+  }
+
+  /** Tells "the name is taken" apart from the other reasons a seat is refused: the rules let any
+   * signed-in user read one name record. */
+  private async isNameTakenByOther(roomCode: string, name: string, uid: string): Promise<boolean> {
+    const record = await getDoc(doc(this.db, `room/${roomCode}/names/${playerNameKey(name)}`))
+    const owner = (record.data() as { ownerUid?: unknown } | undefined)?.ownerUid
+    return record.exists() && owner !== uid
   }
 
   async findSeat(): Promise<Seat | null> {
@@ -307,10 +337,13 @@ export class FirestoreGameRepository implements ResumableGameRepository {
       throw new Error("removePlayer: the host's own seat can't be removed")
     }
     const roomCode = this.requireRoomCode()
-    // One batch: the seat and every round's score doc (ids are `{playerId}_{round}`), so the
-    // removal is all-or-nothing. Deleting a score doc that was never written is a no-op.
+    const seat = await getDoc(doc(this.db, `room/${roomCode}/players/${playerId}`))
+    const name = (seat.data() as PlayerDocData | undefined)?.name
+    // One batch: the seat, its name record (so the name is free again) and every round's score
+    // doc (ids are `{playerId}_{round}`), all-or-nothing. Deleting a doc never written is a no-op.
     const batch = writeBatch(this.db)
     batch.delete(doc(this.db, `room/${roomCode}/players/${playerId}`))
+    if (name) batch.delete(doc(this.db, `room/${roomCode}/names/${playerNameKey(name)}`))
     CONTRACTS.forEach(({ round }) => {
       batch.delete(doc(this.db, `room/${roomCode}/roundScores/${playerId}_${round}`))
     })

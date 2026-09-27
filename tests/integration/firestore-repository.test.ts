@@ -21,6 +21,7 @@ import {
   type Firestore,
 } from 'firebase/firestore'
 import { FirestoreGameRepository } from '@/lib/firestore-repository'
+import { NameTakenError } from '@/lib/player-names'
 import type { ContractRoundNumber, GameState } from '@/lib/types'
 
 const FIRESTORE_EMULATOR_PORT = 8280
@@ -186,5 +187,45 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
 
     hostRepo.leave()
     joinerRepo.leave()
+  })
+
+  // The unique-name records only work if the SDK's batch, the real rules and the repository's
+  // error mapping agree, which no mocked test can show.
+  it('refuses a name already in the room, and frees it once the host removes that player', async () => {
+    const host = makeDevice()
+    const hostRepo = new FirestoreGameRepository({ db: host.db, auth: host.auth })
+    const created = await hostRepo.createGame({
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Juho',
+    })
+    const roomCode = created.roomCode
+    if (!roomCode) throw new Error('expected an online room code')
+
+    const alice = makeDevice()
+    const aliceRepo = new FirestoreGameRepository({ db: alice.db, auth: alice.auth, roomCode })
+    const aliceUid = await aliceRepo.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+
+    const copycat = makeDevice()
+    const copycatRepo = new FirestoreGameRepository({
+      db: copycat.db,
+      auth: copycat.auth,
+      roomCode,
+    })
+    const error = await copycatRepo
+      .addPlayer({ name: ' juho ', deviceUuid: 'device-c' })
+      .catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(NameTakenError)
+
+    await waitForState(hostRepo, (state) => state.players.length === 2)
+    await hostRepo.removePlayer(aliceUid)
+    const bobUid = await copycatRepo.addPlayer({ name: 'ALICE', deviceUuid: 'device-c' })
+    const final = await waitForState(hostRepo, (state) =>
+      state.players.some((player) => player.id === bobUid),
+    )
+    expect(final.players.map((player) => player.name).sort()).toEqual(['ALICE', 'Juho'])
+
+    hostRepo.leave()
+    aliceRepo.leave()
+    copycatRepo.leave()
   })
 })
