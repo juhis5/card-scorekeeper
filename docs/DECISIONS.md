@@ -541,3 +541,18 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   - Browser storage belongs to an address, so testers start fresh there: a new anonymous id,
     empty stats, no saved local game. An app installed to the home screen from the old address
     has to be removed and added again from the new one.
+- 2026-09-27 — Gitflow with a test site (owner's call):
+  - `develop` is the default branch; feature PRs squash-merge into it, and it deploys to
+    test-rommi.vercel.app on staging Firebase. `main` is production (rommi.vercel.app). Testers
+    play on test-rommi, so production holds only real games.
+  - test-rommi is a Preview domain tied to `develop` in the same Vercel project, not a second
+    project: the free plan has no custom environments, and the Preview variables already point
+    at staging, secrets included. Vercel login protection on previews is off, so testers get
+    in.
+  - Releases fast-forward `main` to a `develop` commit (`git push origin develop:main`) when the
+    owner says "release", with a release PR only for the record and CI. The owner asked for a
+    PR without squash or merge commits; GitHub's "Rebase and merge" rewrites every commit id,
+    so the fast-forward is the only way to keep both branches on the same commits. `main`'s
+    ruleset therefore drops its PR rule but keeps required checks, linear history, no
+    force-push and no deletion.
+  - Hotfixes go through `develop` and a release, so `develop` must stay releasable.
