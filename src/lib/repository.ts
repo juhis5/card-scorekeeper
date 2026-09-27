@@ -101,11 +101,18 @@ export function isResumable(repository: GameRepository): repository is Resumable
   return 'findSeat' in repository
 }
 
-/** An online room whose host can point it at the next game once it has finished (Play again). */
+/** An online room whose host can start the next game from it once it has finished (Play again). */
 export interface ReplayableGameRepository extends GameRepository {
+  /** Like `createGame`, for a room that names the finished room its players come from. */
+  createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame>
   /** Host only, finished room only: records the next room's code, which every device in this
    * room then sees as `GameState.nextRoomCode`. Set once; firestore.rules refuses a change. */
   linkNextRoom(nextRoomCode: string): Promise<void>
+  /** Host only, on the room `createNextGame` made, once the finished room links to it: seats
+   * everyone else from the finished room here, as they were there (names, order, guests' ids).
+   * Each seat on its own, so one that can't be taken (a player who joined by themselves first)
+   * doesn't stop the rest; resolves once every seat has been tried. */
+  carrySeats(): Promise<void>
 }
 
 export function isReplayable(repository: GameRepository): repository is ReplayableGameRepository {

@@ -73,6 +73,8 @@ interface RoomDocData {
   createdAt: Timestamp
   expiresAt: Timestamp
   nextRoomCode?: string
+  /** Set on a room started with Play again: the finished room its players come from. */
+  previousRoomCode?: string
 }
 
 interface PlayerDocData {
@@ -141,6 +143,8 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
   private readonly writeTimeoutMs: number
   private readonly newGuestId: () => string
   private roomCode: string | null
+  /** The finished room this one's players come from (Play again), once createNextGame made it. */
+  private previousRoomCode: string | null = null
   private readonly unsubscribes = new Set<Unsubscribe>()
 
   constructor(deps: FirestoreGameRepositoryDeps) {
@@ -153,7 +157,22 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     this.roomCode = deps.roomCode ?? null
   }
 
-  async createGame(config: GameConfig): Promise<CreatedGame> {
+  createGame(config: GameConfig): Promise<CreatedGame> {
+    return this.createRoom(config, {})
+  }
+
+  /** The room records the finished one, which is what lets the host seat its players here (see
+   * firestore.rules' isCarriedSeat). */
+  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame> {
+    const created = await this.createRoom(config, { previousRoomCode })
+    this.previousRoomCode = previousRoomCode
+    return created
+  }
+
+  private async createRoom(
+    config: GameConfig,
+    extraFields: Pick<RoomDocData, 'previousRoomCode'>,
+  ): Promise<CreatedGame> {
     await ensureSignedIn(this.auth)
     const hostUid = this.requireUid()
 
@@ -169,6 +188,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
             hostUid,
             createdAt: Timestamp.fromMillis(nowMs),
             expiresAt: Timestamp.fromMillis(nowMs + ROOM_TTL_MS),
+            ...extraFields,
           }),
           this.writeTimeoutMs,
         )
@@ -212,6 +232,8 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       )
     } catch (error) {
       if (!isPermissionDenied(error)) throw error
+      // The host of the game before seated this device meanwhile (Play again): already in.
+      if (await this.isSeated(uid)) return uid
       const record = await this.nameRecord(roomCode, name)
       // Your own record is a rejoin in progress, not a clash.
       const isTaken = record !== null && (record.ownerUid !== uid || record.playerId !== undefined)
@@ -229,21 +251,11 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     const roomCode = this.requireRoomCode()
     const name = cleanPlayerName(input.name)
     const guestId = `${GUEST_ID_PREFIX}${this.newGuestId()}`
-    const batch = writeBatch(this.db)
-    batch.set(doc(this.db, `room/${roomCode}/players/${guestId}`), {
-      name,
-      ownerUid: hostUid,
-      deviceUuid: guestId,
-      totalScore: 0,
-      joinOrder: this.now(),
-      isGuest: true,
-    } satisfies PlayerDocData)
-    batch.set(doc(this.db, `room/${roomCode}/names/${playerNameKey(name)}`), {
-      ownerUid: hostUid,
-      playerId: guestId,
-    } satisfies NameRecordData)
     try {
-      await withTimeout(batch.commit(), this.writeTimeoutMs)
+      await withTimeout(
+        this.seatGuest(roomCode, hostUid, guestId, { name, joinOrder: this.now() }),
+        this.writeTimeoutMs,
+      )
     } catch (error) {
       if (!isPermissionDenied(error)) throw error
       const record = await this.nameRecord(roomCode, name)
@@ -251,6 +263,64 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       throw error
     }
     return guestId
+  }
+
+  private seatGuest(
+    roomCode: string,
+    hostUid: string,
+    guestId: string,
+    seat: { name: string; joinOrder: number },
+  ): Promise<void> {
+    const batch = writeBatch(this.db)
+    batch.set(doc(this.db, `room/${roomCode}/players/${guestId}`), {
+      name: seat.name,
+      ownerUid: hostUid,
+      deviceUuid: guestId,
+      totalScore: 0,
+      joinOrder: seat.joinOrder,
+      isGuest: true,
+    } satisfies PlayerDocData)
+    batch.set(doc(this.db, `room/${roomCode}/names/${playerNameKey(seat.name)}`), {
+      ownerUid: hostUid,
+      playerId: guestId,
+    } satisfies NameRecordData)
+    return batch.commit()
+  }
+
+  async carrySeats(): Promise<void> {
+    await ensureSignedIn(this.auth)
+    const hostUid = this.requireUid()
+    const roomCode = this.requireRoomCode()
+    if (!this.previousRoomCode) throw new Error('carrySeats: call createNextGame() first')
+    const previousSeats = await withTimeout(
+      getDocs(collection(this.db, `room/${this.previousRoomCode}/players`)),
+      this.writeTimeoutMs,
+    )
+    // Settled, not all: a seat that can't be taken is someone the host adds again in the room,
+    // and their phone still has "Join the next game".
+    await Promise.allSettled(
+      previousSeats.docs
+        .filter((seat) => seat.id !== hostUid)
+        .map((seat) =>
+          withTimeout(
+            this.carrySeat(roomCode, hostUid, seat.id, seat.data() as PlayerDocData),
+            this.writeTimeoutMs,
+          ),
+        ),
+    )
+  }
+
+  /** As it was in the finished room, zeroed: a guest keeps its id, so its stats stay together, and
+   * everyone keeps their place in the order. */
+  private carrySeat(
+    roomCode: string,
+    hostUid: string,
+    playerId: string,
+    seat: PlayerDocData,
+  ): Promise<void> {
+    const kept = { name: seat.name, joinOrder: seat.joinOrder }
+    if (seat.isGuest === true) return this.seatGuest(roomCode, hostUid, playerId, kept)
+    return this.takeSeat(roomCode, playerId, { ...kept, deviceUuid: seat.deviceUuid })
   }
 
   /** The seat and its name record in one batch: the rules only accept a seat together with its
@@ -301,8 +371,8 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     return data.status === 'finished' ? 'finished' : 'open'
   }
 
-  /** The rules only let members read seats, so a non-member reading their own seat is refused:
-   * that means "not seated", not an error. */
+  /** A refused read means "not seated", not an error: rules before the own-seat read (Play
+   * again) only let members read seats. */
   private async isSeated(uid: string): Promise<boolean> {
     try {
       const seat = await getDoc(doc(this.db, `room/${this.requireRoomCode()}/players/${uid}`))
@@ -320,12 +390,30 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     let room: Pick<GameState, 'status' | 'currentRound' | 'nextRoomCode'> | null = null
     let players: Player[] = []
     let roundScores: RoundScore[] = []
+    let hasSeatInNextRoom = false
+    let nextSeatUnsub: Unsubscribe | null = null
 
     // Waits for the room doc's first snapshot before emitting — status/currentRound are
     // required fields on GameState, so there is nothing coherent to emit before then.
     const emit = () => {
       if (!room) return
-      onChange({ ...room, players, roundScores })
+      onChange({ ...room, players, roundScores, ...(hasSeatInNextRoom && { hasSeatInNextRoom }) })
+    }
+
+    // Play again: the host seats everyone in the next room right after linking to it, so this
+    // device watches for its own seat there, and can move as soon as it has one.
+    const watchNextSeat = (nextRoomCode: string) => {
+      const uid = this.auth.currentUser?.uid
+      if (nextSeatUnsub || !uid) return
+      nextSeatUnsub = onSnapshot(
+        doc(this.db, `room/${nextRoomCode}/players/${uid}`),
+        (seat) => {
+          hasSeatInNextRoom = seat.exists()
+          emit()
+        },
+        // Not a lost game: "Join the next game" stays on screen as the way in.
+        () => undefined,
+      )
     }
 
     const roomUnsub = onSnapshot(
@@ -337,6 +425,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
         // The rules check the link, but it becomes a route and a join, so it's checked here too.
         if (typeof data.nextRoomCode === 'string' && isValidRoomCode(data.nextRoomCode)) {
           room.nextRoomCode = data.nextRoomCode
+          watchNextSeat(data.nextRoomCode)
         }
         emit()
       },
@@ -365,6 +454,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       roomUnsub()
       playersUnsub()
       roundScoresUnsub()
+      nextSeatUnsub?.()
       this.unsubscribes.delete(unsubscribe)
     }
     this.unsubscribes.add(unsubscribe)

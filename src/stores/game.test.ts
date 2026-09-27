@@ -700,15 +700,29 @@ describe('useGameStore.resumeOnline', () => {
 class FakeReplayableRepository extends FakeGameRepository implements ReplayableGameRepository {
   linkedRoomCodes: string[] = []
   linkError: Error | null = null
+  /** The links already written when carrySeats ran: the rules need the link first. */
+  linksWhenCarrying: string[] | null = null
+  finishedRoom: FakeReplayableRepository | null = null
+
+  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame> {
+    const created = await this.createGame(config)
+    this.callOrder.splice(-1, 1, `createNextGame:${previousRoomCode}`)
+    return created
+  }
 
   async linkNextRoom(nextRoomCode: string): Promise<void> {
     this.callOrder.push('linkNextRoom')
     if (this.linkError) throw this.linkError
     this.linkedRoomCodes.push(nextRoomCode)
   }
+
+  async carrySeats(): Promise<void> {
+    this.callOrder.push('carrySeats')
+    this.linksWhenCarrying = [...(this.finishedRoom?.linkedRoomCodes ?? [])]
+  }
 }
 
-describe('useGameStore.playAgain', () => {
+describe('useGameStore.playAgain online', () => {
   const FINISHED_CODE = 'ABCDE'
   const NEXT_CODE = 'FGHJK'
 
@@ -718,18 +732,19 @@ describe('useGameStore.playAgain', () => {
     finished.roomCodeToReturn = FINISHED_CODE
     await game.start(finished, HOST_CONFIG)
     await game.finishGame()
-    const next = new FakeGameRepository()
+    const next = new FakeReplayableRepository()
     next.roomCodeToReturn = NEXT_CODE
+    next.finishedRoom = finished
     return { game, finished, next }
   }
 
-  it('creates the next room, points the finished room at it, then follows the next room', async () => {
+  it('creates the next room from the finished one, links to it, brings everyone along, then follows it', async () => {
     const { game, finished, next } = await finishedOnlineGame()
 
     await game.playAgain(next, HOST_CONFIG)
 
-    expect(next.callOrder).toEqual(['createGame', 'subscribe'])
-    expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
+    expect(next.callOrder).toEqual([`createNextGame:${FINISHED_CODE}`, 'carrySeats', 'subscribe'])
+    expect(next.linksWhenCarrying).toEqual([NEXT_CODE])
     expect(finished.leaveCalls).toBe(1)
     expect(game.roomCode).toBe(NEXT_CODE)
     expect(game.isHost).toBe(true)
@@ -738,19 +753,30 @@ describe('useGameStore.playAgain', () => {
     expect(lastRoom()).toBe(NEXT_CODE)
   })
 
-  it('still moves to the next room when the finished room refuses the link', async () => {
+  it('still moves to the next room, bringing whoever it can, when the finished room refuses the link', async () => {
     const { game, finished, next } = await finishedOnlineGame()
     finished.linkError = Object.assign(new Error('expired'), { code: 'permission-denied' })
 
     await game.playAgain(next, HOST_CONFIG)
 
+    expect(next.callOrder).toContain('carrySeats')
+    expect(game.roomCode).toBe(NEXT_CODE)
+  })
+
+  it('still moves to the linked next room when bringing the others fails', async () => {
+    const { game, finished, next } = await finishedOnlineGame()
+    next.carrySeats = () => Promise.reject(new Error('unreachable'))
+
+    await game.playAgain(next, HOST_CONFIG)
+
+    expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
     expect(game.roomCode).toBe(NEXT_CODE)
   })
 
   it('keeps the finished game when the next room cannot be created, and passes the error on', async () => {
     const { game, finished, next } = await finishedOnlineGame()
     const unreachable = new Error('unreachable')
-    next.createGame = () => Promise.reject(unreachable)
+    next.createNextGame = () => Promise.reject(unreachable)
 
     const error = await game.playAgain(next, HOST_CONFIG).catch((caught: unknown) => caught)
 
@@ -761,21 +787,29 @@ describe('useGameStore.playAgain', () => {
     expect(game.status).toBe('finished')
   })
 
-  it("seats the finished game's guests in the next room before pointing the others at it", async () => {
-    const { game, finished, next } = await finishedOnlineGame()
+  it("exposes the finished room's link to the next room, and whether this device is seated there", async () => {
+    const { game, finished } = await finishedOnlineGame()
+
+    finished.emit({ ...finished.state, nextRoomCode: NEXT_CODE })
+    expect(game.nextRoomCode).toBe(NEXT_CODE)
+    expect(game.hasSeatInNextRoom).toBe(false)
+
+    finished.emit({ ...finished.state, hasSeatInNextRoom: true })
+    expect(game.hasSeatInNextRoom).toBe(true)
+  })
+})
+
+describe('useGameStore.playAgain on this device', () => {
+  it('starts the next game with the other players seated again, in order', async () => {
+    const game = useGameStore()
+    await game.start(new FakeGameRepository(), HOST_CONFIG)
+    await game.finishGame()
+    const next = new FakeGameRepository()
 
     await game.playAgain(next, HOST_CONFIG, ['Mummo', 'Ukki'])
 
     expect(next.callOrder).toEqual(['createGame', 'addGuest:Mummo', 'addGuest:Ukki', 'subscribe'])
-    expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
-  })
-
-  it("exposes the finished room's link to the next room", async () => {
-    const { game, finished } = await finishedOnlineGame()
-
-    finished.emit({ ...finished.state, nextRoomCode: NEXT_CODE })
-
-    expect(game.nextRoomCode).toBe(NEXT_CODE)
+    expect(game.status).toBe('waiting')
   })
 })
 

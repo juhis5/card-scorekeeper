@@ -434,6 +434,150 @@ describe('FirestoreGameRepository play again', () => {
       { nextRoomCode: NEXT_CODE },
     )
   })
+
+  it('tells this device once it has a seat in the next room, so it can move there', () => {
+    const onChange = vi.fn()
+    new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: ALICE_UID } } as never,
+      roomCode: ROOM_CODE,
+    }).subscribe(onChange)
+
+    emitRoom({ status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE })
+    const seatWatch = onSnapshotMock.mock.calls.find(
+      (call) => (call[0] as { path: string }).path === `room/${NEXT_CODE}/players/${ALICE_UID}`,
+    )
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ hasSeatInNextRoom: true }),
+    )
+    ;(seatWatch?.[1] as (snapshot: unknown) => void)({ exists: () => true })
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ nextRoomCode: NEXT_CODE, hasSeatInNextRoom: true }),
+    )
+  })
+})
+
+describe('FirestoreGameRepository bringing everyone along (Play again)', () => {
+  const NEXT_CODE = 'FGHJK'
+  const GUEST_ID = 'guest-3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'
+
+  function nextRoomRepository() {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      generateRoomCode: () => NEXT_CODE,
+    })
+  }
+
+  function seatDoc(id: string, fields: Record<string, unknown>) {
+    return { id, data: () => ({ totalScore: 35, ...fields }) }
+  }
+
+  const FINISHED_SEATS = [
+    seatDoc(HOST_UID, {
+      name: 'Host',
+      ownerUid: HOST_UID,
+      deviceUuid: 'device-host',
+      joinOrder: 0,
+    }),
+    seatDoc(ALICE_UID, {
+      name: 'Alice',
+      ownerUid: ALICE_UID,
+      deviceUuid: 'device-alice',
+      joinOrder: 7,
+    }),
+    seatDoc(GUEST_ID, {
+      name: 'Mummo',
+      ownerUid: HOST_UID,
+      deviceUuid: GUEST_ID,
+      joinOrder: 9,
+      isGuest: true,
+    }),
+  ]
+
+  async function nextRoom() {
+    const repo = nextRoomRepository()
+    await repo.createNextGame({ hostDeviceUuid: 'device-host', hostDisplayName: 'Host' }, ROOM_CODE)
+    batchSetMock.mockClear()
+    batchCommitMock.mockClear()
+    getDocsMock.mockResolvedValue({ docs: FINISHED_SEATS })
+    return repo
+  }
+
+  it('creates the next room naming the finished room its players come from', async () => {
+    await nextRoom()
+
+    expect(setDocMock).toHaveBeenCalledWith(
+      { path: `room/${NEXT_CODE}` },
+      expect.objectContaining({ code: NEXT_CODE, previousRoomCode: ROOM_CODE }),
+    )
+  })
+
+  it('seats everyone else as they were, each in a batch of its own, starting from nothing', async () => {
+    const repo = await nextRoom()
+
+    await repo.carrySeats()
+
+    expect(getDocsMock).toHaveBeenCalledWith({ path: `room/${ROOM_CODE}/players` })
+    expect(
+      batchSetMock.mock.calls.map(([ref, data]) => [(ref as { path: string }).path, data]),
+    ).toEqual([
+      [
+        `room/${NEXT_CODE}/players/${ALICE_UID}`,
+        {
+          name: 'Alice',
+          ownerUid: ALICE_UID,
+          deviceUuid: 'device-alice',
+          totalScore: 0,
+          joinOrder: 7,
+        },
+      ],
+      [`room/${NEXT_CODE}/names/n_alice`, { ownerUid: ALICE_UID }],
+      [
+        `room/${NEXT_CODE}/players/${GUEST_ID}`,
+        {
+          name: 'Mummo',
+          ownerUid: HOST_UID,
+          deviceUuid: GUEST_ID,
+          totalScore: 0,
+          joinOrder: 9,
+          isGuest: true,
+        },
+      ],
+      [`room/${NEXT_CODE}/names/n_mummo`, { ownerUid: HOST_UID, playerId: GUEST_ID }],
+    ])
+    expect(batchCommitMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('still seats the others when one seat is refused, such as a player who joined first', async () => {
+    const repo = await nextRoom()
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+
+    await expect(repo.carrySeats()).resolves.toBeUndefined()
+    expect(batchCommitMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('brings nobody along into a room that was not started from a finished one', async () => {
+    const repo = nextRoomRepository()
+    await repo.createGame({ hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+
+    await expect(repo.carrySeats()).rejects.toThrow()
+  })
+
+  it('counts a seat the host brought along meanwhile as joined, not as a refusal', async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+    getDocMock
+      .mockResolvedValueOnce(snapshot(undefined))
+      .mockResolvedValueOnce(snapshot({ name: 'Alice', ownerUid: ALICE_UID, joinOrder: 7 }))
+    const repo = new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: ALICE_UID } } as never,
+      roomCode: NEXT_CODE,
+    })
+
+    await expect(repo.addPlayer({ name: 'Alice', deviceUuid: 'd' })).resolves.toBe(ALICE_UID)
+  })
 })
 
 describe('FirestoreGameRepository write timeouts', () => {

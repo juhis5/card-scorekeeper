@@ -4,13 +4,15 @@
  *
  * - Local: Play again starts the next game at once with the same players; the host adds or
  *   removes players in the room.
- * - Online host: Play again creates the next room, points this one at it and moves there. Never a
- *   local game when the server can't be reached: the other phones wait for that room, so the host
- *   gets an error and a retry instead.
- * - Online, once the host has started the next game: everyone still here is asked to join it,
- *   seated with their name from this game. A host back in this room later gets there the same way.
+ * - Online host: Play again creates the next room, points this one at it, seats everyone there as
+ *   they were here, and moves there. Never a local game when the server can't be reached: the
+ *   other phones wait for that room, so the host gets an error and a retry instead.
+ * - Online, once the host has started the next game: every phone still here moves there by itself
+ *   as soon as it has its seat (third playtest: nobody should have to join again). "Join the next
+ *   game" stays as the way in when that seat never comes, e.g. the host's phone lost the
+ *   connection. A host back in this room later gets there the same way.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRouter } from 'vue-router'
@@ -21,17 +23,12 @@ import { isPermanentWriteError } from '@/lib/write-errors'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 
-const {
-  myName,
-  otherNames,
-  guestNames = [],
-} = defineProps<{
+const { myName, otherNames } = defineProps<{
   /** This device's name in the finished game. */
   myName: string
-  /** Everyone else's, in seat order: a local Play again seats them again. */
+  /** Everyone else's, in seat order: a local Play again seats them again. (Online, the next room
+   * takes everyone's seat as it was.) */
   otherNames: string[]
-  /** Online guests (players without a phone), seated in the next room along with the host. */
-  guestNames?: string[]
 }>()
 
 type PlayAgainError = 'startFailed' | 'unreachable' | 'joinFailed' | 'nameTaken'
@@ -40,7 +37,7 @@ const { t } = useI18n()
 const router = useRouter()
 const game = useGameStore()
 const identity = useIdentityStore()
-const { isHost, isOnline, nextRoomCode } = storeToRefs(game)
+const { isHost, isOnline, nextRoomCode, hasSeatInNextRoom } = storeToRefs(game)
 const { joinRepository, localRepository, nextRoomRepository } = useGameConnectivity()
 
 const isBusy = ref(false)
@@ -74,11 +71,10 @@ async function startNextRoom(): Promise<void> {
     return
   }
   try {
-    await game.playAgain(
-      mode.repository,
-      { hostDeviceUuid: identity.deviceUuid, hostDisplayName: myName },
-      guestNames,
-    )
+    await game.playAgain(mode.repository, {
+      hostDeviceUuid: identity.deviceUuid,
+      hostDisplayName: myName,
+    })
   } catch {
     error.value = 'startFailed'
     return
@@ -125,6 +121,16 @@ function handlePlayAgain(): Promise<void> {
 function handleJoinNext(code: string): Promise<void> {
   return run(() => joinNextRoom(code))
 }
+
+// The seat is already there, so joining just moves this phone over. On the host's own phone this
+// fires while Play again is still busy, and is skipped.
+watch(
+  hasSeatInNextRoom,
+  (isSeated) => {
+    if (isSeated && nextRoomCode.value) void handleJoinNext(nextRoomCode.value)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>

@@ -104,19 +104,30 @@ service cloud.firestore {
       // only ever fetches/subscribes a room by code — never lists the collection.
       allow get: if isSignedIn();
 
+      // Play again: the next room names the finished room its players come from, which lets the
+      // host seat them here (isCarriedSeat below). Only a finished room the same host ran.
+      function isFinishedRoomOfHost(previousCode) {
+        return isRoomCode(previousCode)
+          && previousCode != code
+          && roomData(previousCode).hostUid == request.auth.uid
+          && roomData(previousCode).status == 'finished';
+      }
+
       // Only the creator can mint a room, at a real room code, seeded at round 1 with an honest
       // expiry: in the future, and no later than the 6 h lifetime plus an hour of client clock
       // skew (an open-ended expiry would defeat "rooms auto-expire").
       allow create: if isSignedIn()
         && isRoomCode(code)
-        && request.resource.data.keys().hasOnly(['code', 'status', 'currentRound', 'hostUid', 'createdAt', 'expiresAt'])
+        && request.resource.data.keys().hasOnly(['code', 'status', 'currentRound', 'hostUid', 'createdAt', 'expiresAt', 'previousRoomCode'])
         && request.resource.data.code == code
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.currentRound == 1
         && request.resource.data.status == 'waiting'
         && request.resource.data.createdAt is timestamp
         && request.resource.data.expiresAt > request.time
-        && request.resource.data.expiresAt <= request.time + duration.value(7, 'h');
+        && request.resource.data.expiresAt <= request.time + duration.value(7, 'h')
+        && (!('previousRoomCode' in request.resource.data)
+          || isFinishedRoomOfHost(request.resource.data.previousRoomCode));
 
       // Only the host advances rounds / finishes the game, and only while the room is live.
       // `resource` (not a get()) is enough here — we're already inside this exact document's
@@ -160,6 +171,9 @@ service cloud.firestore {
 
       match /players/{playerUid} {
         allow read: if isSignedIn() && isRoomMember(code);
+        // Your own seat, even before you have one: a phone left in the finished room watches for
+        // the seat the host gives it in the next one (Play again), then moves there.
+        allow get: if isSignedIn() && playerUid == request.auth.uid;
 
         // Joining is seating yourself, and nobody may claim an ownerUid that isn't their own uid.
         // The shape is exact: this doc is the membership key every other rule trusts, and a seat
@@ -206,7 +220,36 @@ service cloud.firestore {
             && request.resource.data.joinOrder is int;
         }
 
-        allow create: if isOwnSeat() || isGuestSeat();
+        // Play again: the host seats a player of the finished room here, as they were there, so
+        // nobody has to join again. Only into the one room the finished room points at (its
+        // nextRoomCode is set once), before the game starts: the host can't seat a former
+        // player in any number of rooms. A guest goes along as a guest seat, above.
+        function isCarriedSeat() {
+          let previousCode = roomData(code).get('previousRoomCode', '');
+          let previousSeat = get(
+            /databases/$(database)/documents/room/$(previousCode)/players/$(playerUid)
+          ).data;
+          return isSignedIn()
+            && isHost(code)
+            && roomNotExpired(code)
+            && roomData(code).status == 'waiting'
+            && isRoomCode(previousCode)
+            && roomData(previousCode).hostUid == request.auth.uid
+            && roomData(previousCode).get('nextRoomCode', '') == code
+            && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
+            && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
+            && previousSeat.ownerUid == playerUid
+            && request.resource.data.ownerUid == playerUid
+            && request.resource.data.name == previousSeat.name
+            && request.resource.data.deviceUuid == previousSeat.deviceUuid
+            && getAfter(
+              /databases/$(database)/documents/room/$(code)/names/$(nameKeyOf(request.resource.data.name))
+            ).data.ownerUid == playerUid
+            && request.resource.data.totalScore == 0
+            && request.resource.data.joinOrder is int;
+        }
+
+        allow create: if isOwnSeat() || isGuestSeat() || isCarriedSeat();
 
         // A player's own running total, or any seat's for the host. Only totalScore may change:
         // deviceUuid is the stats trust anchor (a player rewriting it to someone else's key could
@@ -254,11 +297,22 @@ service cloud.firestore {
             && nameKey == nameKeyOf(seat.name);
         }
 
+        // A player the host seats from the finished room (Play again): the record is the
+        // player's own, as if they had joined, and names the seat the host is creating for them.
+        function isCarriedSeatRecord() {
+          let playerUid = request.resource.data.ownerUid;
+          let seat = getAfter(/databases/$(database)/documents/room/$(code)/players/$(playerUid)).data;
+          return isHost(code)
+            && request.resource.data.keys().hasOnly(['ownerUid'])
+            && seat.ownerUid == playerUid
+            && nameKey == nameKeyOf(seat.name);
+        }
+
         allow get: if isSignedIn();
         allow list: if false;
         allow create: if isSignedIn()
           && roomNotExpired(code)
-          && (isOwnSeatRecord() || isGuestSeatRecord());
+          && (isOwnSeatRecord() || isGuestSeatRecord() || isCarriedSeatRecord());
         allow update: if false;
         allow delete: if isSignedIn() && isHost(code) && roomNotExpired(code);
       }

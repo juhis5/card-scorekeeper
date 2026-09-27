@@ -37,6 +37,9 @@ class FakeRoom implements ReplayableGameRepository {
   linkedRoomCodes: string[] = []
   seatedNames: string[] = []
   addPlayerError: Error | null = null
+  /** The finished room the next one came from, and whether its seats were brought along. */
+  previousRoomCode: string | null = null
+  hasCarriedSeats = false
 
   constructor(private readonly roomCode: string | null) {}
 
@@ -62,8 +65,17 @@ class FakeRoom implements ReplayableGameRepository {
     return () => this.listeners.delete(onChange)
   }
 
+  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame> {
+    this.previousRoomCode = previousRoomCode
+    return this.createGame(config)
+  }
+
   async linkNextRoom(nextRoomCode: string): Promise<void> {
     this.linkedRoomCodes.push(nextRoomCode)
+  }
+
+  async carrySeats(): Promise<void> {
+    this.hasCarriedSeats = true
   }
 
   async setRoundScore(): Promise<void> {}
@@ -93,11 +105,7 @@ function makeRouter() {
   })
 }
 
-async function renderPlayAgain(props: {
-  myName: string
-  otherNames: string[]
-  guestNames?: string[]
-}) {
+async function renderPlayAgain(props: { myName: string; otherNames: string[] }) {
   const router = makeRouter()
   await router.push({ name: 'room', params: { code: FINISHED_CODE } })
   render(PlayAgain, { props, global: { plugins: [i18n, router] } })
@@ -144,7 +152,7 @@ describe('PlayAgain after a local game', () => {
 })
 
 describe('PlayAgain, online host', () => {
-  it('creates the next room under the same name, points this room at it and moves there', async () => {
+  it('creates the next room under the same name, brings everyone along and moves there', async () => {
     const finished = await finishedHostedGame(FINISHED_CODE)
     const next = new FakeRoom(NEXT_CODE)
     nextRoomRepository.mockResolvedValue({ kind: 'online', repository: next })
@@ -154,20 +162,10 @@ describe('PlayAgain, online host', () => {
     await flushPromises()
 
     expect(next.seatedNames).toEqual(['Juho'])
+    expect(next.previousRoomCode).toBe(FINISHED_CODE)
     expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
+    expect(next.hasCarriedSeats).toBe(true)
     expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
-  })
-
-  it('seats the players without a phone in the next room too', async () => {
-    await finishedHostedGame(FINISHED_CODE)
-    const next = new FakeRoom(NEXT_CODE)
-    nextRoomRepository.mockResolvedValue({ kind: 'online', repository: next })
-    await renderPlayAgain({ myName: 'Juho', otherNames: ['Jani', 'Mummo'], guestNames: ['Mummo'] })
-
-    await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
-    await flushPromises()
-
-    expect(next.seatedNames).toEqual(['Juho', 'Mummo (guest)'])
   })
 
   it("says so when the server can't be reached, and a second tap tries again", async () => {
@@ -218,7 +216,33 @@ describe('PlayAgain, the other players', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
-  it('asks to join the next game once the host starts it, and seats them under the same name', async () => {
+  it('moves to the next game by itself once the host has seated them there', async () => {
+    const finished = await finishedJoinedGame()
+    const next = new FakeRoom(NEXT_CODE)
+    joinRepository.mockResolvedValue({ kind: 'online', repository: next })
+    const router = await renderPlayAgain({ myName: 'Jani', otherNames: ['Juho'] })
+
+    finished.finish({ nextRoomCode: NEXT_CODE })
+    await flushPromises()
+    expect(joinRepository).not.toHaveBeenCalled()
+    finished.finish({ nextRoomCode: NEXT_CODE, hasSeatInNextRoom: true })
+    await flushPromises()
+
+    expect(joinRepository).toHaveBeenCalledWith(NEXT_CODE)
+    expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
+  })
+
+  it('moves at once when their seat in the next game is already there as the page opens', async () => {
+    const finished = await finishedJoinedGame()
+    joinRepository.mockResolvedValue({ kind: 'online', repository: new FakeRoom(NEXT_CODE) })
+    finished.finish({ nextRoomCode: NEXT_CODE, hasSeatInNextRoom: true })
+    const router = await renderPlayAgain({ myName: 'Jani', otherNames: ['Juho'] })
+    await flushPromises()
+
+    expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
+  })
+
+  it('asks to join the next game when no seat comes, and seats them under the same name', async () => {
     const finished = await finishedJoinedGame()
     const next = new FakeRoom(NEXT_CODE)
     joinRepository.mockResolvedValue({ kind: 'online', repository: next })

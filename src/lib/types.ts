@@ -51,6 +51,9 @@ export interface GameState {
   /** Online only: set once the game has finished and its host started the next one (Play again),
    * so every device still in this room can join it. */
   nextRoomCode?: string
+  /** Online only: this device already has a seat in the next room (the host brought everyone
+   * along), so it can move there without joining. */
+  hasSeatInNextRoom?: boolean
 }
 
 /** A player's rank in the current (or final) standings. */
