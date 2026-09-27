@@ -617,15 +617,18 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     red and black, and each card has a spoken name ("hertta seitsemän").
 - 2026-09-27 — The open card and the phone keyboard (third playtest: "the input fields are behind
   the mobile keyboard"):
-  - A plain focus again, so the phone moves the field above its keyboard as it would anywhere.
-    Round 2's `focus({ preventScroll: true })` had turned that off.
-  - `useKeepInView` then keeps the whole open card showing between the sticky header and the
-    bottom bar within `window.visualViewport`, re-checking whenever it resizes. On an iPhone the
-    keyboard shrinks only the visual viewport, not the page. The scroll maths is the pure
-    `scrollToReveal`. Android Chrome also gets `interactive-widget=resizes-content`, so its
-    keyboard resizes the page and the bottom bar rides above it.
-  - Found while doing this: leaving a field by tapping another card saved and closed the first
-    card on the press, the list shifted, and the tap landed elsewhere. The score still saves at
-    once, but the card now closes only after that tap's click has landed (or after 500 ms when
-    no tap follows, as with the keyboard), and stays open when the tap lands back on it.
-  - The keyboard part can only be checked on real phones.
+  - Opening a card first moves it clear of the sticky header and the Next bar (`useKeepInView`,
+    the pure `scrollToReveal`), then focuses the field with a plain `focus()`, so the phone's own
+    keyboard scrolling runs last. Round 2's `focus({ preventScroll: true })` had turned that off.
+  - Tried and removed: following `window.visualViewport` resizes while the keyboard was up. On an
+    iPhone it also resizes while scrolling (the toolbars sliding), so the page jumped back
+    mid-scroll. A unit test pins that a resize never scrolls the page.
+  - The real cover-up on the iPhone was the sticky Next bar: with the keyboard up it sits right
+    above the keyboard, on top of the field. The room's bottom bars stop sticking while any field
+    in the room has focus (`:has(input:focus)`) and drop back to the end of the list.
+  - Android Chrome gets `interactive-widget=resizes-content`, so its keyboard resizes the page.
+  - Found on the way: leaving a field by tapping another card saved and closed the first card on
+    the press, the list shifted, and the tap landed elsewhere. The score still saves at once,
+    but the card now closes only after that tap's click has landed (or after 500 ms when no tap
+    follows, as with the keyboard), and stays open when the tap lands back on it.
+  - How the iPhone keyboard behaves can only be checked on a real phone.

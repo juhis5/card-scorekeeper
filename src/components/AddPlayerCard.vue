@@ -30,17 +30,17 @@ const errorMessage = ref('')
 const isAdding = ref(false)
 const openButton = useTemplateRef<HTMLButtonElement>('openButton')
 const cardElement = useTemplateRef<HTMLLIElement>('card')
-const { reveal } = useKeepInView(cardElement, isOpen)
+const { reveal } = useKeepInView(cardElement)
 
 const hasError = computed(() => errorMessage.value !== '')
 
 async function open(): Promise<void> {
   isOpen.value = true
   await nextTick()
-  // Like an open score card: a plain focus, then the whole form clear of the header, the Next bar
-  // and the keyboard.
-  document.getElementById('add-player-name')?.focus()
+  // Like an open score card: the whole form clear of the header and the Next bar, then a plain
+  // focus, so the phone's own keyboard scrolling has the last word.
   reveal()
+  document.getElementById('add-player-name')?.focus()
 }
 
 /** The form unmounts, so hand focus back to the button that opened it: when focus was in the

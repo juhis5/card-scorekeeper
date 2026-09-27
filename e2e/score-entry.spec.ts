@@ -57,6 +57,17 @@ test.describe('score entry on a card', () => {
     await startLocalGame(page)
   })
 
+  test('the Next bar stops sticking while a field has focus, so it never covers the field', async ({
+    page,
+  }) => {
+    const nextBar = page.locator('[data-bottom-bar]')
+    await expect(nextBar).toHaveCSS('position', 'sticky')
+
+    await typeMaijuScore(page, '10')
+
+    await expect(nextBar).toHaveCSS('position', 'static')
+  })
+
   test('tapping another card saves the open one and opens the one tapped', async ({ page }) => {
     await page.getByRole('button', { name: "Enter Host's score" }).click()
     await page.getByLabel("Host's round 1 score").fill('20')
