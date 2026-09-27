@@ -378,3 +378,18 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   - **Seat validation in rules:** exact keys, name 1–40 chars (`MAX_PLAYER_NAME_LENGTH`), starting
     total 0, integer `joinOrder`; updates keep name valid and total a non-negative int.
   - Players without a phone in online rooms: deferred to its own round.
+- 2026-09-27 — Review round 3b, connection resilience:
+  - Reachability = sign in + `getDocFromServer('room/probe')`. Sign-in alone is answered from cache
+    for a returning device, so Wi-Fi without internet used to pass and Start then hung. (Not
+    `__probe__`: Firestore rejects ids matching `__.*__`, caught by the online e2e.)
+  - Creating a room / taking a seat time out after 10 s (`withTimeout`, a transient
+    `deadline-exceeded`); the host falls back to a local game, a joiner is told the game is
+    unreachable. The queued write may still land later as an orphan room; accepted.
+  - Reload resumes `/room/CODE`: `findSeat()` (seat read refused by the rules = not seated; host
+    from `hostUid`), idempotent `addPlayer`, and "Opening room" / "Join room CODE" states.
+  - `subscribe(onChange, onError)`: listener failures show "no longer in this room"
+    (permission-denied, e.g. removed or closed) or "connection lost, reload".
+  - The launch flush no longer loads Firebase when nothing is queued. The offline banner says
+    "Playing a local game on this device…" instead of claiming "You're offline".
+  - Still open: a snapshot-metadata "not synced yet" indicator (sync-7) and showing the
+    failed-results list.
