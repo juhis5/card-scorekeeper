@@ -31,7 +31,7 @@ Concrete and enforced, not vibes. Prettier owns formatting; ESLint owns correctn
 ## Types (TypeScript strict)
 
 - **No `any`.** Use precise types; `unknown` + narrowing at untyped boundaries (API/model responses), then validate before the value flows inward.
-- Model the domain in `src/lib/types.ts`; make illegal states unrepresentable (discriminated unions over a soup of optional fields).
+- Model the domain in `src/lib/game/types.ts`; make illegal states unrepresentable (discriminated unions over a soup of optional fields).
 - No non-null `!` assertions to dodge the checker — handle the null.
 
 ## Structure & duplication

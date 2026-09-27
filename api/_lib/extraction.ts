@@ -8,8 +8,8 @@
  * resolves cleanly here — the recompute is *the same code* the manual-entry path and the rest of
  * the app use, not a copy that could drift out of parity.
  */
-import { cardValue, roundTotal } from '../../src/lib/rules.js'
-import type { Card, Rank, Suit } from '../../src/lib/types.js'
+import { cardValue, roundTotal } from '../../src/lib/game/rules.js'
+import type { Card, Rank, Suit } from '../../src/lib/game/types.js'
 import type { CountResponseBody } from './types.js'
 
 const VALID_RANKS: ReadonlySet<string> = new Set([

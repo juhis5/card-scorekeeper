@@ -17,7 +17,7 @@ pnpm dlx shadcn-vue@latest add button dialog sheet input label sonner table
 ```
 
 - Verify the current commands/flags against shadcn-vue docs — versions here are directional ("use latest").
-- Components land in `src/components/ui/`. The `cn()` helper (clsx + tailwind-merge) lives in `src/lib/utils.ts`.
+- Components land in `src/components/ui/`. The `cn()` helper (clsx + tailwind-merge) lives in `src/lib/utils.ts` (kept at the top of `lib/`, where the shadcn CLI expects it).
 - The theme (CSS variables in `:root` + `.dark`) is set here — see the `design-system` skill for our dark-first values.
 
 ## The rule: reach for a primitive first

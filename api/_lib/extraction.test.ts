@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import { buildExtractionResult, parseModelCards, parseModelOutput } from './extraction'
-import type { Card } from '../../src/lib/types'
+import type { Card } from '../../src/lib/game/types'
 
 describe('parseModelCards', () => {
   it('parses a well-formed cards array', () => {

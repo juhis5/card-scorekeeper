@@ -5,9 +5,9 @@
  * page can't drift from the scoring. Plain content, part of the precached app, so it opens offline.
  */
 import { useI18n } from 'vue-i18n'
-import PlayingCard from '@/components/PlayingCard.vue'
-import { CONTRACTS, cardValue } from '@/lib/rules'
-import type { Card, Suit } from '@/lib/types'
+import PlayingCard from '@/components/rules/PlayingCard.vue'
+import { CONTRACTS, cardValue } from '@/lib/game/rules'
+import type { Card, Suit } from '@/lib/game/types'
 
 const { t, n } = useI18n()
 

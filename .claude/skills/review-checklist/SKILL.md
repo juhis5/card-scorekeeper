@@ -27,7 +27,7 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 - No `any`, no `!` non-null dodges, no `@ts-ignore` / `eslint-disable` without an inline reason.
 
 ### 2. Tests sufficient (per `tdd`)
-- Logic (`lib/rules.ts`, stats, stores, composables, serverless) has test-first-grade coverage; new branches + edge cases covered.
+- Logic (`lib/game/rules.ts`, stats, stores, composables, serverless) has test-first-grade coverage; new branches + edge cases covered.
 - Components: **behavior** tested, not just "it renders".
 - **Firestore security rules** changes have emulator tests (own-vs-other score edits, host override, expired room, room-scoped reads).
 - Critical flow has/updates an e2e (two clients: an entered score shows as entered on the other live, and its number appears on both when the host moves on).

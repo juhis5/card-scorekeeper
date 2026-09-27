@@ -48,13 +48,13 @@ jobs:
           distribution: temurin
           java-version: '21' # the Firestore emulator JAR needs a JDK
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test:rules # firebase emulators:exec 'vitest run --config vitest.rules.config.ts'
-      # Real client SDK (browser build) vs the emulator — see vitest.integration.config.ts.
+      - run: pnpm test:rules # the `rules` project in vitest.config.ts, under emulators:exec
+      # Real client SDK (browser build) vs the emulator — the `integration` project.
       - run: pnpm test:integration
 
   # Two real browsers against the emulators and a production build: a score entered on one
   # client appears live on the other. Chromium + Firefox only: Playwright-WebKit's live-sync run
-  # is a documented flake (see playwright.config.ts). No retries, so a flake fails the job.
+  # is a documented flake (see tests/e2e/playwright.config.ts). No retries, so a flake fails the job.
   e2e:
     runs-on: ubuntu-latest
     steps:

@@ -15,15 +15,15 @@
     "lint:check": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:api": "vitest run --config vitest.api.config.ts",
+    "test": "vitest --project unit",
+    "test:run": "vitest run --project unit",
+    "test:api": "vitest run --project api",
     "test:api-load": "tsc -p tsconfig.api.json --noEmit false --outDir node_modules/.tmp/api-build && node --no-experimental-require-module --input-type=module -e \"await import('./node_modules/.tmp/api-build/api/count.js')\"",
-    "test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.rules.config.ts'",
-    "test:integration": "firebase emulators:exec --only firestore,auth 'vitest run --config vitest.integration.config.ts'",
-    "e2e": "playwright test",
-    "test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test'",
-    "test:e2e:ci": "CI=1 firebase emulators:exec --only firestore,auth 'playwright test --project=chromium --project=firefox'",
+    "test:rules": "firebase emulators:exec --only firestore,auth 'vitest run --project rules'",
+    "test:integration": "firebase emulators:exec --only firestore,auth 'vitest run --project integration'",
+    "e2e": "playwright test -c tests/e2e",
+    "test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test -c tests/e2e'",
+    "test:e2e:ci": "CI=1 firebase emulators:exec --only firestore,auth 'playwright test -c tests/e2e --project=chromium --project=firefox'",
     "prepare": "husky"
   },
   "dependencies": {
@@ -88,6 +88,11 @@
     ],
     "*.{js,json,css,md}": [
       "prettier --write"
+    ]
+  },
+  "commitlint": {
+    "extends": [
+      "@commitlint/config-conventional"
     ]
   }
 }

@@ -36,12 +36,12 @@ import {
   MAX_ROUND_SCORE,
   ROUND_SCORE_STEP,
   TOTAL_ROUNDS,
-} from '@/lib/rules'
-import { playerNameKey } from '@/lib/player-names'
+} from '@/lib/game/rules'
+import { playerNameKey } from '@/lib/game/player-names'
 
 const RULES_PATH = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
-  '../../firestore.rules',
+  '../../firebase/firestore.rules',
 )
 
 const ROOM_CODE = 'ABCDE'

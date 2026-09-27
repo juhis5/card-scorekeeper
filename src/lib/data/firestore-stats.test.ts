@@ -1,0 +1,147 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { GamePlayer, GameResult } from '../game/types'
+
+const setDocMock = vi.fn().mockResolvedValue(undefined)
+const getDocMock = vi.fn()
+const docMock = vi.fn((db: unknown, path: string) => ({ db, path }))
+
+vi.mock('firebase/firestore', () => ({
+  doc: (db: unknown, path: string) => docMock(db, path),
+  getDoc: (ref: unknown) => getDocMock(ref),
+  setDoc: (ref: unknown, data: unknown) => setDocMock(ref, data),
+}))
+
+const { writeGameResult } = await import('./firestore-stats')
+
+const DB = {} as never
+
+const RESULT: GameResult = {
+  gameId: 'g1',
+  finishedAt: '2026-01-01T00:00:00.000Z',
+  totalRounds: 5,
+}
+
+const PLAYERS: GamePlayer[] = [
+  {
+    gameId: 'g1',
+    deviceUuid: 'device-a',
+    displayName: 'Alice',
+    finalScore: 10,
+    placement: 1,
+    bestRound: 0,
+    worstRound: 5,
+  },
+  {
+    gameId: 'g1',
+    deviceUuid: 'device-b',
+    displayName: 'Bob',
+    finalScore: 20,
+    placement: 2,
+    bestRound: 2,
+    worstRound: 8,
+  },
+]
+
+/** By default, nothing has been written yet — every doc's existence check reports false. */
+function pathOf(ref: unknown): string {
+  return (ref as { path: string }).path
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  setDocMock.mockResolvedValue(undefined)
+  getDocMock.mockResolvedValue({ exists: () => false })
+})
+
+describe('writeGameResult', () => {
+  it('writes the game_result doc keyed by gameId, naming every player as a participant', async () => {
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    expect(docMock).toHaveBeenCalledWith(DB, 'game_result/g1')
+    expect(setDocMock).toHaveBeenCalledWith(
+      { db: DB, path: 'game_result/g1' },
+      {
+        gameId: 'g1',
+        finishedAt: '2026-01-01T00:00:00.000Z',
+        totalRounds: 5,
+        participantUids: ['device-a', 'device-b'],
+      },
+    )
+  })
+
+  it('writes one game_player doc per player, keyed by {gameId}_{deviceUuid}', async () => {
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    expect(docMock).toHaveBeenCalledWith(DB, 'game_player/g1_device-a')
+    expect(docMock).toHaveBeenCalledWith(DB, 'game_player/g1_device-b')
+    expect(setDocMock).toHaveBeenCalledWith(
+      { db: DB, path: 'game_player/g1_device-a' },
+      {
+        gameId: 'g1',
+        participantUids: ['device-a', 'device-b'],
+        deviceUuid: 'device-a',
+        displayName: 'Alice',
+        finalScore: 10,
+        placement: 1,
+        bestRound: 0,
+        worstRound: 5,
+      },
+    )
+  })
+
+  it('writes the game_result doc before any game_player doc (sequential, not batched)', async () => {
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    const paths = setDocMock.mock.calls.map((call) => pathOf(call[0]))
+    const resultIndex = paths.indexOf('game_result/g1')
+    const playerIndices = paths
+      .map((path, index) => ({ path, index }))
+      .filter((entry) => entry.path.startsWith('game_player/'))
+      .map((entry) => entry.index)
+
+    expect(resultIndex).toBe(0)
+    expect(Math.min(...playerIndices)).toBeGreaterThan(resultIndex)
+  })
+
+  it('writes nothing beyond the game_result doc when there are no players', async () => {
+    await writeGameResult(DB, RESULT, [])
+
+    expect(setDocMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips re-creating the game_result doc when it already exists (idempotent retry)', async () => {
+    getDocMock.mockImplementation((ref: unknown) =>
+      Promise.resolve({ exists: () => pathOf(ref) === 'game_result/g1' }),
+    )
+
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    const paths = setDocMock.mock.calls.map((call) => pathOf(call[0]))
+    expect(paths).not.toContain('game_result/g1')
+    // The game_player docs didn't exist yet, so they're still written.
+    expect(paths).toEqual(
+      expect.arrayContaining(['game_player/g1_device-a', 'game_player/g1_device-b']),
+    )
+  })
+
+  it('skips re-creating a game_player row that already exists, still writing the others', async () => {
+    getDocMock.mockImplementation((ref: unknown) =>
+      Promise.resolve({ exists: () => pathOf(ref) === 'game_player/g1_device-a' }),
+    )
+
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    const paths = setDocMock.mock.calls.map((call) => pathOf(call[0]))
+    expect(paths).toContain('game_result/g1')
+    expect(paths).not.toContain('game_player/g1_device-a')
+    expect(paths).toContain('game_player/g1_device-b')
+  })
+
+  it('writes nothing at all when every doc already exists (a fully-succeeded retry is a no-op)', async () => {
+    getDocMock.mockResolvedValue({ exists: () => true })
+
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    expect(setDocMock).not.toHaveBeenCalled()
+  })
+})

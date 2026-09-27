@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import en from './en.json'
 import fi from './fi.json'
-import { CONTRACTS } from '@/lib/rules'
+import { CONTRACTS } from '@/lib/game/rules'
 
 /** All dotted leaf-key paths in a nested messages object, e.g. "home.heading". */
 function leafKeyPaths(messages: object, prefix = ''): string[] {

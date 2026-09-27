@@ -101,7 +101,7 @@ export interface UsePhotoCountDeps {
 }
 
 async function defaultGetIdToken(): Promise<string | null> {
-  const { getFirebaseAuth } = await import('@/lib/firebase')
+  const { getFirebaseAuth } = await import('@/lib/data/firebase')
   const user = getFirebaseAuth().currentUser
   return user ? user.getIdToken() : null
 }
