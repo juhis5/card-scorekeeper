@@ -49,7 +49,7 @@ pnpm test:run           # unit + component (fast, no network)
 pnpm test:api           # /api/count function (SDKs mocked)
 pnpm test:rules         # Firestore rules on the emulator (needs Java — installed locally)
 pnpm test:e2e           # two-client live-sync (boots firestore+auth emulators + a preview server)
-# pnpm test:integration # emulator-backed repo test (browser SDK build) — in CI since 2026-09-27
+# pnpm test:integration # emulator-backed repo test — QUARANTINED (documented cold-boot flake), not in CI
 
 vercel dev              # app + /api function together (needs the env vars below)
 ```
@@ -108,3 +108,19 @@ None of these block the build; they need things not available in an autonomous s
    `vercel-deploy` skill's last-mile steps). Run `/security-review` before the first real deploy.
 3. Swap the in-memory rate limiter for Vercel KV before enabling photo-count publicly.
 4. Consider adding a chromium-only live-sync e2e to CI once run against a clean runner a few times.
+
+## Addendum — 2026-09-27 (card-fixer branch)
+
+The report above describes the 2026-07-24 build and is left as written. Since then:
+
+- Card values changed to the house rule (2–9 = 5, 10 = 10) and round scores must be multiples of 5
+  (client check plus `points % 5 == 0` in `firestore.rules`). `ScoreCard` replaced `PlayerScoreRow`.
+- `pnpm test:integration` now runs the Firestore SDK's browser build and is **in CI** (the `rules`
+  job). The old gRPC framing flake is gone; a second, exit-code-only teardown flake was fixed with
+  `tests/integration/beacon.setup.ts`. See DECISIONS 2026-09-27.
+- CI uses current node24 Actions pinned by SHA, and gates on `pnpm lint:check` and
+  `pnpm format:check` (no auto-fix).
+- Suite sizes: 319 unit, 74 api, 47 rules, 2 integration, 5 e2e.
+- Item 3 of "What's left": Vercel KV is no longer offered. Use a Redis integration from the Vercel
+  Marketplace (for example Upstash) for the shared rate-limit store.
+- A full review on 2026-09-27 listed the remaining work; it is tracked outside this file.

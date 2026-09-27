@@ -23,7 +23,8 @@ import viteConfig from './vite.config'
  *
  * Expect a few `socket hang up` lines in the output: happy-dom logs the emulator closing
  * WebChannel's hanging requests when `deleteApp` ends a channel. Harmless — a browser drops them
- * silently.
+ * silently. The one teardown failure that did change the exit code (an unhandled rejection from
+ * the SDK's terminate beacon) is handled in tests/integration/beacon.setup.ts.
  */
 const requireFromFirebase = createRequire(
   createRequire(import.meta.url).resolve('firebase/package.json'),
@@ -43,6 +44,7 @@ export default mergeConfig(
       server: { deps: { inline: [/firebase/] } },
       globals: true,
       include: ['tests/integration/**/*.test.ts'],
+      setupFiles: ['tests/integration/beacon.setup.ts'],
       root: fileURLToPath(new URL('./', import.meta.url)),
       testTimeout: 30_000,
       hookTimeout: 30_000,

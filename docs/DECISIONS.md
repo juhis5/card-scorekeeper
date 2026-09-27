@@ -334,3 +334,16 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   runs the SDK's browser build (WebChannel — what the app ships) via happy-dom + inlined `firebase`
   + an alias to the browser entry (see vitest.integration.config.ts); the `warmUpListenChannel`
   workaround is gone. 20/20 cold runs green, ~2s each (was ~15–30s).
+- 2026-09-27 — Correction to the entry above: "20/20 cold runs green" was partly judged on the
+  "Tests passed" line, not the exit code. A second, exit-code-only flake remained (3 in 35 runs
+  during the full review): on `deleteApp` the SDK sends WebChannel's `TYPE=terminate` request via
+  `navigator.sendBeacon` without awaiting it, happy-dom implements the beacon as a `fetch()` whose
+  promise nobody handles, and when Vitest aborts the window at teardown that rejection is unhandled,
+  so the run exits 1 with every assertion passing. Re-calling `terminate()` wouldn't help:
+  `deleteApp` already runs it. Fix: `tests/integration/beacon.setup.ts` makes the beacon send and
+  drop its outcome, as a browser does. Verified all 8 terminate beacons per run go through it, then
+  40/40 cold runs exited 0. Flake checks on emulator suites now count exit codes (tdd skill).
+- 2026-09-27 — CI made real (review round 1): node24 Actions pinned by commit SHA, a read-only
+  `GITHUB_TOKEN`, `workflow_dispatch`, and non-fixing `lint:check` / `format:check` gates. The v4
+  pins declared node20, which GitHub removed from runners on 2026-09-23; CI had not run since
+  2026-07-24.
