@@ -7,13 +7,13 @@
  * friendly error, not a silent local game.
  *
  * With `roomCode` set (the /join/CODE page an invite link opens) the code is fixed: the form asks
- * only for a name, and the page's own heading names the room.
+ * only for a name, and the page's own heading names the room. A bare form: the page around it
+ * provides the card.
  */
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
@@ -38,7 +38,9 @@ const { joinRepository } = useGameConnectivity()
 
 // A room page's "Join room ABCDE" link passes the code along, so the player only adds a name.
 const roomCodeInput = ref(typeof route.query.code === 'string' ? route.query.code : '')
-const joinerName = ref(identity.displayName)
+/** Home shares the name with "Uusi peli"; unbound (the join page), it's this form's own. */
+const joinerName = defineModel<string>('name', { default: '' })
+if (joinerName.value === '') joinerName.value = identity.displayName
 const attemptedSubmit = ref(false)
 const isSubmitting = ref(false)
 const isCheckingConnection = ref(false)
@@ -108,65 +110,51 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <form class="flex flex-col gap-4" novalidate @submit.prevent="handleSubmit">
-    <Card>
-      <CardHeader v-if="!roomCode">
-        <CardTitle>{{ t('home.join.heading') }}</CardTitle>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-4">
-        <div v-if="!roomCode" class="flex flex-col gap-1.5">
-          <Label for="join-room-code">{{ t('home.join.roomCodeLabel') }}</Label>
-          <Input
-            id="join-room-code"
-            v-model="roomCodeInput"
-            type="text"
-            autocapitalize="characters"
-            autocomplete="off"
-            autocorrect="off"
-            spellcheck="false"
-            enterkeyhint="next"
-            class="h-11 text-base uppercase"
-            :placeholder="t('home.join.roomCodePlaceholder')"
-            :aria-invalid="isCodeInvalid"
-            :aria-describedby="isCodeInvalid ? 'join-room-code-error' : undefined"
-          />
-          <p v-if="isCodeInvalid" id="join-room-code-error" class="text-destructive text-sm">
-            {{ t('home.join.errors.invalidCode') }}
-          </p>
-        </div>
+    <div class="flex flex-col gap-1.5">
+      <Label for="join-name">{{ t('home.join.nameLabel') }}</Label>
+      <Input
+        id="join-name"
+        v-model="joinerName"
+        :maxlength="MAX_PLAYER_NAME_LENGTH"
+        type="text"
+        autocomplete="name"
+        :enterkeyhint="roomCode ? 'go' : 'next'"
+        class="h-11 text-base"
+        :aria-invalid="isNameInvalid"
+        :aria-describedby="isNameInvalid ? 'join-name-error' : undefined"
+      />
+      <p v-if="isNameInvalid" id="join-name-error" class="text-destructive text-sm">
+        {{ nameError }}
+      </p>
+    </div>
 
-        <div class="flex flex-col gap-1.5">
-          <Label for="join-name">{{ t('home.join.nameLabel') }}</Label>
-          <Input
-            id="join-name"
-            v-model="joinerName"
-            :maxlength="MAX_PLAYER_NAME_LENGTH"
-            type="text"
-            autocomplete="name"
-            enterkeyhint="done"
-            class="h-11 text-base"
-            :aria-invalid="isNameInvalid"
-            :aria-describedby="isNameInvalid ? 'join-name-error' : undefined"
-          />
-          <p v-if="isNameInvalid" id="join-name-error" class="text-destructive text-sm">
-            {{ nameError }}
-          </p>
-        </div>
-      </CardContent>
-      <CardFooter class="flex flex-col gap-2">
-        <p v-if="isCheckingConnection" role="status" class="text-muted-foreground text-sm">
-          {{ t('home.form.checkingConnection') }}
-        </p>
-        <p v-if="submitError" role="alert" class="text-destructive text-sm">{{ submitError }}</p>
-        <Button
-          type="submit"
-          variant="outline"
-          class="h-11 w-full"
-          :disabled="isSubmitting"
-          :aria-busy="isSubmitting"
-        >
-          {{ t('home.join.button') }}
-        </Button>
-      </CardFooter>
-    </Card>
+    <div v-if="!roomCode" class="flex flex-col gap-1.5">
+      <Label for="join-room-code">{{ t('home.join.roomCodeLabel') }}</Label>
+      <Input
+        id="join-room-code"
+        v-model="roomCodeInput"
+        type="text"
+        autocapitalize="characters"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+        enterkeyhint="go"
+        class="h-11 text-base uppercase"
+        :placeholder="t('home.join.roomCodePlaceholder')"
+        :aria-invalid="isCodeInvalid"
+        :aria-describedby="isCodeInvalid ? 'join-room-code-error' : undefined"
+      />
+      <p v-if="isCodeInvalid" id="join-room-code-error" class="text-destructive text-sm">
+        {{ t('home.join.errors.invalidCode') }}
+      </p>
+    </div>
+
+    <p v-if="isCheckingConnection" role="status" class="text-muted-foreground text-sm">
+      {{ t('home.form.checkingConnection') }}
+    </p>
+    <p v-if="submitError" role="alert" class="text-destructive text-sm">{{ submitError }}</p>
+    <Button type="submit" class="h-11 w-full" :disabled="isSubmitting" :aria-busy="isSubmitting">
+      {{ t('home.join.button') }}
+    </Button>
   </form>
 </template>

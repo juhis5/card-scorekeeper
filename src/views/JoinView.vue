@@ -10,6 +10,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import JoinGame from '@/components/JoinGame.vue'
+import { Card } from '@/components/ui/card'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import type { RoomAvailability } from '@/lib/repository'
 import { isValidRoomCode, normalizeRoomCode } from '@/lib/room-code'
@@ -82,7 +83,9 @@ onMounted(async () => {
     <p v-if="state === 'checking'" role="status" class="text-muted-foreground">
       {{ t('join.checking') }}
     </p>
-    <JoinGame v-else-if="state === 'open'" :room-code="code" />
+    <Card v-else-if="state === 'open'" class="px-4">
+      <JoinGame :room-code="code" />
+    </Card>
     <template v-else>
       <p>{{ unavailableMessage }}</p>
       <RouterLink :to="{ name: 'home' }" class="text-primary underline underline-offset-4">

@@ -5,7 +5,7 @@
  */
 import { expect, test } from '@playwright/test'
 import {
-  joinForm,
+  homeForm,
   joinHostedGame,
   readRoomCode,
   expectOnlineRoom,
@@ -35,7 +35,7 @@ test.describe('unique names in a room', () => {
         ),
       ).toBeVisible()
 
-      await joinForm(joinerPage).getByLabel('Your name', { exact: true }).fill('Jani')
+      await homeForm(joinerPage).getByLabel('Your name', { exact: true }).fill('Jani')
       await joinerPage.getByRole('button', { name: 'Join game' }).click()
 
       await expect(scoreboardRow(hostPage, 'Jani')).toBeVisible()

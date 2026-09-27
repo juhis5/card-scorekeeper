@@ -11,24 +11,38 @@ const TOTAL_ROUNDS = 5
  * rendered in the UI, not to generate one. */
 export const ROOM_CODE_PATTERN = /[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{5}/
 
-/** HomeView renders the host form (GameSetup) and the join form (JoinGame) at the same time, and
- * both have a field labelled "Your name" — scope to each form (by its card heading text) so
- * `getByLabel` never has to choose between two identically-labelled fields. */
-export function hostForm(page: Page) {
-  return page.locator('form').filter({ hasText: 'New game' })
+/** Home shows one form at a time: Join (the default) or, after switching, New game. */
+export function homeForm(page: Page) {
+  return page.locator('form')
 }
 
-export function joinForm(page: Page) {
-  return page.locator('form').filter({ hasText: 'Join a game' })
-}
-
-/** Host flow: submit GameSetup with just a name. Online (emulator reachable) is the only
+/** Host flow: switch Home to New game and start under a name. Online (emulator reachable) is the
  * outcome under test here — the connectivity probe resolving true is asserted implicitly by the
  * caller expecting a room code to appear. */
 export async function startHostedGame(page: Page, hostName: string): Promise<void> {
   await page.goto('/')
-  await hostForm(page).getByLabel('Your name', { exact: true }).fill(hostName)
-  await hostForm(page).getByRole('button', { name: 'Start game' }).click()
+  await page.getByRole('button', { name: 'New game' }).click()
+  await homeForm(page).getByLabel('Your name', { exact: true }).fill(hostName)
+  await homeForm(page).getByRole('button', { name: 'Start game' }).click()
+}
+
+/** A local game on this one device: the emulators are made unreachable, so hosting falls back to
+ * local, and the other players are added in the room. */
+export async function startLocalGame(page: Page, hostName: string, others: string[]) {
+  await page.route(/localhost:(8280|9299)/, (route) => route.abort())
+  await startHostedGame(page, hostName)
+  await expect(roundHeading(page, 1)).toBeVisible()
+  for (const name of others) await addPlayerInRoom(page, name)
+}
+
+/** The host's "Add player" at the end of the room's cards. */
+export async function addPlayerInRoom(page: Page, name: string): Promise<void> {
+  await page.getByRole('button', { name: 'Add player' }).click()
+  await page.getByLabel("Player's name").fill(name)
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: new RegExp(`^Enter ${name}'s score`) }),
+  ).toBeVisible()
 }
 
 /** Reads the room code the host's RoomView is displaying. Throws (failing the test with a clear
@@ -59,9 +73,9 @@ export async function joinHostedGame(
   joinerName: string,
 ): Promise<void> {
   await page.goto('/')
-  await joinForm(page).getByLabel('Room code').fill(roomCode)
-  await joinForm(page).getByLabel('Your name', { exact: true }).fill(joinerName)
-  await joinForm(page).getByRole('button', { name: 'Join game' }).click()
+  await homeForm(page).getByLabel('Room code').fill(roomCode)
+  await homeForm(page).getByLabel('Your name', { exact: true }).fill(joinerName)
+  await homeForm(page).getByRole('button', { name: 'Join game' }).click()
 }
 
 /** Expands the player's ScoreCard (collapsed by default), fills their round-score input and taps

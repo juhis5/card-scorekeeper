@@ -34,25 +34,22 @@
   },
   "home": {
     "heading": "Rommi Scorekeeper",
-    "orDivider": "or",
     "statsLink": "View your stats",
+    "play": {
+      "label": "Play",
+      "join": "Join",
+      "new": "New game"
+    },
     "form": {
-      "heading": "New game",
       "hostNameLabel": "Your name",
-      "otherPlayersHeading": "Other players",
-      "otherPlayersHint": "Players without their own phone: you enter their scores. Everyone else joins with the room code.",
-      "otherPlayersEmpty": "No other players yet — add at least one to start.",
-      "nameLabel": "Player {number} name",
-      "removeLabel": "Remove player {number}",
-      "addPlayerButton": "Add player",
       "startButton": "Start game",
       "checkingConnection": "Checking connection…",
       "replaceConfirm": "Start a new game? The game in progress on this device will be lost.",
       "replaceStart": "Start new game",
-      "replaceKeep": "Keep playing"
+      "replaceKeep": "Keep playing",
+      "hint": "Add the others in the game, or they join with the room code."
     },
     "join": {
-      "heading": "Join a game",
       "roomCodeLabel": "Room code",
       "roomCodePlaceholder": "e.g. 7K4RQ",
       "nameLabel": "Your name",
@@ -67,9 +64,7 @@
     },
     "errors": {
       "hostNameRequired": "Enter your name to continue.",
-      "otherPlayersRequired": "Add at least one other player.",
-      "startFailed": "Couldn't start the game. Try again.",
-      "duplicateName": "Each player needs a different name."
+      "startFailed": "Couldn't start the game. Try again."
     },
     "continue": {
       "heading": "Game in progress",

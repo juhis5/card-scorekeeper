@@ -1,17 +1,26 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import GameSetup from '@/components/GameSetup.vue'
 import JoinGame from '@/components/JoinGame.vue'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { lastRoom } from '@/lib/last-room'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/local-game-route'
 import { hasUnfinishedPersistedGame } from '@/lib/local-repository'
 import { useGameStore } from '@/stores/game'
+import { useIdentityStore } from '@/stores/identity'
 
 const { t } = useI18n()
 const game = useGameStore()
+const identity = useIdentityStore()
+
+/** Liity first: most players join a game someone else started. */
+const PLAY_MODES = ['join', 'new'] as const
+const mode = ref<(typeof PLAY_MODES)[number]>('join')
+/** One name for both, so switching modes keeps what was typed. */
+const playerName = ref(identity.displayName)
 
 // A game left via Back is still running in the store; after a reload only storage remembers it.
 // Leaving a room never ends its game, so Home offers the way back.
@@ -52,13 +61,32 @@ const canContinueLocalGame = computed(
         </RouterLink>
       </Button>
     </section>
-    <GameSetup />
-    <div class="text-muted-foreground flex items-center gap-3 text-sm">
-      <span aria-hidden="true" class="bg-border h-px flex-1" />
-      {{ t('home.orDivider') }}
-      <span aria-hidden="true" class="bg-border h-px flex-1" />
-    </div>
-    <JoinGame />
+    <!-- One card: join (what most players do) or start a game, with one name field between them. -->
+    <Card class="gap-4 px-4">
+      <div
+        role="group"
+        :aria-label="t('home.play.label')"
+        class="bg-muted grid grid-cols-2 gap-1 rounded-lg p-1"
+      >
+        <button
+          v-for="option in PLAY_MODES"
+          :key="option"
+          type="button"
+          class="focus-visible:ring-ring h-11 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+          :class="
+            mode === option
+              ? 'bg-background text-foreground shadow-sm'
+              : 'text-muted-foreground hover:text-foreground'
+          "
+          :aria-pressed="mode === option"
+          @click="mode = option"
+        >
+          {{ t(`home.play.${option}`) }}
+        </button>
+      </div>
+      <JoinGame v-if="mode === 'join'" v-model:name="playerName" />
+      <GameSetup v-else v-model:name="playerName" />
+    </Card>
     <RouterLink
       :to="{ name: 'stats' }"
       class="text-muted-foreground hover:text-foreground flex h-11 items-center justify-center self-center text-sm underline underline-offset-4"
