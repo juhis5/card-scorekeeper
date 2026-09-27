@@ -31,7 +31,7 @@ The card game is joined by strangers via a room code, and any player can snap a 
 |---|---|---|
 | 1 | method, body shape, room-code format, mime type, base64 | 405 / 400 |
 | 2 | image size cap (before any I/O) | 413 |
-| 3 | ID token verified by the Admin SDK (`auth/*` errors only; anything else is a server fault → 500) | 401 |
+| 3 | ID token verified with `jose` in `id-token.ts` (Firebase's documented checks; `auth/*` errors only, anything else is a server fault → 500) | 401 |
 | 4 | room exists, not finished/expired, caller has a seat | 403 |
 | 5 | per-room (30 / 15 min), then global (300 / h) rate limit | 429 |
 | 6 | Gemini call: timeout → 504, quota/429 → 503, anything else → 502 | 504 / 503 / 502 |
@@ -71,6 +71,8 @@ Good enough for a friends' game, not airtight: a seated player can still burn ca
 ## ESM on Vercel — explicit `.js` imports
 
 The repo is `"type": "module"`, and Vercel runs `api/` as native Node ESM. Every relative import in `api/`, **and in any `src/lib` file `api/` imports** (`rules.ts`, `types.ts`, `room-code.ts`), must end in `.js`. `tsconfig.api.json` (`module: nodenext`) enforces it at typecheck, and `pnpm test:api-load` (in CI) compiles `api/` and imports it in plain Node to prove it loads.
+
+Vercel's function loader also refuses `require()` of an ESM-only package, which Node 24 otherwise allows. That's why `firebase-admin/auth` is never imported: it loads `jwks-rsa`, which `require()`s `jose` v6. `test:api-load` runs with `--no-experimental-require-module` to catch this. To test Vercel's own function build locally, run `pnpm dlx vercel build --prod --yes` (it needs a `.vercel/project.json`, not a login) and import `.vercel/output/functions/api/count.func/api/count.js` with the same flag.
 
 ## Downscale the image in the browser before upload
 

@@ -440,3 +440,11 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     project, a small project quota), not by tooling. Provisioning is `firebase.json` (`location`,
     `auth.providers.anonymous`) plus one `firebase deploy --only firestore,auth --project <id>`;
     see the vercel-deploy skill.
+- 2026-09-27 — First deploy fix: `/api/count` crashed on load on Vercel (`ERR_REQUIRE_ESM`).
+  `firebase-admin/auth` loads `jwks-rsa`, which `require()`s the ESM-only `jose` v6. Node 24
+  allows that; Vercel's function loader does not, and our checks ran plain Node, so only the real
+  deploy showed it. ID tokens are now verified with `jose` directly (`api/_lib/id-token.ts`,
+  Firebase's documented checks for third-party libraries), and `firebase-admin/auth` is no
+  longer imported. `test:api-load` now runs with `--no-experimental-require-module`, which
+  reproduces the failure locally. Pinning `jwks-rsa`'s `jose` to v5 was the alternative; rejected
+  as a pin on an old major.
