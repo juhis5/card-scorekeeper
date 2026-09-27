@@ -49,8 +49,8 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
     <!-- Persistent chrome (see the routing skill), reachable from every route incl. mid-game:
          Back, the room code while in an online room, and the menu with the pages (Stats is a
          device-wide record, not tied to any one room) and the settings. No title link: Back
-         already leads home, and the app's name sits in the menu. Sticky, so it stays while a
-         page scrolls. -->
+         already leads home, and the app's name sits in the menu. Sticky: the only part of a page
+         that stays put while the rest scrolls (owner's call, second playtest). -->
     <header
       class="bg-background sticky top-0 z-20 mx-auto flex h-(--app-header-height) w-full max-w-md items-center gap-1 px-4 pt-2"
     >

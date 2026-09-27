@@ -116,8 +116,7 @@
 :root {
   --dur-fast: 120ms;
   --dur: 200ms;
-  /* The sticky app header's height (a 44px row plus its top padding): the room's pinned board
-     sticks right under it. */
+  /* The sticky app header's height (a 44px row plus its top padding). */
   --app-header-height: 3.25rem;
 }
 @theme {
@@ -127,6 +126,10 @@
 @layer base {
   * {
     @apply border-border outline-ring/80; /* 80%: a 3:1 focus ring in both themes */
+  }
+  /* Whatever is scrolled or focused into view lands below the sticky header, not under it. */
+  html {
+    scroll-padding-top: var(--app-header-height);
   }
   body {
     @apply bg-background text-foreground;

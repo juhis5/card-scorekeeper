@@ -388,7 +388,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="group/room mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
+  <main class="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-4 p-4">
     <!-- One heading for every state: navigation focuses it before the room's first snapshot
          arrives, and a new element per state would drop that focus when the room opens. While a
          game is on screen it's for screen readers only; the board needs the space more. -->
@@ -453,16 +453,9 @@ onMounted(async () => {
         }}
       </p>
 
-      <!-- The round and the board stay on screen while the cards scroll under them: sticky over the
-           page's own scroll, not a scrolling box inside it, which the iPhone keyboard handles
-           badly. While a field has focus the block lets go, so the field and Save stay above the
-           keyboard. -->
-      <div
-        class="bg-background border-border sticky top-(--app-header-height) z-10 -mx-4 -mt-2 flex flex-col gap-2 border-b px-4 pt-2 group-has-[input:focus]/room:static"
-      >
-        <ContractBanner :round="currentRound" :contract-key="currentContract.contractKey" />
-        <ScoreBoard :rows="board" :completed-rounds="completedRounds" />
-      </div>
+      <ContractBanner :round="currentRound" :contract-key="currentContract.contractKey" />
+
+      <ScoreBoard :rows="board" :completed-rounds="completedRounds" />
 
       <WinnerBanner v-if="isFinished" :winners="winners" />
 

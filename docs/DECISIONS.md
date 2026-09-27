@@ -596,14 +596,12 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     drawn as one SVG path from its module grid, dark on white in both themes. Copying uses the
     Clipboard API with a hidden-textarea fallback (`useCopyText`), not VueUse's useClipboard,
     which only tries the Clipboard API after a permission query Firefox and Safari lack.
-- 2026-09-27 — The board stays on screen (second playtest: "the scroll should target the players
-  list … keep the table and header always visible"):
-  - The app header is sticky, and in a room the round banner and the scoreboard stick right
-    under it (`--app-header-height`), while the cards scroll beneath. Sticky over the page's own
-    scroll, not a scrolling box inside the page: nested scrolling next to the iPhone keyboard is
-    the classic way this breaks.
-  - While any field in the room has focus (a score, a new player's name), the block lets go
-    (`:has(input:focus)`), so the field and its button stay above the keyboard.
-  - To make room, the banner is one small line and the board's rows are tighter. At 360×640 with
-    six players, three cards still show below the board. The real keyboard behaviour needs a
-    check on an iPhone and an Android phone.
+- 2026-09-27 — The top bar stays on screen (second playtest: "the scroll should target the
+  players list … keep the table and header always visible"):
+  - Tried first: the round banner and the scoreboard pinned under the header while only the cards
+    scrolled. The owner found that a mistake: only the top bar with the menu stays; everything
+    else, board included, scrolls with the page.
+  - The app header is sticky on every page. `html { scroll-padding-top }` equals its height
+    (`--app-header-height`), so anything scrolled or focused into view lands below it.
+  - Kept from the attempt: the round banner is one small line and the board's rows are tighter,
+    so more of the game fits on a phone.
