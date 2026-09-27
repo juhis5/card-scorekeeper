@@ -114,6 +114,18 @@ describe('AddPlayerCard', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Add player' }))
   })
 
+  it('closes on a tap outside without adding anyone, and forgets the typed name', async () => {
+    await renderInGame()
+
+    await openAndType('Mummo')
+    await fireEvent.pointerUp(document.body)
+    await flushPromises()
+
+    expect(useGameStore().standings).toHaveLength(1)
+    await fireEvent.click(screen.getByRole('button', { name: 'Add player' }))
+    expect((screen.getByLabelText("Player's name") as HTMLInputElement).value).toBe('')
+  })
+
   it("explains it's for players without a phone only in an online game", async () => {
     await renderInGame()
 

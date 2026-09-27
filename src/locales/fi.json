@@ -203,11 +203,10 @@
     },
     "remove": {
       "trigger": "Poista pelaaja {name}",
-      "confirmText": "Poistetaanko pelaaja {name} ja hänen pisteensä tästä pelistä?",
-      "keep": "Älä poista",
       "keepLabel": "Älä poista pelaajaa {name}",
-      "confirm": "Poista",
-      "confirmLabel": "Kyllä, poista pelaaja {name}"
+      "confirmLabel": "Kyllä, poista pelaaja {name}",
+      "title": "Poistetaanko {name}?",
+      "description": "Hänen pisteensä tästä pelistä poistuvat myös. Tätä ei voi perua."
     },
     "opening": "Avataan huonetta {code}…",
     "notSeated": {
@@ -249,7 +248,8 @@
       "description": "Kierroksen pisteet pelaaja kerrallaan.",
       "saveAndNext": "Tallenna ja seuraava",
       "skip": "Ohita {name}",
-      "next": "Seuraavana: {name}"
+      "next": "Seuraavana: {name}",
+      "skipButton": "Ohita"
     }
   },
   "notFound": {

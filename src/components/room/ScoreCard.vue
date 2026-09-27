@@ -3,10 +3,10 @@
  * Single job: one player's round-score entry card. Collapsed by default (name + saved points, or
  * just "scored" when the number isn't this device's to see); tapping the header expands it inline
  * into two rows: the name row gains the card's icons (photo count, and the parent's remove), and
- * below it the points field with ✓ (save) and ✕ (cancel). ✓ is the way to save on a phone: the
- * iPhone number keypad has no Enter key. Enter and leaving the field still save too. The field's
- * label is for screen readers only; the name row already says whose points they are. A non-host player's own card reads "Enter
- * your points" instead of their name.
+ * below it the points field with ✓ (save) and ✕ (cancel). Only ✓ or Enter saves (fourth round): a
+ * tap outside the card, or another card opening, closes it and throws the typed number away. The
+ * field's label is for screen readers only; the name row already says whose points they are. A
+ * non-host player's own card reads "Enter your points" instead of their name.
  * Presentation + local draft value only; persisting the score is the parent's job (it owns the
  * store call), this just emits the validated number on commit.
  *
@@ -16,13 +16,14 @@
  * Renders as an `<li>` — the parent wraps the cards in a `<ul role="list">` grid. No round
  * watcher: the parent keys each card by player + round, so a new round remounts it fresh.
  */
-import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, X } from '@lucide/vue'
 import PhotoCountSheet from '@/components/room/PhotoCountSheet.vue'
 import RoundScoreInput from '@/components/room/RoundScoreInput.vue'
 import { Button } from '@/components/ui/button'
 import { useKeepInView } from '@/composables/useKeepInView'
+import { useSingleOpenCard } from '@/composables/useSingleOpenCard'
 import { isValidRoundScore, MAX_ROUND_SCORE } from '@/lib/game/rules'
 import type { ContractRoundNumber, Player } from '@/lib/game/types'
 
@@ -64,13 +65,15 @@ const points = ref<number | null>(null)
 const savedPoints = ref<number | null>(null)
 const errorMessage = ref('')
 const isExpanded = ref(false)
-/** Pressing a control inside the card (✓, ✕, the camera, the trash) blurs the input before that control's
- * click lands. The blur must not save, but iOS Safari doesn't focus a tapped button, so the blur's
- * relatedTarget can't tell us where focus is going. Remember the press instead. */
-let isPressInsidePanel = false
 const cardElement = useTemplateRef<HTMLLIElement>('card')
 const headerButton = useTemplateRef<HTMLButtonElement>('header')
 const { reveal } = useKeepInView(cardElement)
+useSingleOpenCard({
+  id: () => `score-${player.id}-${round}`,
+  element: cardElement,
+  isOpen: isExpanded,
+  onDismiss: () => discardDraft({ restoreFocus: false }),
+})
 
 const inputId = computed(() => `score-card-${player.id}`)
 const errorId = computed(() => `${inputId.value}-error`)
@@ -110,7 +113,6 @@ function playerHeaderLabel(): string {
 
 async function expand(): Promise<void> {
   if (isExpanded.value) return
-  isPressInsidePanel = false
   // Start from the synced score when this device may see it (it may have changed on another
   // device), else from the last score this card saved.
   if (visiblePoints.value !== null) savedPoints.value = visiblePoints.value
@@ -131,10 +133,6 @@ async function collapse({ restoreFocus }: { restoreFocus: boolean }): Promise<vo
   if (!restoreFocus) return
   await nextTick()
   headerButton.value?.focus()
-}
-
-function isInsideCard(target: EventTarget | null): boolean {
-  return target instanceof Node && (cardElement.value?.contains(target) ?? false)
 }
 
 /** Validates and emits the typed score; false when there's nothing valid to save. */
@@ -158,42 +156,9 @@ function commitPoints({ restoreFocus }: { restoreFocus: boolean }): void {
   if (savePoints()) void collapse({ restoreFocus })
 }
 
-/** Longer than a tap takes from press to release; after it, a card left by keyboard closes. */
-const TAP_SETTLE_MS = 500
-let cancelPendingCollapse: (() => void) | null = null
-
-/** Leaving the field by tapping another card blurs it on the press. Closing right then would shift
- * the list under the finger and the tap would land on whatever moved there, so close only once
- * that tap's click has landed, unless it landed back on this card. */
-function collapseAfterTap(): void {
-  cancelPendingCollapse?.()
-  const finish = (event?: Event) => {
-    cancelPendingCollapse?.()
-    if (event && isInsideCard(event.target)) return
-    void collapse({ restoreFocus: false })
-  }
-  const timer = setTimeout(finish, TAP_SETTLE_MS)
-  window.addEventListener('click', finish, { once: true })
-  cancelPendingCollapse = () => {
-    clearTimeout(timer)
-    window.removeEventListener('click', finish)
-    cancelPendingCollapse = null
-  }
-}
-
-onBeforeUnmount(() => cancelPendingCollapse?.())
-
-function markPressInsideCard(): void {
-  isPressInsidePanel = true
-}
-
-function clearPressInsideCard(): void {
-  isPressInsidePanel = false
-}
-
-function discardDraft(): void {
+function discardDraft({ restoreFocus }: { restoreFocus: boolean }): void {
   points.value = savedPoints.value
-  void collapse({ restoreFocus: true })
+  void collapse({ restoreFocus })
 }
 
 /** Save and Enter ask to save, so an empty field says why nothing happened. Focus stays on the
@@ -206,18 +171,6 @@ function handleSave(): void {
   commitPoints({ restoreFocus: true })
 }
 
-/** A blur saves only when focus is leaving the card (Tab out, tapping another card), and then
- * leaves focus where the user sent it. */
-function handleInputBlur(event: FocusEvent): void {
-  const wasPressInsidePanel = isPressInsidePanel
-  isPressInsidePanel = false
-  // Collapsing removes the focused input and Chromium blurs it on removal. That blur comes after
-  // Enter already saved, or after Cancel/Escape discarded, so it must do nothing.
-  if (!isExpanded.value) return
-  if (wasPressInsidePanel || isInsideCard(event.relatedTarget)) return
-  if (savePoints()) collapseAfterTap()
-}
-
 /** The photo is only ever a SUGGESTION (see CLAUDE.md) — confirming feeds the number through the
  * exact same commit path manual entry uses (including its validation/error display), rather than
  * writing to the store directly. Focus sits in the (teleported) sheet here, which unmounts on
@@ -228,7 +181,7 @@ function handlePhotoConfirm(total: number): void {
 }
 
 function handleKeyDown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && isExpanded.value) discardDraft()
+  if (event.key === 'Escape' && isExpanded.value) discardDraft({ restoreFocus: true })
 }
 </script>
 
@@ -239,8 +192,6 @@ function handleKeyDown(event: KeyboardEvent): void {
     class="bg-card border-border rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
     :class="isExpanded ? 'ring-ring ring-2' : 'hover:bg-muted'"
     @keydown="handleKeyDown"
-    @pointerdown="markPressInsideCard"
-    @click="clearPressInsideCard"
   >
     <!-- The name row. While the card is open it also holds the card's own actions (photo count,
          the parent's remove), which wrap onto a line of their own when they need one. -->
@@ -297,7 +248,6 @@ function handleKeyDown(event: KeyboardEvent): void {
         :is-invalid="hasError"
         :described-by="hasError ? errorId : undefined"
         @commit="handleSave"
-        @blur="handleInputBlur"
       >
         <Button
           type="button"
@@ -314,7 +264,7 @@ function handleKeyDown(event: KeyboardEvent): void {
           size="icon"
           class="size-11 shrink-0"
           :aria-label="t('room.score.cancel')"
-          @click="discardDraft"
+          @click="discardDraft({ restoreFocus: true })"
         >
           <X aria-hidden="true" class="size-5" />
         </Button>

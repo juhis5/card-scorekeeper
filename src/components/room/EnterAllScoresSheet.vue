@@ -2,8 +2,9 @@
 /**
  * Single job: the host enters this round's points for everyone still missing one, one player at a
  * time (third playtest: "Input all points"). Laid out like an open score card: the name, then the
- * field with ✓ (save and move on) and → (skip). The field stays the same element from one player
- * to the next, so the phone keyboard stays up throughout.
+ * field with ✓ (save and move on); Skip sits in the bottom row, away from ✓ (fourth round). The
+ * field stays the same element from one player to the next, and a tap on ✓ or Skip hands focus
+ * straight back to it, so the phone keyboard stays up throughout.
  *
  * It floats in the upper part of the screen, about the middle of what stays visible with the
  * keyboard up. A centred or bottom dialog would put its field behind the keyboard: an iPhone
@@ -60,9 +61,25 @@ const position = computed(() =>
 )
 const hasError = computed(() => errorMessage.value !== '')
 
+function refocusField(): void {
+  document.getElementById(INPUT_ID)?.focus({ preventScroll: true })
+}
+
 async function focusField(): Promise<void> {
   await nextTick()
-  document.getElementById(INPUT_ID)?.focus({ preventScroll: true })
+  refocusField()
+}
+
+/** On an iPhone the tap on a button takes focus from the field and the keyboard closes. Focus
+ * returns only while the tap is still being handled, not after the save's network wait. */
+function saveTapped(): void {
+  refocusField()
+  void saveAndMoveOn()
+}
+
+function skipTapped(): void {
+  refocusField()
+  skip()
 }
 
 watch(
@@ -179,28 +196,32 @@ function skip(): void {
             class="size-11 shrink-0"
             :disabled="isSaving"
             :aria-label="t('room.enterAll.saveAndNext')"
-            @click="saveAndMoveOn"
+            @mousedown.prevent
+            @click="saveTapped"
           >
             <Check aria-hidden="true" class="size-5" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            class="size-11 shrink-0"
-            :aria-label="t('room.enterAll.skip', { name: current.name })"
-            @click="skip"
-          >
-            <ChevronRight aria-hidden="true" class="size-5" />
           </Button>
         </RoundScoreInput>
         <p v-if="hasError" :id="`${INPUT_ID}-error`" role="alert" class="text-destructive text-sm">
           {{ errorMessage }}
         </p>
       </div>
-      <p v-if="nextUp" class="text-muted-foreground text-sm">
-        {{ t('room.enterAll.next', { name: nextUp.name }) }}
-      </p>
+      <div v-if="current" class="flex items-center justify-between gap-2">
+        <p class="text-muted-foreground min-w-0 text-sm">
+          {{ nextUp ? t('room.enterAll.next', { name: nextUp.name }) : '' }}
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          class="h-11 shrink-0 gap-1 px-3"
+          :aria-label="t('room.enterAll.skip', { name: current.name })"
+          @mousedown.prevent
+          @click="skipTapped"
+        >
+          {{ t('room.enterAll.skipButton') }}
+          <ChevronRight aria-hidden="true" class="size-4" />
+        </Button>
+      </div>
     </SheetContent>
   </Sheet>
 </template>

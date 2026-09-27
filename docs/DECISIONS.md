@@ -720,3 +720,21 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   - "Vain tällä puhelimella" under Uusi peli starts a game on this device without checking the
     connection, for a table where nobody else has a phone. Off by default; the device remembers
     the choice (`this-phone-only` in localStorage).
+- 2026-09-28 — Score entry (fourth round: "clicking outside the score card should close it and
+  dismiss the inputted points", "only the checkmark should accept"):
+  - A card saves only on ✓ or Enter; leaving the field saves nothing. A tap outside the open card
+    closes it and throws the typed number away. So does another card opening: one card is open at
+    a time, Add player included (`useSingleOpenCard`, with the room providing which card is open).
+    A tap is a `pointerup`: a scroll ends in `pointercancel`, so scrolling never closes a card.
+    Taps inside a dialog or its overlay (photo count, remove confirm) don't count. The keyboard
+    closing by itself keeps the card open with its number. This replaces the blur save and the
+    delayed collapse from the third round.
+  - A number typed but not saved when Next is tapped is thrown away, so Next says whose score is
+    still missing instead of moving on.
+  - Removing a player asks in a shadcn AlertDialog with icon buttons, ✕ keep and 🗑 remove. Focus
+    starts on ✕ and returns to the trash button when declined.
+  - Syötä kaikki: Skip moved to the bottom row, opposite "Seuraavaksi" (the owner's call). The
+    next player's field lost the keyboard on an iPhone: the tap on ✓ takes focus from the field,
+    and focusing it again after the save's network wait no longer counts as the tap. ✓ and Skip
+    now hand focus straight back while the tap is handled; `mousedown.prevent` keeps it there
+    with a mouse.
