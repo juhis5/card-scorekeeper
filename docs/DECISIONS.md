@@ -429,3 +429,14 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     from a second deck stay distinct. The picker no longer forces the camera.
   - The Gemini key belongs in a separate Google Cloud project, restricted to the Generative
     Language API; never the Firebase browser key.
+- 2026-09-27 — Deploy setup:
+  - **Two Firebase projects on Spark:** `card-scorekeeper-prod-1673f` for Production and
+    `card-scorekeeper-staging` shared by every PR preview. Each has its own free quota, and
+    preview code never touches real data or prod credentials. Open PRs share staging.
+  - **Vercel stays the host.** All-Firebase would need Blaze for Cloud Functions, or a
+    photo-count redesign on Firebase AI Logic (client calls through Firebase's proxy, gated by
+    App Check instead of room membership). Revisit if public preview links matter.
+  - **No Terraform.** Backends per PR are blocked by the free tier (one Firestore database per
+    project, a small project quota), not by tooling. Provisioning is `firebase.json` (`location`,
+    `auth.providers.anonymous`) plus one `firebase deploy --only firestore,auth --project <id>`;
+    see the vercel-deploy skill.
