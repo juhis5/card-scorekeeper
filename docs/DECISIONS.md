@@ -284,8 +284,8 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
   Still open: **4b-ii's e2e** needs BOTH firestore + auth emulators + `connectAuthEmulator`
   (`VITE_USE_EMULATOR`) — not started this session.
 - CI: `.github/workflows/ci.yml` has a commented `test:rules` job — wire it now that rules exist
-  (needs Java + firebase-tools on the runner). Do in 4b or polish. Do NOT add `test:integration`
-  to CI (see flake below).
+  (needs Java + firebase-tools on the runner). Do in 4b or polish. ~~Do NOT add `test:integration`
+  to CI (see flake below).~~ Added 2026-09-27 once the flake was fixed.
 - ~~KNOWN FLAKE~~ FIXED 2026-09-27 (see the dated entry at the end). Original note: `pnpm test:integration` (emulator-backed FirestoreGameRepository
   test) intermittently fails on a cold-booted emulator via Vitest — a Node24 + grpc-js + emulator
   HTTP/2 cold-boot transport race (browser uses WebChannel, so NOT a product bug). Isolated into its
