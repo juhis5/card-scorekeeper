@@ -37,6 +37,7 @@ import {
   winners as leadingPlayers,
 } from './rules'
 import { bestAndWorstRound } from './stats'
+import { withTimeout } from './timeout'
 import { isPermissionDenied } from './write-errors'
 import type {
   ContractRoundNumber,
@@ -109,13 +110,20 @@ export interface FirestoreGameRepositoryDeps {
   now?: () => number
   /** Injected for deterministic tests. Defaults to the real `generateRoomCode`. */
   generateRoomCode?: () => string
+  /** How long creating a room or taking a seat may wait for the server. Defaults to 10 s. */
+  writeTimeoutMs?: number
 }
+
+/** Firestore writes wait for the server indefinitely while offline, so the two writes the user
+ * waits on before entering a room (create, join) get a bound; the caller then falls back. */
+const DEFAULT_WRITE_TIMEOUT_MS = 10_000
 
 export class FirestoreGameRepository implements GameRepository {
   private readonly db: Firestore
   private readonly auth: Auth
   private readonly now: () => number
   private readonly generateRoomCode: () => string
+  private readonly writeTimeoutMs: number
   private roomCode: string | null
   private readonly unsubscribes = new Set<Unsubscribe>()
 
@@ -124,6 +132,7 @@ export class FirestoreGameRepository implements GameRepository {
     this.auth = deps.auth
     this.now = deps.now ?? (() => Date.now())
     this.generateRoomCode = deps.generateRoomCode ?? (() => defaultGenerateRoomCode())
+    this.writeTimeoutMs = deps.writeTimeoutMs ?? DEFAULT_WRITE_TIMEOUT_MS
     this.roomCode = deps.roomCode ?? null
   }
 
@@ -135,25 +144,31 @@ export class FirestoreGameRepository implements GameRepository {
       const roomCode = this.generateRoomCode()
       const nowMs = this.now()
       try {
-        await setDoc(doc(this.db, `room/${roomCode}`), {
-          code: roomCode,
-          status: 'waiting',
-          currentRound: 1,
-          hostUid,
-          createdAt: Timestamp.fromMillis(nowMs),
-          expiresAt: Timestamp.fromMillis(nowMs + ROOM_TTL_MS),
-        })
+        await withTimeout(
+          setDoc(doc(this.db, `room/${roomCode}`), {
+            code: roomCode,
+            status: 'waiting',
+            currentRound: 1,
+            hostUid,
+            createdAt: Timestamp.fromMillis(nowMs),
+            expiresAt: Timestamp.fromMillis(nowMs + ROOM_TTL_MS),
+          }),
+          this.writeTimeoutMs,
+        )
         // Sequential, not batched: the player-create rule's roomNotExpired() reads the room
         // doc via get(), which does not see a sibling write in the same batch/transaction — so
         // the room doc must already be committed before this write is sent (see
         // docs/DECISIONS.md's trust-model entry and firestore.rules).
-        await setDoc(doc(this.db, `room/${roomCode}/players/${hostUid}`), {
-          name: config.hostDisplayName,
-          ownerUid: hostUid,
-          deviceUuid: config.hostDeviceUuid,
-          totalScore: 0,
-          joinOrder: 0,
-        })
+        await withTimeout(
+          setDoc(doc(this.db, `room/${roomCode}/players/${hostUid}`), {
+            name: config.hostDisplayName,
+            ownerUid: hostUid,
+            deviceUuid: config.hostDeviceUuid,
+            totalScore: 0,
+            joinOrder: 0,
+          }),
+          this.writeTimeoutMs,
+        )
         this.roomCode = roomCode
         return { gameId: roomCode, roomCode, hostPlayerId: hostUid }
       } catch (error) {
@@ -172,13 +187,16 @@ export class FirestoreGameRepository implements GameRepository {
     await ensureSignedIn(this.auth)
     const uid = this.requireUid()
     const roomCode = this.requireRoomCode()
-    await setDoc(doc(this.db, `room/${roomCode}/players/${uid}`), {
-      name: input.name,
-      ownerUid: uid,
-      deviceUuid: input.deviceUuid,
-      totalScore: 0,
-      joinOrder: this.now(),
-    })
+    await withTimeout(
+      setDoc(doc(this.db, `room/${roomCode}/players/${uid}`), {
+        name: input.name,
+        ownerUid: uid,
+        deviceUuid: input.deviceUuid,
+        totalScore: 0,
+        joinOrder: this.now(),
+      }),
+      this.writeTimeoutMs,
+    )
     return uid
   }
 

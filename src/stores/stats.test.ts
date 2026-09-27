@@ -7,7 +7,9 @@ const getDbMock = vi.fn(() => ({ marker: 'db' }))
 
 vi.mock('@/lib/firebase', () => ({
   getDb: () => getDbMock(),
+  getFirebaseAuth: () => ({}),
   ensureSignedIn: () => ensureSignedInMock(),
+  checkBackendReachable: () => ensureSignedInMock(),
 }))
 
 /** A where() clause captured as data so the getDocs mock can dispatch on it (see below) — mirrors

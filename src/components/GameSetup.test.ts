@@ -17,10 +17,13 @@ import type { HostGameMode } from '@/lib/game-mode'
 // the connectivity-checked repository choice — the one thing this component owns — is mocked at
 // its own seam (see the tdd skill's "mock at the boundary") rather than the lower-level
 // connectivity/Firebase modules it's built from.
-const { hostRepository } = vi.hoisted(() => ({ hostRepository: vi.fn() }))
+const { hostRepository, localRepository } = vi.hoisted(() => ({
+  hostRepository: vi.fn(),
+  localRepository: vi.fn(),
+}))
 
 vi.mock('@/composables/useGameConnectivity', () => ({
-  useGameConnectivity: () => ({ hostRepository, joinRepository: vi.fn() }),
+  useGameConnectivity: () => ({ hostRepository, joinRepository: vi.fn(), localRepository }),
 }))
 
 /** A plain in-memory stand-in for localStorage — deterministic, no real browser API. */
@@ -144,6 +147,44 @@ describe('GameSetup hosting offline (backend unreachable)', () => {
     expect(router.currentRoute.value.name).toBe('room')
     expect(router.currentRoute.value.params.code).toBe('local')
     expect(game.standings.map((standing) => standing.player.name).sort()).toEqual(['Alice', 'Juho'])
+  })
+})
+
+describe('GameSetup when the online room cannot be created', () => {
+  function unreachableAfterProbe(): HostGameMode {
+    const repository = makeFakeOnlineRepository('7K4RQ')
+    repository.createGame = vi
+      .fn()
+      .mockRejectedValue(Object.assign(new Error('timed out'), { code: 'deadline-exceeded' }))
+    return { kind: 'online', repository }
+  }
+
+  it('falls back to a local game with the entered players', async () => {
+    hostRepository.mockResolvedValue(unreachableAfterProbe())
+    localRepository.mockReturnValue(offlineMode())
+    const router = renderGameSetup()
+    const game = useGameStore()
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'Alice')
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+
+    expect(router.currentRoute.value.params.code).toBe('local')
+    expect(game.standings.map((standing) => standing.player.name).sort()).toEqual(['Alice', 'Juho'])
+  })
+
+  it('asks for the other players when none were entered for the local fallback', async () => {
+    hostRepository.mockResolvedValue(unreachableAfterProbe())
+    localRepository.mockReturnValue(offlineMode())
+    const router = renderGameSetup()
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+
+    expect(screen.getByText('Add at least one other player.')).toBeTruthy()
+    expect(router.currentRoute.value.name).not.toBe('room')
   })
 })
 

@@ -8,7 +8,7 @@
  * (`exists(room/{gameId}/players/{deviceUuid})`) against the value player docs are actually keyed
  * by.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GamePlayer, GameResult } from './types'
 
 const ensureSignedInMock = vi.fn().mockResolvedValue('host-uid')
@@ -25,6 +25,8 @@ const collectionMock = vi.fn((_db: unknown, path: string) => ({ path }))
 const docMock = vi.fn((_db: unknown, path: string) => ({ path }))
 const getDocsMock = vi.fn()
 const updateDocMock = vi.fn().mockResolvedValue(undefined)
+const setDocMock = vi.fn().mockResolvedValue(undefined)
+const getDocMock = vi.fn()
 const batchDeleteMock = vi.fn()
 const batchCommitMock = vi.fn().mockResolvedValue(undefined)
 const writeBatchMock = vi.fn(() => ({ delete: batchDeleteMock, commit: batchCommitMock }))
@@ -32,12 +34,12 @@ const writeBatchMock = vi.fn(() => ({ delete: batchDeleteMock, commit: batchComm
 vi.mock('firebase/firestore', () => ({
   collection: (db: unknown, path: string) => collectionMock(db, path),
   doc: (db: unknown, path: string) => docMock(db, path),
-  getDoc: vi.fn(),
+  getDoc: (ref: unknown) => getDocMock(ref),
   getDocs: (ref: unknown) => getDocsMock(ref),
   onSnapshot: vi.fn(),
   orderBy: vi.fn(),
   query: (...args: unknown[]) => args[0],
-  setDoc: vi.fn(),
+  setDoc: (...args: unknown[]) => setDocMock(...args),
   Timestamp: { fromMillis: (ms: number) => ({ toMillis: () => ms }) },
   updateDoc: (...args: unknown[]) => updateDocMock(...args),
   where: vi.fn(),
@@ -73,6 +75,47 @@ beforeEach(() => {
   collectionMock.mockImplementation((_db: unknown, path: string) => ({ path }))
   docMock.mockImplementation((_db: unknown, path: string) => ({ path }))
   batchCommitMock.mockResolvedValue(undefined)
+  setDocMock.mockResolvedValue(undefined)
+  getDocMock.mockResolvedValue({ exists: () => false, data: () => undefined })
+})
+
+describe('FirestoreGameRepository write timeouts', () => {
+  const TIMEOUT_MS = 1000
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    setDocMock.mockReturnValue(new Promise(() => undefined))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  function repository(roomCode?: string) {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      roomCode,
+      writeTimeoutMs: TIMEOUT_MS,
+      generateRoomCode: () => ROOM_CODE,
+    })
+  }
+
+  it('gives up creating a room when the write never reaches the server', async () => {
+    const creating = repository().createGame({ hostDeviceUuid: 'd', hostDisplayName: 'Host' })
+    const assertion = await expect(creating).rejects.toMatchObject({ code: 'deadline-exceeded' })
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
+    await assertion
+  })
+
+  it('gives up taking a seat when the write never reaches the server', async () => {
+    const joining = repository(ROOM_CODE).addPlayer({ name: 'Alice', deviceUuid: 'd' })
+    const assertion = await expect(joining).rejects.toMatchObject({ code: 'deadline-exceeded' })
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
+    await assertion
+  })
 })
 
 describe('FirestoreGameRepository.removePlayer', () => {

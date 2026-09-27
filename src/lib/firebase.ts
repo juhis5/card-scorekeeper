@@ -19,6 +19,8 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
   connectFirestoreEmulator,
+  doc,
+  getDocFromServer,
   initializeFirestore,
   memoryLocalCache,
   persistentLocalCache,
@@ -143,4 +145,20 @@ export function ensureSignedIn(authInstance: Auth = getFirebaseAuth()): Promise<
     })
   signInPromises.set(authInstance, promise)
   return promise
+}
+
+/** Never a real room code (lowercase is outside the room-code alphabet). Not `__probe__`:
+ * Firestore rejects document ids matching `__.*__` as invalid, which would fail every probe. */
+const REACHABILITY_PROBE_PATH = 'room/probe'
+
+/**
+ * The check before starting or joining an online game. Signing in isn't enough on its own: a
+ * returning device's anonymous session is restored from cache with no network call, so on Wi-Fi
+ * with no internet it would pass and the first write would then hang. A read from the server
+ * proves Firestore itself answers. The rules let any signed-in user get a single room doc, and
+ * getting one that doesn't exist is fine.
+ */
+export async function checkBackendReachable(authInstance: Auth, db: Firestore): Promise<void> {
+  await ensureSignedIn(authInstance)
+  await getDocFromServer(doc(db, REACHABILITY_PROBE_PATH))
 }

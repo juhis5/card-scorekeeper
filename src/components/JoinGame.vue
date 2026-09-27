@@ -18,6 +18,7 @@ import { isValidRoomCode, normalizeRoomCode } from '@/lib/room-code'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/rules'
+import { isPermanentWriteError } from '@/lib/write-errors'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -62,10 +63,12 @@ async function handleSubmit(): Promise<void> {
       deviceUuid: identity.deviceUuid,
     })
     await router.push({ name: 'room', params: { code: normalizedCode.value } })
-  } catch {
-    // Covers an invalid/expired code (Firestore rules reject the write) and any other join
-    // failure alike — never a raw error, always a retryable, human message (see error-ux).
-    submitError.value = t('home.join.errors.joinFailed')
+  } catch (error) {
+    // The rules refusing the seat means a wrong or expired code; anything else (a timeout, a
+    // dropped connection) means we couldn't reach the game. Never a raw error (see error-ux).
+    submitError.value = isPermanentWriteError(error)
+      ? t('home.join.errors.joinFailed')
+      : t('home.join.errors.unreachable')
   } finally {
     isSubmitting.value = false
     isCheckingConnection.value = false

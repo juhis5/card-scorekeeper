@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const ensureSignedInMock = vi.fn()
+const checkBackendReachableMock = vi.fn()
 
 vi.mock('@/lib/firebase', () => ({
   getFirebaseAuth: () => ({ currentUser: null }),
   getDb: () => ({}),
-  ensureSignedIn: ensureSignedInMock,
+  checkBackendReachable: checkBackendReachableMock,
 }))
 
 vi.mock('@/lib/firestore-repository', () => ({
@@ -29,7 +29,7 @@ beforeEach(() => {
 describe('useGameConnectivity().hostRepository', () => {
   it('builds an online (Firestore) repository when the backend check resolves', async () => {
     vi.stubGlobal('navigator', { onLine: true })
-    ensureSignedInMock.mockResolvedValue('uid-1')
+    checkBackendReachableMock.mockResolvedValue('uid-1')
 
     const mode = await useGameConnectivity().hostRepository()
 
@@ -42,7 +42,7 @@ describe('useGameConnectivity().hostRepository', () => {
 
   it('builds a local repository when the backend check rejects', async () => {
     vi.stubGlobal('navigator', { onLine: true })
-    ensureSignedInMock.mockRejectedValue(new Error('offline'))
+    checkBackendReachableMock.mockRejectedValue(new Error('offline'))
 
     const mode = await useGameConnectivity().hostRepository()
 
@@ -56,7 +56,7 @@ describe('useGameConnectivity().hostRepository', () => {
     const mode = await useGameConnectivity().hostRepository()
 
     expect(mode.kind).toBe('offline')
-    expect(ensureSignedInMock).not.toHaveBeenCalled()
+    expect(checkBackendReachableMock).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 })
@@ -64,7 +64,7 @@ describe('useGameConnectivity().hostRepository', () => {
 describe('useGameConnectivity().joinRepository', () => {
   it('passes the given room code to the online repository when reachable', async () => {
     vi.stubGlobal('navigator', { onLine: true })
-    ensureSignedInMock.mockResolvedValue('uid-1')
+    checkBackendReachableMock.mockResolvedValue('uid-1')
 
     const mode = await useGameConnectivity().joinRepository('ABCDE')
 

@@ -18,7 +18,9 @@ const getDbMock = vi.fn(() => ({}))
 
 vi.mock('@/lib/firebase', () => ({
   getDb: () => getDbMock(),
+  getFirebaseAuth: () => ({}),
   ensureSignedIn: () => ensureSignedInMock(),
+  checkBackendReachable: () => ensureSignedInMock(),
 }))
 
 interface WhereClause {
