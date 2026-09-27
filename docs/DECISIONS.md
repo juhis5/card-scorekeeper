@@ -605,3 +605,13 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     (`--app-header-height`), so anything scrolled or focused into view lands below it.
   - Kept from the attempt: the round banner is one small line and the board's rows are tighter,
     so more of the game fits on a phone.
+- 2026-09-27 — Rules page (second playtest: "rules sections … with visual examples"):
+  - "Säännöt" in the menu opens /rules: the five contracts (from CONTRACTS), the melds with
+    example cards, and what each card left in the hand costs (from cardValue), so the page can't
+    drift from the scoring. Part of the precached app, so it opens offline.
+  - Owner's rule: an ace counts as 1 or 14 in a straight, never both, so K-A-2-3 doesn't count.
+  - Drafted on assumptions for the owner to correct on test-rommi: a värisuora is four or more
+    cards; a set of three may repeat suits (2–3 decks); a joker stands in for any card; twos are
+    not wild. Nothing about going out or laying off is on the page yet.
+  - Cards are white in both themes, like real cards; the suit symbol tells suits apart, not only
+    red and black, and each card has a spoken name ("hertta seitsemän").

@@ -294,5 +294,61 @@
     "missing": "Huonetta {code} ei ole. Tarkista koodi.",
     "invalid": "Linkissä ei ole huonekoodia.",
     "toHome": "Takaisin etusivulle"
+  },
+  "rules": {
+    "heading": "Säännöt",
+    "intro": "Peli kestää viisi kierrosta. Jokaisella kierroksella on oma sopimus: yhdistelmät, jotka pitää saada pöytään. Kierroksen lopuksi kädessä jäljelle jääneet kortit lasketaan pisteiksi. Pienin yhteispistemäärä viiden kierroksen jälkeen voittaa.",
+    "rounds": {
+      "heading": "Kierrokset",
+      "hint": "Sopimus pitää täyttää, ennen kuin kortteja saa laskea pöytään."
+    },
+    "melds": {
+      "heading": "Yhdistelmät",
+      "set": "Kolmen sarja: vähintään kolme samanarvoista korttia. Maat saavat toistua, kun pelissä on 2–3 pakkaa.",
+      "straight": "Värisuora: vähintään neljä peräkkäistä korttia samaa maata.",
+      "aceLow": "Ässä voi olla suoran alussa, jolloin se on 1.",
+      "aceHigh": "Tai suoran lopussa, jolloin se on 14.",
+      "noWrap": "Mutta ei molempia kerralla: suora ei jatku kuninkaasta ässän kautta kakkoseen.",
+      "joker": "Jokeri korvaa minkä tahansa puuttuvan kortin.",
+      "counts": "käy",
+      "doesNotCount": "ei käy"
+    },
+    "points": {
+      "heading": "Pisteet",
+      "hint": "Jokainen kädessä jäljelle jäänyt kortti maksaa pisteitä. Kierroksen pisteet ovat aina viidellä jaollisia.",
+      "card": "Kortti",
+      "value": "Pisteet",
+      "low": "2–9",
+      "ten": "10",
+      "face": "Jätkä, kuningatar, kuningas",
+      "ace": "Ässä",
+      "joker": "Jokeri",
+      "amount": "{points} p"
+    },
+    "card": {
+      "name": "{suit} {rank}",
+      "joker": "jokeri"
+    },
+    "suit": {
+      "hearts": "hertta",
+      "diamonds": "ruutu",
+      "clubs": "risti",
+      "spades": "pata"
+    },
+    "rank": {
+      "A": "ässä",
+      "2": "kaksi",
+      "3": "kolme",
+      "4": "neljä",
+      "5": "viisi",
+      "6": "kuusi",
+      "7": "seitsemän",
+      "8": "kahdeksan",
+      "9": "yhdeksän",
+      "10": "kymmenen",
+      "J": "jätkä",
+      "Q": "kuningatar",
+      "K": "kuningas"
+    }
   }
 }

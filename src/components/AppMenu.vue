@@ -2,7 +2,7 @@
 /**
  * Single job: the app menu, a side panel from the right. The header has room only for Back, the
  * room code and this button, so everything else lives here: the app's name (nothing else on
- * screen names it), the pages, and the language and theme settings. Reka's dialog traps focus
+ * screen names it), the pages (Home, Stats, Rules), and the language and theme settings. Reka's dialog traps focus
  * while it's open and returns it to the menu button when it closes; following a link closes it.
  */
 import { ref } from 'vue'
@@ -28,6 +28,7 @@ const isOpen = ref(false)
 const pages = [
   { name: 'home', labelKey: 'app.menu.home' },
   { name: 'stats', labelKey: 'nav.stats' },
+  { name: 'rules', labelKey: 'rules.heading' },
 ] as const
 
 function close(): void {
