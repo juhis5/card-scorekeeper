@@ -12,6 +12,7 @@ import { useI18n } from 'vue-i18n'
 import { Check } from '@lucide/vue'
 import PhotoCountSheet from '@/components/PhotoCountSheet.vue'
 import RoundScoreInput from '@/components/RoundScoreInput.vue'
+import { isValidRoundScore } from '@/lib/rules'
 import type { ContractRoundNumber, Player } from '@/lib/types'
 
 const {
@@ -47,9 +48,9 @@ const photoCountId = computed(() => `photo-count-${player.id}`)
  * checks both explicitly rather than assuming that invariant holds across a future refactor. */
 const canSnapCards = computed(() => canUsePhotoCount && roomCode !== null)
 
-/** A leftover-card score is always a whole, non-negative number of points. */
+/** A leftover-card score must be a non-negative integer divisible by 5. */
 function isValidScore(value: number): boolean {
-  return Number.isInteger(value) && value >= 0
+  return isValidRoundScore(value)
 }
 
 function handleCommit(): void {

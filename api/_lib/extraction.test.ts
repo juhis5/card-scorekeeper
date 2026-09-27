@@ -94,12 +94,12 @@ describe('buildExtractionResult', () => {
     ]
     expect(buildExtractionResult(cards)).toEqual({
       cards: [
-        { rank: '4', suit: 'diamonds', value: 4 },
+        { rank: '4', suit: 'diamonds', value: 5 },
         { rank: 'K', suit: 'spades', value: 10 },
         { rank: 'A', suit: 'hearts', value: 15 },
         { rank: 'Joker', suit: null, value: 25 },
       ],
-      total: 54,
+      total: 55,
     })
   })
 
@@ -107,6 +107,6 @@ describe('buildExtractionResult', () => {
     // parseModelCards never keeps a model-supplied `value` in the first place, but this pins the
     // recompute contract directly: buildExtractionResult only ever trusts rank/suit.
     const cards = [{ rank: '2' as const, suit: 'clubs' as const }]
-    expect(buildExtractionResult(cards).cards[0]).toEqual({ rank: '2', suit: 'clubs', value: 2 })
+    expect(buildExtractionResult(cards).cards[0]).toEqual({ rank: '2', suit: 'clubs', value: 5 })
   })
 })

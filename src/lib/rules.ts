@@ -13,7 +13,8 @@ export function cardValue(card: Card): number {
   if (card.rank === 'Joker') return JOKER_VALUE
   if (card.rank === 'A') return ACE_VALUE
   if (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K') return FACE_CARD_VALUE
-  return Number(card.rank)
+  if (card.rank === '10') return 10
+  return 5
 }
 
 /** Sums the leftover-card points for a hand at the end of a round. */
@@ -82,4 +83,9 @@ export function winners(players: Player[]): Standing[] {
   const [leader] = ranked
   if (!leader) return []
   return ranked.filter((standing) => standing.placement === leader.placement)
+}
+
+/** Every card value is a multiple of 5, so any valid leftover-card total must also be one. */
+export function isValidRoundScore(points: number): boolean {
+  return Number.isInteger(points) && points >= 0 && points % 5 === 0
 }

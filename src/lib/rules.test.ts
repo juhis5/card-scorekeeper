@@ -6,6 +6,7 @@ import {
   TOTAL_ROUNDS,
   cardValue,
   contractForRound,
+  isValidRoundScore,
   placements,
   roundTotal,
   runningTotal,
@@ -19,13 +20,36 @@ function makePlayer(id: string, totalScore: number): Player {
   return { id, name: id, totalScore }
 }
 
-describe('cardValue', () => {
-  it('values number cards at their face value from 2 through 10', () => {
-    const numberRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7', '8', '9', '10']
+describe('isValidRoundScore', () => {
+  it('accepts a non-negative integer divisible by 5', () => {
+    expect(isValidRoundScore(0)).toBe(true)
+    expect(isValidRoundScore(5)).toBe(true)
+    expect(isValidRoundScore(55)).toBe(true)
+  })
 
-    numberRanks.forEach((rank) => {
-      expect(cardValue({ rank, suit: 'clubs' } as Card)).toBe(Number(rank))
+  it('rejects a non-integer', () => {
+    expect(isValidRoundScore(5.5)).toBe(false)
+  })
+
+  it('rejects a negative number', () => {
+    expect(isValidRoundScore(-5)).toBe(false)
+  })
+
+  it('rejects a number not divisible by 5', () => {
+    expect(isValidRoundScore(3)).toBe(false)
+    expect(isValidRoundScore(12)).toBe(false)
+    expect(isValidRoundScore(101)).toBe(false)
+  })
+})
+
+describe('cardValue', () => {
+  it('values number cards 2–9 at 5 points, and 10 at 10 points', () => {
+    const lowRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7', '8', '9']
+
+    lowRanks.forEach((rank) => {
+      expect(cardValue({ rank, suit: 'clubs' } as Card)).toBe(5)
     })
+    expect(cardValue({ rank: '10', suit: 'clubs' })).toBe(10)
   })
 
   it('values J, Q, and K at 10 points each', () => {
@@ -44,7 +68,7 @@ describe('cardValue', () => {
 })
 
 describe('roundTotal', () => {
-  it('sums the PLAN example hand (4♦, K♠, A♥, Joker) to 54 points', () => {
+  it('sums the example hand (4♦, K♠, A♥, Joker) to 55 points', () => {
     const hand: Card[] = [
       { rank: '4', suit: 'diamonds' },
       { rank: 'K', suit: 'spades' },
@@ -52,7 +76,7 @@ describe('roundTotal', () => {
       { rank: 'Joker', suit: null },
     ]
 
-    expect(roundTotal(hand)).toBe(54)
+    expect(roundTotal(hand)).toBe(55)
   })
 })
 

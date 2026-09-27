@@ -66,7 +66,7 @@ const RESPONSE_SCHEMA: Schema = {
  * spelled out explicitly (not just implied by "Jack, Queen, King...") — a model left to describe
  * cards in prose would write "King"/"Ace" and fail the schema/validator on nearly every hand. */
 const PROMPT = `You are reading a photo of leftover playing cards at the end of a round of Finnish Rummy (Rommi). Identify every visible card and score it using these exact point values:
-- Number cards 2-10 are worth their face value.
+- Number cards 2-9 are worth 5 points each. 10 is worth 10.
 - Jack, Queen, and King are each worth 10.
 - Ace is worth 15.
 - Joker is worth 25 and has no suit.

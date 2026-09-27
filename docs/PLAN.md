@@ -188,7 +188,7 @@ The scorekeeper is built around this specific ruleset, not generic Rummy:
 - **Scoring direction:** points count **against** cards left in your hand when someone
   goes out. Low is good.
 - **Card values (cards left in hand):**
-  - Number cards = face value (2–10)
+  - Number cards 2–9 = 5 each; 10 = 10
   - Face cards (J, Q, K) = 10 each
   - **Ace = 15**
   - **Joker = 25**
@@ -236,11 +236,11 @@ cards; a vision model reads them and suggests the total.
 
 - **Who:** any player, for their own hand.
 - **What it shows before committing:** the **list of cards it detected + the total**,
-  e.g. "4♦, K♠, A♥, Joker → 4 + 10 + 15 + 25 = 54". The player then **confirms or
+  e.g. "4♦, K♠, A♥, Joker → 5 + 10 + 15 + 25 = 55". The player then **confirms or
   edits** — the photo never silently sets a score.
 - **Fallback:** manual typing stays right there; if the read looks wrong or the photo
   fails, the player just types the number.
-- **Values applied:** number = face value, J/Q/K = 10, Ace = 15, Joker = 25 (the
+- **Values applied:** 2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25 (the
   round rules, encoded in the prompt).
 
 #### Accuracy notes (important)
@@ -257,12 +257,12 @@ half-hidden cards cause misreads, and a wrong count matters in a scored game. So
 The vision function returns something like:
 ```json
 { "cards": [
-    {"rank":"4","suit":"diamonds","value":4},
+    {"rank":"4","suit":"diamonds","value":5},
     {"rank":"K","suit":"spades","value":10},
     {"rank":"A","suit":"hearts","value":15},
     {"rank":"Joker","suit":null,"value":25}
   ],
-  "total": 54 }
+  "total": 55 }
 ```
 The app shows the list, lets the player fix any card (or the total directly), then
 commits the confirmed number to `round_score`.

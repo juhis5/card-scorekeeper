@@ -82,17 +82,17 @@ describe('PlayerScoreRow, confirming a photo-count result', () => {
   it('commits the confirmed total through the same path as manual entry', async () => {
     countCardsMock.mockResolvedValue({
       ok: true,
-      cards: [{ rank: '4', suit: 'diamonds', value: 4 }],
-      total: 4,
+      cards: [{ rank: '4', suit: 'diamonds', value: 5 }],
+      total: 5,
     })
     const { emitted } = renderRow({ canUsePhotoCount: true, roomCode: 'ABCDE' })
 
     await selectPhoto()
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
 
-    expect(emitted().commit).toEqual([[ALICE.id, 4]])
+    expect(emitted().commit).toEqual([[ALICE.id, 5]])
     // The manual score field itself reflects the confirmed number, same as if it had been typed.
-    expect((screen.getByLabelText("Alice's round 1 score") as HTMLInputElement).value).toBe('4')
+    expect((screen.getByLabelText("Alice's round 1 score") as HTMLInputElement).value).toBe('5')
   })
 
   it('never commits when the photo read fails — the manual field stays ready', async () => {
@@ -124,14 +124,14 @@ describe('PlayerScoreRow, confirming a photo-count result', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
 
     expect(emitted().commit).toBeUndefined()
-    expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
   })
 
   it('never commits a confirmed total the player edited to a fractional number', async () => {
     countCardsMock.mockResolvedValue({
       ok: true,
-      cards: [{ rank: '4', suit: 'diamonds', value: 4 }],
-      total: 4,
+      cards: [{ rank: '4', suit: 'diamonds', value: 5 }],
+      total: 5,
     })
     const { emitted } = renderRow({ canUsePhotoCount: true, roomCode: 'ABCDE' })
 
@@ -140,6 +140,6 @@ describe('PlayerScoreRow, confirming a photo-count result', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Use this total' }))
 
     expect(emitted().commit).toBeUndefined()
-    expect(screen.getByText('Enter a whole number of 0 or more.')).toBeTruthy()
+    expect(screen.getByText('Enter a multiple of 5 (0, 5, 10, 15…).')).toBeTruthy()
   })
 })
