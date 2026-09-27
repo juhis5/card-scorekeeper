@@ -164,10 +164,10 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
         state.players.find((player) => player.id === aliceUid)?.totalScore === 12 &&
         state.roundScores.some((score) => score.playerId === aliceUid && score.round === 1),
     )
-    await joinerRepo.setRoundScore({ playerId: aliceUid, round: 1, points: 12 })
+    await joinerRepo.setRoundScore({ playerId: aliceUid, round: 1, points: 15 })
     const scoredState = await hostSeesScore
     expect(scoredState.players.find((player) => player.id === aliceUid)?.totalScore).toBe(12)
-    expect(scoredState.roundScores).toContainEqual({ playerId: aliceUid, round: 1, points: 12 })
+    expect(scoredState.roundScores).toContainEqual({ playerId: aliceUid, round: 1, points: 15 })
 
     hostRepo.leave()
     joinerRepo.leave()

@@ -116,7 +116,8 @@ service cloud.firestore {
         // self-defeating — there's no server to catch a falsified value otherwise), and the doc
         // id is pinned to `{ownerUid}_{round}` so there is structurally exactly one score per
         // player per round — an arbitrary id would let a client double-count a round via extra
-        // sibling docs `runningTotal` would sum together.
+        // sibling docs `runningTotal` would sum together. `points % 5` mirrors `isValidRoundScore`
+        // in src/lib/rules.ts: every card value is a multiple of 5, so no real hand totals otherwise.
         allow create, update: if isSignedIn()
           && roomNotExpired(code)
           && request.resource.data.playerId == request.resource.data.ownerUid
@@ -127,6 +128,7 @@ service cloud.firestore {
           && request.resource.data.points is int
           && request.resource.data.points >= 0
           && request.resource.data.points <= 1000
+          && request.resource.data.points % 5 == 0
           && scoreId == request.resource.data.ownerUid + '_' + string(request.resource.data.round);
 
         allow delete: if false;

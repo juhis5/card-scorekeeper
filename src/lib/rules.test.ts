@@ -3,6 +3,9 @@ import {
   ACE_VALUE,
   FACE_CARD_VALUE,
   JOKER_VALUE,
+  LOW_NUMBER_CARD_VALUE,
+  ROUND_SCORE_STEP,
+  TEN_VALUE,
   TOTAL_ROUNDS,
   cardValue,
   contractForRound,
@@ -47,9 +50,35 @@ describe('cardValue', () => {
     const lowRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7', '8', '9']
 
     lowRanks.forEach((rank) => {
-      expect(cardValue({ rank, suit: 'clubs' } as Card)).toBe(5)
+      expect(cardValue({ rank, suit: 'clubs' } as Card)).toBe(LOW_NUMBER_CARD_VALUE)
     })
-    expect(cardValue({ rank: '10', suit: 'clubs' })).toBe(10)
+    expect(cardValue({ rank: '10', suit: 'clubs' })).toBe(TEN_VALUE)
+  })
+
+  it('makes every card value a multiple of ROUND_SCORE_STEP, so every hand total is valid', () => {
+    const allRanks: Exclude<Card['rank'], 'Joker'>[] = [
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+      '8',
+      '9',
+      '10',
+      'J',
+      'Q',
+      'K',
+      'A',
+    ]
+    const allCards: Card[] = [
+      ...allRanks.map((rank): Card => ({ rank, suit: 'hearts' })),
+      { rank: 'Joker', suit: null },
+    ]
+
+    allCards.forEach((card) => {
+      expect(cardValue(card) % ROUND_SCORE_STEP).toBe(0)
+    })
   })
 
   it('values J, Q, and K at 10 points each', () => {
@@ -77,6 +106,17 @@ describe('roundTotal', () => {
     ]
 
     expect(roundTotal(hand)).toBe(55)
+  })
+
+  it('counts every copy of a repeated card — the game is played with 2–3 decks', () => {
+    const hand: Card[] = [
+      { rank: '7', suit: 'hearts' },
+      { rank: '7', suit: 'hearts' },
+      { rank: 'Joker', suit: null },
+      { rank: 'Joker', suit: null },
+    ]
+
+    expect(roundTotal(hand)).toBe(60)
   })
 })
 

@@ -197,7 +197,7 @@ describe('roundScores own-write trust model', () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
     const scoreRef = doc(alice, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`)
 
-    await assertSucceeds(setDoc(scoreRef, roundScoreFixture(ALICE_UID, { points: 12 })))
+    await assertSucceeds(setDoc(scoreRef, roundScoreFixture(ALICE_UID, { points: 15 })))
     await assertSucceeds(updateDoc(scoreRef, { points: 30 }))
   })
 
@@ -211,7 +211,7 @@ describe('roundScores own-write trust model', () => {
     const bob = testEnv.authenticatedContext('bob-uid').firestore()
 
     await assertFails(
-      updateDoc(doc(bob, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`), { points: 999 }),
+      updateDoc(doc(bob, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`), { points: 995 }),
     )
   })
 
@@ -225,7 +225,7 @@ describe('roundScores own-write trust model', () => {
     const host = testEnv.authenticatedContext(HOST_UID).firestore()
 
     await assertSucceeds(
-      updateDoc(doc(host, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`), { points: 42 }),
+      updateDoc(doc(host, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`), { points: 40 }),
     )
   })
 })
@@ -260,7 +260,18 @@ describe('roundScores value bounds', () => {
     await assertFails(
       setDoc(
         doc(alice, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
-        roundScoreFixture(ALICE_UID, { points: 1001 }),
+        roundScoreFixture(ALICE_UID, { points: 1005 }),
+      ),
+    )
+  })
+
+  it('denies a roundScore write with points that are not a multiple of 5', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(alice, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
+        roundScoreFixture(ALICE_UID, { points: 12 }),
       ),
     )
   })
