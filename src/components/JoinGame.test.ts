@@ -66,6 +66,15 @@ beforeEach(() => {
   joinRepository.mockReset()
 })
 
+describe('JoinGame name field', () => {
+  it('shows no example name, but keeps the room-code format hint', () => {
+    renderJoinGame()
+
+    expect(screen.getByLabelText('Your name').getAttribute('placeholder')).toBeNull()
+    expect(screen.getByLabelText('Room code').getAttribute('placeholder')).toBe('e.g. 7K4RQ')
+  })
+})
+
 describe('JoinGame validation', () => {
   it("prefills the room code from the link a room page offers ('Join room 7K4RQ')", async () => {
     const router = makeTestRouter()

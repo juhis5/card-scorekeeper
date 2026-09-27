@@ -7,6 +7,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
   ROOM_CODE_PATTERN,
+  enterOwnRoundScore,
   enterRoundScore,
   joinHostedGame,
   readRoomCode,
@@ -23,7 +24,7 @@ function roundHeading(page: Page, round: number) {
 /** Both players score, the host sees both totals and moves on, and the joiner follows. */
 async function playRound(hostPage: Page, joinerPage: Page, round: number): Promise<void> {
   await enterRoundScore(hostPage, 'Host', round, 20)
-  await enterRoundScore(joinerPage, 'Alice', round, 10)
+  await enterOwnRoundScore(joinerPage, round, 10)
   await expect(scoreboardRow(hostPage, 'Alice')).toContainText(String(round * 10))
   const isLastRound = round === TOTAL_ROUNDS
   const button = hostPage.getByRole('button', { name: isLastRound ? 'Finish game' : 'Next round' })

@@ -110,12 +110,6 @@ describe('ScoreCard', () => {
     expect(screen.queryByLabelText("Alice's round 1 score")).toBeNull()
   })
 
-  it('shows "Scored" indicator when isScored is true', () => {
-    renderCard({ isScored: true })
-
-    expect(screen.getByText('Scored')).toBeTruthy()
-  })
-
   it('collapses on Escape key', async () => {
     const { container } = renderCard()
 
@@ -410,5 +404,82 @@ describe('ScoreCard, confirming a photo-count result', () => {
 
     expect(emitted().commit).toBeUndefined()
     expect(screen.getByText('Enter a multiple of 5 from 0 to 1,000.')).toBeTruthy()
+  })
+})
+
+describe('ScoreCard, a saved score', () => {
+  it('shows the saved points on the collapsed card when this device may see them', () => {
+    renderCard({ scoredPoints: 15, showPoints: true })
+
+    expect(screen.getByText('15 pts')).toBeTruthy()
+    expect(headerButton().getAttribute('aria-label')).toBe("Edit Alice's score (15 points)")
+  })
+
+  it('shows a scored zero as 0, not as unscored', () => {
+    renderCard({ scoredPoints: 0, showPoints: true })
+
+    expect(screen.getByText('0 pts')).toBeTruthy()
+    expect(headerButton().getAttribute('aria-label')).toBe("Edit Alice's score (0 points)")
+  })
+
+  it('shows only "Scored" when the number is not this device\'s to see', () => {
+    renderCard({ scoredPoints: 20, showPoints: false })
+
+    expect(screen.getByText('Scored')).toBeTruthy()
+    expect(screen.queryByText('20 pts')).toBeNull()
+    expect(headerButton().getAttribute('aria-label')).toBe("Edit Alice's score (scored)")
+  })
+
+  it('starts editing from the saved value, and Cancel restores it', async () => {
+    renderCard({ scoredPoints: 15, showPoints: true })
+
+    await expandCard()
+    expect(scoreInput().value).toBe('15')
+    await fireEvent.update(scoreInput(), '20')
+    await fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await expandCard()
+
+    expect(scoreInput().value).toBe('15')
+  })
+
+  it('starts editing from an empty field when the number is hidden', async () => {
+    renderCard({ scoredPoints: 20, showPoints: false })
+
+    await expandCard()
+
+    expect(scoreInput().value).toBe('')
+  })
+})
+
+describe("ScoreCard, a player's own card", () => {
+  it('says "Enter your points" instead of the player\'s name', () => {
+    renderCard({ isOwnCard: true })
+
+    const header = screen.getByRole('button', { name: 'Enter your points' })
+    expect(header.textContent).toContain('Enter your points')
+    expect(header.textContent).not.toContain('Alice')
+  })
+
+  it('labels the input as your own points', async () => {
+    renderCard({ isOwnCard: true })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Enter your points' }))
+
+    expect(screen.getByLabelText('Your round 1 points')).toBeTruthy()
+  })
+
+  it('includes the saved points in the spoken name', () => {
+    renderCard({ isOwnCard: true, scoredPoints: 15, showPoints: true })
+
+    expect(screen.getByRole('button', { name: 'Enter your points (15 points saved)' })).toBeTruthy()
+    expect(screen.getByText('15 pts')).toBeTruthy()
+  })
+
+  it('names a missed round on your own card', () => {
+    renderCard({ isOwnCard: true, isMissedRound: true, round: 2 })
+
+    expect(
+      screen.getByRole('button', { name: 'Enter your points for missed round 2' }),
+    ).toBeTruthy()
   })
 })

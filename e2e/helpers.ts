@@ -64,6 +64,15 @@ export async function enterRoundScore(
   await input.blur()
 }
 
+/** A non-host player's own card reads "Enter your points" instead of their name. */
+export async function enterOwnRoundScore(page: Page, round: number, points: number): Promise<void> {
+  // exact: the missed-round cards' names also start with "Enter your points".
+  await page.getByRole('button', { name: 'Enter your points', exact: true }).click()
+  const input = page.getByLabel(`Your round ${round} points`)
+  await input.fill(String(points))
+  await input.blur()
+}
+
 /** The scoreboard (ScoreBoard.vue) renders one real <table> with one <tr> per player, so a row
  * scoped by that player's name is a stable, ambiguity-free target for both "did they show up"
  * and "did their total update" assertions. */

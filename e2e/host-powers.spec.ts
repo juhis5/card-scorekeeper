@@ -8,6 +8,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import {
   ROOM_CODE_PATTERN,
+  enterOwnRoundScore,
   enterRoundScore,
   joinHostedGame,
   readRoomCode,
@@ -15,14 +16,10 @@ import {
   startHostedGame,
 } from './helpers'
 
-async function fillMissedRound(
-  page: Page,
-  playerName: string,
-  round: number,
-  points: number,
-): Promise<void> {
-  await page.getByRole('button', { name: `Fill in ${playerName}'s missed round ${round}` }).click()
-  const input = page.getByLabel(`${playerName}'s round ${round} score`)
+/** A late joiner fills in their own missed round, so the card reads "Enter your points…". */
+async function fillOwnMissedRound(page: Page, round: number, points: number): Promise<void> {
+  await page.getByRole('button', { name: `Enter your points for missed round ${round}` }).click()
+  const input = page.getByLabel(`Your round ${round} points`)
   await input.fill(String(points))
   await input.blur()
 }
@@ -49,11 +46,11 @@ test.describe('late joiners and host powers', () => {
       await expect(joinerPage.getByRole('heading', { name: 'Missed rounds' })).toBeVisible()
 
       await enterRoundScore(hostPage, 'Host', 2, 10)
-      await enterRoundScore(joinerPage, 'Alice', 2, 5)
+      await enterOwnRoundScore(joinerPage, 2, 5)
       await expect(scoreboardRow(hostPage, 'Alice')).toContainText('5')
       await expect(hostPage.getByRole('button', { name: 'Next round' })).toBeDisabled()
 
-      await fillMissedRound(joinerPage, 'Alice', 1, 15)
+      await fillOwnMissedRound(joinerPage, 1, 15)
       await expect(scoreboardRow(hostPage, 'Alice')).toContainText('20')
       await expect(hostPage.getByRole('button', { name: 'Next round' })).toBeEnabled()
     } finally {

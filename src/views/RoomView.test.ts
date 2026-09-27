@@ -251,6 +251,35 @@ describe('RoomView score entry', () => {
     const aliceRow = rows.find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow?.textContent).toContain('10')
   })
+
+  it('marks no leader until the first round is complete', async () => {
+    const game = useGameStore()
+    await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await renderRoom()
+
+    expect(screen.queryByText('Leader')).toBeNull()
+    await enterScore('Host', 1, 20)
+    await enterScore('Alice', 1, 10)
+    expect(screen.queryByText('Leader')).toBeNull()
+
+    await advanceOrFinish(1)
+
+    const leaderRow = screen.getAllByRole('row').find((row) => row.textContent?.includes('Leader'))
+    expect(leaderRow?.textContent).toContain('Alice')
+  })
+
+  it('shows the host the points it entered, on every card it can edit', async () => {
+    const game = useGameStore()
+    await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await renderRoom()
+
+    await enterScore('Alice', 1, 15)
+
+    expect(screen.getByRole('button', { name: "Edit Alice's score (15 points)" })).toBeTruthy()
+    expect(screen.getByText('15 pts')).toBeTruthy()
+  })
 })
 
 describe('RoomView invalid score entry', () => {
@@ -600,7 +629,8 @@ describe('RoomView online mode', () => {
 
     await renderAs(joinerPinia)
 
-    expect(screen.getByRole('button', { name: /alice/i })).toBeTruthy()
+    // A joiner's own card reads "Enter your points", not their name.
+    expect(screen.getByRole('button', { name: 'Enter your points' })).toBeTruthy()
     // Host's card should not appear for the joiner
     expect(screen.queryByRole('button', { name: /host/i })).toBeNull()
   })
@@ -667,12 +697,37 @@ describe('RoomView online mode', () => {
     expect(screen.queryByRole('button', { name: 'Remove Host' })).toBeNull()
   })
 
+  it('shows a joiner the points they saved on their own card', async () => {
+    const { joinerPinia } = await setUpOnlineRoom()
+    setActivePinia(joinerPinia)
+    await renderAs(joinerPinia)
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Enter your points' }))
+    await fireEvent.update(screen.getByLabelText('Your round 1 points'), '15')
+    await fireEvent.blur(screen.getByLabelText('Your round 1 points'))
+    await flushPromises()
+
+    expect(screen.getByRole('button', { name: 'Enter your points (15 points saved)' })).toBeTruthy()
+    expect(screen.getByText('15 pts')).toBeTruthy()
+  })
+
+  it("shows the host only 'Scored' for points a player entered themselves", async () => {
+    const { hostPinia, joinerGame, aliceId } = await setUpOnlineRoom()
+    await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 20 })
+    setActivePinia(hostPinia)
+    await renderAs(hostPinia)
+    await flushPromises()
+
+    expect(screen.getByRole('button', { name: "Edit Alice's score (scored)" })).toBeTruthy()
+    expect(screen.queryByText('20 pts')).toBeNull()
+  })
+
   it('never offers removing players to a joiner', async () => {
     const { joinerPinia } = await setUpOnlineRoom()
     setActivePinia(joinerPinia)
     await renderAs(joinerPinia)
 
-    await fireEvent.click(screen.getByRole('button', { name: "Enter Alice's score" }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Enter your points' }))
 
     expect(screen.queryByRole('button', { name: /^Remove/ })).toBeNull()
   })
@@ -815,8 +870,10 @@ describe('RoomView late joiners', () => {
     await renderAs(joinerPinia)
 
     expect(screen.getByRole('heading', { name: 'Missed rounds' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: "Fill in Alice's missed round 1" })).toBeTruthy()
-    expect(screen.getByRole('button', { name: "Enter Alice's score" })).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Enter your points for missed round 1' }),
+    ).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Enter your points' })).toBeTruthy()
   })
 
   it('saves a missed-round score for that round', async () => {
@@ -824,9 +881,11 @@ describe('RoomView late joiners', () => {
     setActivePinia(joinerPinia)
     await renderAs(joinerPinia)
 
-    await fireEvent.click(screen.getByRole('button', { name: "Fill in Alice's missed round 1" }))
-    await fireEvent.update(screen.getByLabelText("Alice's round 1 score"), '15')
-    await fireEvent.blur(screen.getByLabelText("Alice's round 1 score"))
+    await fireEvent.click(
+      screen.getByRole('button', { name: 'Enter your points for missed round 1' }),
+    )
+    await fireEvent.update(screen.getByLabelText('Your round 1 points'), '15')
+    await fireEvent.blur(screen.getByLabelText('Your round 1 points'))
     await flushPromises()
 
     expect(joinerGame.roundScores).toContainEqual({ playerId: aliceId, round: 1, points: 15 })

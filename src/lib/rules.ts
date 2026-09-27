@@ -5,7 +5,15 @@
  * The game is played with 2 (sometimes 3) decks shuffled together, so a hand can hold the same
  * card more than once. Nothing here assumes one copy per card — a hand is scored per physical card.
  */
-import type { Card, Contract, ContractRoundNumber, Player, RoundScore, Standing } from './types.js'
+import type {
+  Card,
+  Contract,
+  ContractRoundNumber,
+  GameStatus,
+  Player,
+  RoundScore,
+  Standing,
+} from './types.js'
 
 export const LOW_NUMBER_CARD_VALUE = 5
 export const TEN_VALUE = 10
@@ -73,6 +81,22 @@ export function isEveryRoundScored(
   return playerIds.every(
     (playerId) => missingRounds(playerId, roundScores, throughRound).length === 0,
   )
+}
+
+/** Rounds whose scores are settled: those before the current one, or all of them once the game
+ * is finished. The scoreboard marks a leader only after the first one. */
+export function completedRounds(currentRound: ContractRoundNumber, status: GameStatus): number {
+  return status === 'finished' ? TOTAL_ROUNDS : currentRound - 1
+}
+
+/** A player's points for one round, or null when they have none yet (0 is a real score). */
+export function pointsFor(
+  playerId: string,
+  round: ContractRoundNumber,
+  roundScores: RoundScore[],
+): number | null {
+  const score = roundScores.find((entry) => entry.playerId === playerId && entry.round === round)
+  return score ? score.points : null
 }
 
 /** A player's accumulated points across all recorded rounds so far. */

@@ -9,11 +9,13 @@ import {
   TEN_VALUE,
   TOTAL_ROUNDS,
   cardValue,
+  completedRounds,
   contractForRound,
   isEveryRoundScored,
   missingRounds,
   isValidRoundScore,
   placements,
+  pointsFor,
   roundTotal,
   runningTotal,
   standings,
@@ -276,5 +278,37 @@ describe('isEveryRoundScored', () => {
 
   it('is true for no players', () => {
     expect(isEveryRoundScored([], scores, 2)).toBe(true)
+  })
+})
+
+describe('completedRounds', () => {
+  it('counts the rounds before the current one while a game is running', () => {
+    expect(completedRounds(1, 'waiting')).toBe(0)
+    expect(completedRounds(1, 'playing')).toBe(0)
+    expect(completedRounds(3, 'playing')).toBe(2)
+  })
+
+  it('counts every round once the game is finished', () => {
+    expect(completedRounds(5, 'finished')).toBe(TOTAL_ROUNDS)
+  })
+})
+
+describe('pointsFor', () => {
+  const scores: RoundScore[] = [
+    { playerId: 'alice', round: 1, points: 0 },
+    { playerId: 'alice', round: 2, points: 15 },
+    { playerId: 'bob', round: 2, points: 20 },
+  ]
+
+  it("returns the player's points for that round", () => {
+    expect(pointsFor('alice', 2, scores)).toBe(15)
+  })
+
+  it('returns 0 for a scored zero, not "no score"', () => {
+    expect(pointsFor('alice', 1, scores)).toBe(0)
+  })
+
+  it('returns null when the player has no score for that round', () => {
+    expect(pointsFor('bob', 1, scores)).toBeNull()
   })
 })

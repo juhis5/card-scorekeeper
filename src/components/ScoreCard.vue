@@ -1,7 +1,9 @@
 <script setup lang="ts">
 /**
- * Single job: one player's round-score entry card. Collapsed by default (name + "scored" status);
- * tapping the header expands it inline to reveal the numeric input + photo-count affordance.
+ * Single job: one player's round-score entry card. Collapsed by default (name + saved points, or
+ * just "scored" when the number isn't this device's to see); tapping the header expands it inline
+ * to reveal the numeric input + photo-count affordance. A non-host player's own card reads "Enter
+ * your points" instead of their name.
  * Presentation + local draft value only; persisting the score is the parent's job (it owns the
  * store call), this just emits the validated number on commit.
  *
@@ -22,14 +24,22 @@ import type { ContractRoundNumber, Player } from '@/lib/types'
 const {
   player,
   round,
-  isScored = false,
+  scoredPoints = null,
+  showPoints = false,
+  isOwnCard = false,
   isMissedRound = false,
   canUsePhotoCount = false,
   roomCode = null,
 } = defineProps<{
   player: Player
   round: ContractRoundNumber
-  isScored?: boolean
+  /** This round's saved points for the player, or null when they haven't scored yet. */
+  scoredPoints?: number | null
+  /** Whether this device may show the number: players see their own, the host also sees the
+   * ones it entered. Otherwise the card only says "scored" until the round is revealed. */
+  showPoints?: boolean
+  /** A non-host player's own card, labelled "Enter your points" rather than by name. */
+  isOwnCard?: boolean
   /** A round played before this player joined the app, still to be filled in. */
   isMissedRound?: boolean
   /** Gates the "Snap cards" affordance — only true when this device is online AND this is its
@@ -58,21 +68,47 @@ const headerButton = useTemplateRef<HTMLButtonElement>('header')
 
 const inputId = computed(() => `score-card-${player.id}`)
 const errorId = computed(() => `${inputId.value}-error`)
-const label = computed(() => t('room.score.inputLabel', { name: player.name, round }))
+const isScored = computed(() => scoredPoints !== null)
+const visiblePoints = computed(() => (showPoints ? scoredPoints : null))
+const title = computed(() => (isOwnCard ? t('room.score.ownCardLabel') : player.name))
+const label = computed(() =>
+  isOwnCard
+    ? t('room.score.ownInputLabel', { round })
+    : t('room.score.inputLabel', { name: player.name, round }),
+)
 const hasError = computed(() => errorMessage.value !== '')
 const photoCountId = computed(() => `photo-count-${player.id}`)
 /** `canUsePhotoCount` alone already implies `roomCode !== null` in practice (it's only ever true
  * online, and `isOnline` is derived from a non-null room code — see stores/game.ts), but this
  * checks both explicitly rather than assuming that invariant holds across a future refactor. */
 const canSnapCards = computed(() => canUsePhotoCount && roomCode !== null)
-const headerLabel = computed(() => {
-  if (isMissedRound) return t('room.score.cardLabelMissed', { name: player.name, round })
-  return t(isScored ? 'room.score.cardLabelScored' : 'room.score.cardLabel', { name: player.name })
-})
+const headerLabel = computed(() => (isOwnCard ? ownHeaderLabel() : playerHeaderLabel()))
+
+/** The spoken name replaces the visible text, so it carries the visible title and points too. */
+function ownHeaderLabel(): string {
+  if (isMissedRound) return t('room.score.ownCardLabelMissed', { round })
+  if (visiblePoints.value !== null) {
+    return t('room.score.ownCardLabelScored', { points: n(visiblePoints.value) })
+  }
+  return t('room.score.ownCardLabel')
+}
+
+function playerHeaderLabel(): string {
+  const name = player.name
+  if (isMissedRound) return t('room.score.cardLabelMissed', { name, round })
+  if (visiblePoints.value !== null) {
+    return t('room.score.cardLabelScoredPoints', { name, points: n(visiblePoints.value) })
+  }
+  return t(isScored.value ? 'room.score.cardLabelScored' : 'room.score.cardLabel', { name })
+}
 
 async function expand(): Promise<void> {
   if (isExpanded.value) return
   isPressInsidePanel = false
+  // Start from the synced score when this device may see it (it may have changed on another
+  // device), else from the last score this card saved.
+  if (visiblePoints.value !== null) savedPoints.value = visiblePoints.value
+  points.value = savedPoints.value
   isExpanded.value = true
   await nextTick()
   document.getElementById(inputId.value)?.focus()
@@ -166,13 +202,17 @@ function handleKeyDown(event: KeyboardEvent): void {
       :aria-label="headerLabel"
       @click="expand"
     >
-      <span class="text-foreground truncate text-base font-medium">{{ player.name }}</span>
+      <span class="text-foreground truncate text-base font-medium">{{ title }}</span>
       <span v-if="isMissedRound" class="text-muted-foreground shrink-0 text-sm">
         {{ t('room.score.missedRoundLabel', { round }) }}
       </span>
       <span v-if="isScored" class="text-primary flex shrink-0 items-center gap-1 text-sm">
         <Check aria-hidden="true" class="size-4" />
-        {{ t('room.score.scoredLabel') }}
+        {{
+          visiblePoints === null
+            ? t('room.score.scoredLabel')
+            : t('room.score.scoredPoints', { points: n(visiblePoints) })
+        }}
       </span>
     </button>
 
