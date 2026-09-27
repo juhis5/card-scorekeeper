@@ -775,3 +775,14 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     entries say "you".
   - Entries start with this release. At the release, the production games played since the wipe
     get their entries copied in once.
+- 2026-09-28 — Visual snapshots (fourth round; the owner chose Playwright over Chromatic, whose
+  free 5,000 snapshots a month our PR pace would use up):
+  - `tests/e2e/visual.spec.ts` screenshots the key screens in Finnish, dark and light: Home (both
+    modes), a room, an open card, the remove dialog, the points sheet, a finished game, the menu
+    with the theme list, and Säännöt. A local game, so no server and nothing that changes per run.
+  - Screenshots only match where fonts render identically, so they're made and compared in
+    Playwright's own Linux image, on x86 like GitHub's runners: `pnpm test:visual` compares and
+    `pnpm test:visual:update` makes new baselines, both through Docker (`tests/e2e/visual.sh`).
+    CI's `visual` job runs in the same image. The `visual` Playwright project only exists with
+    `VISUAL=1`, so ordinary e2e runs skip it. The image tag in ci.yml follows the
+    @playwright/test version.

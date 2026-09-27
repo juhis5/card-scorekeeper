@@ -73,13 +73,20 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
       },
+      testIgnore: '**/visual.spec.ts',
     },
     {
       name: 'firefox',
       use: {
         ...devices['Desktop Firefox'],
       },
+      testIgnore: '**/visual.spec.ts',
     },
+    // Screenshots, compared only in Playwright's Linux image, where the baselines are made
+    // (tests/e2e/visual.sh); anywhere else fonts render differently.
+    ...(process.env.VISUAL
+      ? [{ name: 'visual', use: { ...devices['Desktop Chrome'] }, testMatch: '**/visual.spec.ts' }]
+      : []),
     {
       name: 'webkit',
       use: {
@@ -106,6 +113,7 @@ export default defineConfig({
       // host-powers, online-game and unique-names use the same two-client live-sync pattern, so
       // the same exclusion applies.
       testIgnore: [
+        '**/visual.spec.ts',
         '**/live-sync.spec.ts',
         '**/host-powers.spec.ts',
         '**/online-game.spec.ts',

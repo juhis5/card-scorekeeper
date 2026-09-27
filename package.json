@@ -24,6 +24,8 @@
     "e2e": "playwright test -c tests/e2e",
     "test:e2e": "firebase emulators:exec --only firestore,auth 'playwright test -c tests/e2e'",
     "test:e2e:ci": "CI=1 firebase emulators:exec --only firestore,auth 'playwright test -c tests/e2e --project=chromium --project=firefox'",
+    "test:visual": "tests/e2e/visual.sh",
+    "test:visual:update": "tests/e2e/visual.sh --update-snapshots",
     "prepare": "husky"
   },
   "dependencies": {
