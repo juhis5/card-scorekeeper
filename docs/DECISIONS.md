@@ -638,3 +638,16 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     but the card now closes only after that tap's click has landed (or after 500 ms when no tap
     follows, as with the keyboard), and stays open when the tap lands back on it.
   - How the iPhone keyboard behaves can only be checked on a real phone.
+- 2026-09-27 — "Syötä kaikki" for the host (third playtest: "Input all points"):
+  - Beside the round heading while anyone is missing a score this round, host only. It opens a
+    sheet that goes through those players one at a time, laid out like an open score card (the
+    owner's call): the name, then the field with ✓ (save and move on) and → (skip). "2/4" shows
+    progress, and a player who enters their own score meanwhile drops out. It closes when nobody
+    is left.
+  - The field stays the same element from player to player, so the phone keyboard stays up. The
+    sheet floats in the upper part of the screen (`--floating-sheet-top`), about the middle of
+    what stays visible with the keyboard up. The owner asked about the true middle, but an iPhone
+    centres on the whole screen, not the part above the keyboard, so a centred field lands behind
+    the keyboard.
+  - Saving goes through the room's own handler, so the saved-score announcement, the room's
+    error message, and which numbers the host may see work as they do for the cards.

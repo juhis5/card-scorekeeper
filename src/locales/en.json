@@ -230,7 +230,16 @@
       "nameRequired": "Enter the player's name.",
       "failed": "Couldn't add {name}. Try again."
     },
-    "guest": "guest"
+    "guest": "guest",
+    "enterAll": {
+      "button": "Enter all",
+      "title": "Enter points · {position}/{total}",
+      "close": "Close",
+      "description": "This round's points, one player at a time.",
+      "saveAndNext": "Save and next",
+      "skip": "Skip {name}",
+      "next": "Next: {name}"
+    }
   },
   "notFound": {
     "heading": "Page not found",
