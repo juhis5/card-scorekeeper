@@ -68,7 +68,7 @@ if (!id) { id = crypto.randomUUID(); localStorage.setItem('device_uuid', id) }
 
 Permissions from the plan must live in rules, not only the client:
 
-- Any player may create/edit **their own** `round_score` / `player` row; the **host** may edit anyone's in their room.
+- Any player may create/edit **their own** `round_score` / `player` row; the **host** may edit anyone's in their room. The host also creates **guest seats** (players without a phone, id `guest-<uuid>`, `isGuest: true`) and enters their scores; see DECISIONS "guest seats".
 - Reads scoped to a room a client is in.
 - Reject writes to expired rooms.
 - Permanent stats records are append-only on game finish; not editable afterward.

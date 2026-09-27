@@ -33,7 +33,7 @@
       "heading": "New game",
       "hostNameLabel": "Your name",
       "otherPlayersHeading": "Other players",
-      "otherPlayersHint": "Only used if this device ends up hosting locally — online, others join with the room code instead.",
+      "otherPlayersHint": "Players without their own phone: you enter their scores. Everyone else joins with the room code.",
       "otherPlayersEmpty": "No other players yet — add at least one to start.",
       "nameLabel": "Player {number} name",
       "removeLabel": "Remove player {number}",
@@ -54,7 +54,8 @@
         "invalidCode": "Enter the 5-character room code exactly as shown.",
         "unreachable": "Couldn't reach the game — check your connection and try again.",
         "joinFailed": "Couldn't join that room. Check the code and try again.",
-        "nameTaken": "Someone in this game already uses that name. Add an initial or a nickname."
+        "nameTaken": "Someone in this game already uses that name. Add an initial or a nickname.",
+        "nameTakenByGuest": "The host already added a player with that name. Ask the host to remove them, then join."
       }
     },
     "errors": {
@@ -175,7 +176,8 @@
       "allScored": "Everyone has entered round {round} scores.",
       "roundResults": "Round {round} results: {names} leads with {total} points. | Round {round} results: {names} lead with {total} points.",
       "yourPlacement": "You're in place {placement}.",
-      "playerRemoved": "{name} was removed from the game."
+      "playerRemoved": "{name} was removed from the game.",
+      "playerAdded": "{name} added."
     },
     "empty": {
       "heading": "No local game in progress",
@@ -213,7 +215,16 @@
         "nameTaken": "Someone in the next game already uses your name."
       },
       "joinWithAnotherName": "Join with another name"
-    }
+    },
+    "addPlayer": {
+      "button": "Add player",
+      "nameLabel": "Player's name",
+      "hint": "For a player without a phone: you enter their scores.",
+      "add": "Add",
+      "nameRequired": "Enter the player's name.",
+      "failed": "Couldn't add {name}. Try again."
+    },
+    "guest": "guest"
   },
   "notFound": {
     "heading": "Page not found",

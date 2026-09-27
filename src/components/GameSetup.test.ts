@@ -46,6 +46,7 @@ function makeFakeOnlineRepository(roomCode: string): GameRepository {
   return {
     createGame: vi.fn().mockResolvedValue({ gameId: roomCode, roomCode, hostPlayerId: 'host-uid' }),
     addPlayer: vi.fn(),
+    addGuest: vi.fn().mockResolvedValue('guest-id'),
     removePlayer: vi.fn(),
     subscribe: vi.fn((onChange: (state: GameState) => void) => {
       onChange({
@@ -174,7 +175,21 @@ describe('GameSetup hosting offline (backend unreachable)', () => {
   })
 })
 
-describe('GameSetup with repeated names in a local game', () => {
+describe('GameSetup with repeated names', () => {
+  it('flags them online too, before any room is created', async () => {
+    const onlineRepo = makeFakeOnlineRepository('7K4RQ')
+    hostRepository.mockResolvedValue({ kind: 'online', repository: onlineRepo })
+    renderGameSetup()
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho')
+    await fireEvent.update(screen.getByLabelText('Player 1 name'), 'JUHO')
+    await fireEvent.click(screen.getByRole('button', { name: 'Start game' }))
+    await flushPromises()
+
+    expect(screen.getByText('Each player needs a different name.')).toBeTruthy()
+    expect(onlineRepo.createGame).not.toHaveBeenCalled()
+  })
+
   it('flags the repeated name, ignoring case and spaces, and starts nothing', async () => {
     hostRepository.mockResolvedValue(offlineMode())
     renderGameSetup()
@@ -327,6 +342,7 @@ describe('GameSetup hosting online (backend reachable)', () => {
     expect(router.currentRoute.value.name).toBe('room')
     expect(router.currentRoute.value.params.code).toBe('7K4RQ')
     expect(onlineRepo.addPlayer).not.toHaveBeenCalled()
+    expect(onlineRepo.addGuest).toHaveBeenCalledWith({ name: 'Alice' })
     expect(game.isHost).toBe(true)
     expect(game.isOnline).toBe(true)
     expect(screen.queryByText('Add at least one other player.')).toBeNull()

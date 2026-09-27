@@ -228,4 +228,42 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     aliceRepo.leave()
     copycatRepo.leave()
   })
+
+  it('seats a guest the host scores for, whose name a joiner is told belongs to a guest', async () => {
+    const host = makeDevice()
+    const hostRepo = new FirestoreGameRepository({ db: host.db, auth: host.auth })
+    const created = await hostRepo.createGame({
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Juho',
+    })
+    const roomCode = created.roomCode
+    if (!roomCode) throw new Error('expected an online room code')
+
+    const guestId = await hostRepo.addGuest({ name: 'Mummo' })
+    await hostRepo.setRoundScore({ playerId: guestId, round: 1, points: 15 })
+
+    const alice = makeDevice()
+    const aliceRepo = new FirestoreGameRepository({ db: alice.db, auth: alice.auth, roomCode })
+    const error = await aliceRepo
+      .addPlayer({ name: 'MUMMO', deviceUuid: 'device-a' })
+      .catch((caught: unknown) => caught)
+    expect(error).toBeInstanceOf(NameTakenError)
+    expect((error as NameTakenError).isGuestSeat).toBe(true)
+
+    await aliceRepo.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    const seen = await waitForState(
+      aliceRepo,
+      (state) => state.players.length === 3 && state.roundScores.length === 1,
+    )
+    expect(seen.players.find((player) => player.id === guestId)).toEqual({
+      id: guestId,
+      name: 'Mummo',
+      totalScore: 15,
+      isGuest: true,
+    })
+    expect(seen.roundScores).toContainEqual({ playerId: guestId, round: 1, points: 15 })
+
+    hostRepo.leave()
+    aliceRepo.leave()
+  })
 })

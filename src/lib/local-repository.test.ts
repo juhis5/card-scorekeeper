@@ -112,6 +112,29 @@ describe('LocalGameRepository.subscribe', () => {
   })
 })
 
+describe('LocalGameRepository.addGuest', () => {
+  it('adds a player the host scores for, at any point in the game', async () => {
+    const repository = makeRepository()
+    await repository.createGame(HOST_CONFIG)
+    await repository.advanceRound()
+
+    const playerId = await repository.addGuest({ name: ' Mummo ' })
+
+    const emissions = recordEmissions(repository)
+    expect(emissions[0]?.players).toContainEqual({ id: playerId, name: 'Mummo', totalScore: 0 })
+    expect(emissions[0]?.currentRound).toBe(2)
+  })
+
+  it('refuses a name already in the game', async () => {
+    const repository = makeRepository()
+    await repository.createGame(HOST_CONFIG)
+
+    await expect(
+      repository.addGuest({ name: HOST_CONFIG.hostDisplayName.toUpperCase() }),
+    ).rejects.toBeInstanceOf(NameTakenError)
+  })
+})
+
 describe('LocalGameRepository.addPlayer', () => {
   it('adds a player with a zero starting total, alongside the host', async () => {
     const repository = makeRepository()

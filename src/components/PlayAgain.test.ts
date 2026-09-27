@@ -8,6 +8,7 @@ import { i18n } from '@/i18n'
 import { NameTakenError } from '@/lib/player-names'
 import { useGameStore } from '@/stores/game'
 import type {
+  AddGuestInput,
   AddPlayerInput,
   CreatedGame,
   GameConfig,
@@ -49,6 +50,11 @@ class FakeRoom implements ReplayableGameRepository {
     return 'jani'
   }
 
+  async addGuest(input: AddGuestInput): Promise<string> {
+    this.seatedNames.push(`${input.name} (guest)`)
+    return `guest-${input.name}`
+  }
+
   subscribe(onChange: (state: GameState) => void): Unsubscribe {
     this.listeners.add(onChange)
     onChange(this.state)
@@ -85,7 +91,11 @@ function makeRouter() {
   })
 }
 
-async function renderPlayAgain(props: { myName: string; otherNames: string[] }) {
+async function renderPlayAgain(props: {
+  myName: string
+  otherNames: string[]
+  guestNames?: string[]
+}) {
   const router = makeRouter()
   await router.push({ name: 'room', params: { code: FINISHED_CODE } })
   render(PlayAgain, { props, global: { plugins: [i18n, router] } })
@@ -140,6 +150,18 @@ describe('PlayAgain, online host', () => {
     expect(next.seatedNames).toEqual(['Juho'])
     expect(finished.linkedRoomCodes).toEqual([NEXT_CODE])
     expect(router.currentRoute.value.params.code).toBe(NEXT_CODE)
+  })
+
+  it('seats the players without a phone in the next room too', async () => {
+    await finishedHostedGame(FINISHED_CODE)
+    const next = new FakeRoom(NEXT_CODE)
+    nextRoomRepository.mockResolvedValue({ kind: 'online', repository: next })
+    await renderPlayAgain({ myName: 'Juho', otherNames: ['Jani', 'Mummo'], guestNames: ['Mummo'] })
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Play again' }))
+    await flushPromises()
+
+    expect(next.seatedNames).toEqual(['Juho', 'Mummo (guest)'])
   })
 
   it("says so when the server can't be reached, and a second tap tries again", async () => {

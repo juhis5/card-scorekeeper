@@ -24,6 +24,7 @@ import { forgetRoom, rememberRoom } from '@/lib/last-room'
 import { boardRows } from '@/lib/scoreboard'
 import type { KeyValueStorage } from '@/lib/local-repository'
 import type {
+  AddGuestInput,
   AddPlayerInput,
   CreatedGame,
   GameConfig,
@@ -140,12 +141,18 @@ export const useGameStore = defineStore('game', () => {
 
   /**
    * Play again, online: creates the next room on `nextRepo` while the finished game stays on
-   * screen, points the finished room at it so the other devices are asked to join, then follows
-   * the next room as its host. A failed create changes nothing, so the host can retry.
+   * screen, seats the finished game's guests there (players without a phone can't join by
+   * themselves), points the finished room at it so the other devices are asked to join, then
+   * follows the next room as its host. A failed create changes nothing, so the host can retry.
    */
-  async function playAgain(nextRepo: GameRepository, config: GameConfig): Promise<void> {
+  async function playAgain(
+    nextRepo: GameRepository,
+    config: GameConfig,
+    guestNames: readonly string[] = [],
+  ): Promise<void> {
     const finished = requireRepository()
     const created = await nextRepo.createGame(config)
+    for (const name of guestNames) await nextRepo.addGuest({ name })
     if (created.roomCode && isReplayable(finished)) {
       // The next game goes ahead even when the link doesn't land: an expired room refuses it,
       // and the next room's code is on screen to share instead.
@@ -236,6 +243,11 @@ export const useGameStore = defineStore('game', () => {
     return requireRepository().addPlayer(input)
   }
 
+  /** Host only: a player without a phone, whose scores the host enters. */
+  async function addGuest(input: AddGuestInput): Promise<PlayerId> {
+    return requireRepository().addGuest(input)
+  }
+
   async function setRoundScore(input: SetRoundScoreInput): Promise<void> {
     await requireRepository().setRoundScore(input)
   }
@@ -290,6 +302,7 @@ export const useGameStore = defineStore('game', () => {
     join,
     resume,
     addPlayer,
+    addGuest,
     setRoundScore,
     removePlayer,
     resumeOnline,

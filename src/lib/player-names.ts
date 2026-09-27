@@ -43,13 +43,16 @@ export function duplicateNameIndexes(names: readonly string[]): Set<number> {
   return duplicates
 }
 
-/** Someone in this game already uses the name, compared as above. */
+/** Someone in this game already uses the name, compared as above. `isGuestSeat` when it's a
+ * player without a phone the host added, so a joiner can be told to ask the host. */
 export class NameTakenError extends Error {
   readonly playerName: string
+  readonly isGuestSeat: boolean
 
-  constructor(playerName: string) {
+  constructor(playerName: string, { isGuestSeat = false }: { isGuestSeat?: boolean } = {}) {
     super(`Someone in this game already uses the name "${playerName}"`)
     this.name = 'NameTakenError'
     this.playerName = playerName
+    this.isGuestSeat = isGuestSeat
   }
 }

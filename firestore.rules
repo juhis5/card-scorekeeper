@@ -66,6 +66,13 @@ service cloud.firestore {
       return isValidPlayerName(name) && name == name.trim() && !name.matches('.*\\s\\s.*');
     }
 
+    /** A guest seat's id (see players/ below): 'guest-' and a lowercase UUID. An anonymous uid has
+     * no '-', so a guest id can never be anyone's signed-in identity or room membership. */
+    function isGuestId(id) {
+      return id is string
+        && id.matches('^guest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+    }
+
     /** A name's unique-name record id, the same as playerNameKey in src/lib/player-names.ts.
      * lower() only changes A to Z, so the Nordic capitals are folded here one by one, before it:
      * keep this list and FOLDED_CAPITALS in player-names.ts the same. */
@@ -154,26 +161,52 @@ service cloud.firestore {
       match /players/{playerUid} {
         allow read: if isSignedIn() && isRoomMember(code);
 
-        // Joining is always seating yourself — the host never creates another player's doc,
-        // and nobody may claim an ownerUid that isn't their own uid. The shape is exact: this doc
-        // is the membership key every other rule trusts, and a seat missing joinOrder would be
-        // invisible to the app's orderBy('joinOrder') subscription while still counting as a
-        // member. The seat's name must be clean and come with this player's own record under
-        // names/ (written in the same batch), which is what keeps names unique in the room.
-        allow create: if isSignedIn()
-          && playerUid == request.auth.uid
-          && request.resource.data.ownerUid == request.auth.uid
-          && roomNotExpired(code)
-          && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
-          && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
-          && isCleanPlayerName(request.resource.data.name)
-          && getAfter(
-            /databases/$(database)/documents/room/$(code)/names/$(nameKeyOf(request.resource.data.name))
-          ).data.ownerUid == request.auth.uid
-          && request.resource.data.deviceUuid is string
-          && request.resource.data.deviceUuid.size() <= 64
-          && request.resource.data.totalScore == 0
-          && request.resource.data.joinOrder is int;
+        // Joining is seating yourself, and nobody may claim an ownerUid that isn't their own uid.
+        // The shape is exact: this doc is the membership key every other rule trusts, and a seat
+        // missing joinOrder would be invisible to the app's orderBy('joinOrder') subscription
+        // while still counting as a member. The seat's name must be clean and come with this
+        // player's own record under names/ (written in the same batch), which is what keeps names
+        // unique in the room.
+        function isOwnSeat() {
+          return isSignedIn()
+            && playerUid == request.auth.uid
+            && request.resource.data.ownerUid == request.auth.uid
+            && roomNotExpired(code)
+            && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
+            && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
+            && isCleanPlayerName(request.resource.data.name)
+            && getAfter(
+              /databases/$(database)/documents/room/$(code)/names/$(nameKeyOf(request.resource.data.name))
+            ).data.ownerUid == request.auth.uid
+            && request.resource.data.deviceUuid is string
+            && request.resource.data.deviceUuid.size() <= 64
+            && request.resource.data.totalScore == 0
+            && request.resource.data.joinOrder is int;
+        }
+
+        // A guest: a player without a phone, seated by the host, who then scores for them. Its id
+        // is a guest id (never a uid, so never a member), it's owned by the host, its deviceUuid
+        // is its own id (the stats rows' key), and its name record names this seat.
+        function isGuestSeat() {
+          return isSignedIn()
+            && isHost(code)
+            && isGuestId(playerUid)
+            && roomNotExpired(code)
+            && roomData(code).status != 'finished'
+            && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder', 'isGuest'])
+            && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder', 'isGuest'])
+            && request.resource.data.isGuest == true
+            && request.resource.data.ownerUid == request.auth.uid
+            && request.resource.data.deviceUuid == playerUid
+            && isCleanPlayerName(request.resource.data.name)
+            && getAfter(
+              /databases/$(database)/documents/room/$(code)/names/$(nameKeyOf(request.resource.data.name))
+            ).data.playerId == playerUid
+            && request.resource.data.totalScore == 0
+            && request.resource.data.joinOrder is int;
+        }
+
+        allow create: if isOwnSeat() || isGuestSeat();
 
         // A player's own running total, or any seat's for the host. Only totalScore may change:
         // deviceUuid is the stats trust anchor (a player rewriting it to someone else's key could
@@ -198,16 +231,34 @@ service cloud.firestore {
       // never updated, so a second player can't take the same name even at the same moment (their
       // write would be an update). Anyone signed in may check a name, to say "taken" clearly;
       // listing is refused. The host deletes a removed player's record with the seat.
+      // A player's own record has only ownerUid; a guest's also names its seat (playerId), which
+      // is how the app can say a name belongs to a guest.
       match /names/{nameKey} {
+        function isOwnSeatRecord() {
+          return request.resource.data.keys().hasOnly(['ownerUid'])
+            && request.resource.data.ownerUid == request.auth.uid
+            && nameKey == nameKeyOf(
+              getAfter(/databases/$(database)/documents/room/$(code)/players/$(request.auth.uid)).data.name
+            );
+        }
+
+        function isGuestSeatRecord() {
+          let guestId = request.resource.data.playerId;
+          let seat = getAfter(/databases/$(database)/documents/room/$(code)/players/$(guestId)).data;
+          return isHost(code)
+            && request.resource.data.keys().hasOnly(['ownerUid', 'playerId'])
+            && request.resource.data.ownerUid == request.auth.uid
+            && isGuestId(guestId)
+            && seat.ownerUid == request.auth.uid
+            && seat.isGuest == true
+            && nameKey == nameKeyOf(seat.name);
+        }
+
         allow get: if isSignedIn();
         allow list: if false;
         allow create: if isSignedIn()
           && roomNotExpired(code)
-          && request.resource.data.keys().hasOnly(['ownerUid'])
-          && request.resource.data.ownerUid == request.auth.uid
-          && nameKey == nameKeyOf(
-            getAfter(/databases/$(database)/documents/room/$(code)/players/$(request.auth.uid)).data.name
-          );
+          && (isOwnSeatRecord() || isGuestSeatRecord());
         allow update: if false;
         allow delete: if isSignedIn() && isHost(code) && roomNotExpired(code);
       }

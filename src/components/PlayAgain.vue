@@ -21,11 +21,17 @@ import { isPermanentWriteError } from '@/lib/write-errors'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 
-const { myName, otherNames } = defineProps<{
+const {
+  myName,
+  otherNames,
+  guestNames = [],
+} = defineProps<{
   /** This device's name in the finished game. */
   myName: string
   /** Everyone else's, in seat order: the local setup form gets them back. */
   otherNames: string[]
+  /** Online guests (players without a phone), seated in the next room along with the host. */
+  guestNames?: string[]
 }>()
 
 type PlayAgainError = 'startFailed' | 'unreachable' | 'joinFailed' | 'nameTaken'
@@ -63,10 +69,11 @@ async function startNextRoom(): Promise<void> {
     return
   }
   try {
-    await game.playAgain(mode.repository, {
-      hostDeviceUuid: identity.deviceUuid,
-      hostDisplayName: myName,
-    })
+    await game.playAgain(
+      mode.repository,
+      { hostDeviceUuid: identity.deviceUuid, hostDisplayName: myName },
+      guestNames,
+    )
   } catch {
     error.value = 'startFailed'
     return

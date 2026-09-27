@@ -37,6 +37,8 @@ export interface Player {
   name: string
   /** Running total across all scored rounds so far; ascending = winning. */
   totalScore: number
+  /** Online only: a player without a phone, seated by the host, who scores for them. */
+  isGuest?: boolean
 }
 
 export type GameStatus = 'waiting' | 'playing' | 'finished'

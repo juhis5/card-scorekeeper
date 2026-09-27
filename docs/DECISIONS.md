@@ -556,3 +556,28 @@ Resume order after reset: ~~finish 4b-i~~ → review → 4b-ii e2e → slice 5 (
     ruleset therefore drops its PR rule but keeps required checks, linear history, no
     force-push and no deletion.
   - Hotfixes go through `develop` and a release, so `develop` must stay releasable.
+- 2026-09-27 — Players without a phone: guest seats (second playtest, owner's call):
+  - Names typed in the start form used to be ignored online (they only fed the local fallback).
+    Now, in both modes, they become players the host scores for: online a guest seat, locally
+    just another player. "Lisää pelaaja" at the end of the host's cards adds one at any round;
+    added mid-game, they fill in the rounds they missed like a late joiner.
+  - A guest seat's id is `guest-<lowercase uuid>`. An anonymous uid has no '-', so a guest id
+    is never a signed-in identity and never a room member. The seat is owned by the host, its
+    deviceUuid is its own id (the stats rows' key), and it carries `isGuest: true`.
+  - Rules stay additive: new host-only branches create a guest seat and its name record, which
+    also names the seat (`playerId`). The joiner and old-record branches are unchanged, so the
+    rules can reach each environment before the app. The host already could write any seat's
+    scores and total, and a stats row only needs the seat to exist.
+  - The host always sees the numbers on a guest's card: nobody else can enter them.
+  - A joiner who picks a guest's name is told the host already added that player and to ask the
+    host to remove them. A phone taking over a guest seat is deferred.
+  - Online Play again seats the finished game's guests in the next room, since they can't join
+    by code.
+  - Guest ids land in a stats row's participantUids alongside the uids; harmless, since nobody
+    signs in as one. A guest gets a new id each game, as local players always have, so
+    head-to-head lists a guest once per game. No photo count on guest cards.
+  - Known gaps, deferred: an add that times out stays queued in the SDK and may still land, so
+    retrying the same name can then say it's taken (the first attempt got there). And the start
+    form still falls back to a local game if a guest write fails after the room was created,
+    leaving that room behind; the probe has just passed, so it's unlikely, but the better
+    behaviour is to stay in the room and say who couldn't be added.

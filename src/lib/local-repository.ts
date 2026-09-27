@@ -19,6 +19,7 @@ import { browserLocalStorage } from './key-value-storage'
 import type { KeyValueStorage } from './key-value-storage'
 import type { GamePlayer, GameResult, GameState, Player, RoundScore } from './types'
 import type {
+  AddGuestInput,
   AddPlayerInput,
   CreatedGame,
   GameConfig,
@@ -211,6 +212,10 @@ export class LocalGameRepository implements GameRepository {
     }
     this.persistAndNotify()
     return playerId
+  }
+  /** Every other player in a local game is already one the host scores for. */
+  async addGuest(input: AddGuestInput): Promise<PlayerId> {
+    return this.addPlayer({ name: input.name, deviceUuid: this.newId() })
   }
 
   subscribe(onChange: (state: GameState) => void): Unsubscribe {
