@@ -11,6 +11,14 @@
       "available": "A new version is available.",
       "reload": "Reload",
       "dismiss": "Dismiss"
+    },
+    "menu": {
+      "open": "Menu",
+      "close": "Close menu",
+      "description": "Pages and settings",
+      "pages": "Pages",
+      "home": "Home",
+      "language": "Language"
     }
   },
   "nav": {
@@ -26,7 +34,6 @@
   },
   "home": {
     "heading": "Rommi Scorekeeper",
-    "tagline": "Low score wins. Scores sync live.",
     "orDivider": "or",
     "statsLink": "View your stats",
     "form": {

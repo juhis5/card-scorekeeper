@@ -11,6 +11,14 @@
       "available": "Uusi versio on saatavilla.",
       "reload": "Lataa uudelleen",
       "dismiss": "Sulje"
+    },
+    "menu": {
+      "open": "Valikko",
+      "close": "Sulje valikko",
+      "description": "Sivut ja asetukset",
+      "pages": "Sivut",
+      "home": "Etusivu",
+      "language": "Kieli"
     }
   },
   "nav": {
@@ -26,7 +34,6 @@
   },
   "home": {
     "heading": "Rommi-pisteet",
-    "tagline": "Pienin pistemäärä voittaa. Pisteet päivittyvät suorassa lähetyksessä.",
     "orDivider": "tai",
     "statsLink": "Katso tilastosi",
     "form": {

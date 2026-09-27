@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Single job: an accessible dark/light toggle for the app header (deferred from slice 3 — see
+ * Single job: an accessible dark/light toggle, in the app menu (deferred from slice 3 — see
  * docs/DECISIONS.md). A real `<button>` with `aria-pressed` (not a text-changing label) so the
  * accessible name stays stable ("Dark mode") while `aria-pressed` carries the on/off state — the
  * Moon/Sun icon swap is the visible, non-color-only echo of the same state (a11y-mobile: never

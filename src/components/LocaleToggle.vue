@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Single job: an accessible fi/en switcher for the app header (deferred from slice 3 — see
+ * Single job: an accessible fi/en switcher, in the app menu (deferred from slice 3 — see
  * docs/DECISIONS.md). Only two locales exist (`SUPPORTED_LOCALES` in `i18n/index.ts`), so this is
  * a single button that flips to the other one and calls the existing `setLocale()` (which persists
  * the choice and sets `<html lang>` — see the i18n skill).

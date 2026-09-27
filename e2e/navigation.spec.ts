@@ -1,8 +1,9 @@
 /**
- * The header's Back control and Home's "Continue game": moving around must never lose a game in
- * progress, and Back must never leave the app, even from a page opened directly.
+ * The header's Back control, its menu, and Home's "Continue game": moving around must never lose
+ * a game in progress, and Back must never leave the app, even from a page opened directly.
  */
 import { expect, test, type Page } from '@playwright/test'
+import { openFromMenu } from './helpers'
 
 function homeHeading(page: Page) {
   return page.getByRole('heading', { level: 1, name: 'Rommi Scorekeeper' })
@@ -18,7 +19,7 @@ test.describe('Back and Continue game', () => {
     await expect(homeHeading(page)).toBeVisible()
     await expect(backButton(page)).toHaveCount(0)
 
-    await page.getByRole('link', { name: 'Stats' }).first().click()
+    await openFromMenu(page, 'Stats')
     await expect(page.getByRole('heading', { name: 'Your stats' })).toBeVisible()
 
     await backButton(page).click()

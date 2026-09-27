@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { RouterView, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ChartColumn, X } from '@lucide/vue'
+import { X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
+import AppMenu from '@/components/AppMenu.vue'
 import BackButton from '@/components/BackButton.vue'
-import ThemeToggle from '@/components/ThemeToggle.vue'
-import LocaleToggle from '@/components/LocaleToggle.vue'
 import { useServiceWorker } from '@/composables/useServiceWorker'
 
 const route = useRoute()
@@ -40,29 +39,14 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
     <div aria-live="polite" role="status" class="sr-only">{{ routeAnnouncement }}</div>
     <div aria-live="polite" role="status" class="sr-only">{{ updateAnnouncement }}</div>
 
-    <!-- Persistent chrome (see the routing skill): reachable from every route, incl. mid-game,
-         since stats are a device-wide record, not tied to any one room. -->
-    <!-- At 360px the full header (Back, title, Stats, language, theme) doesn't fit, so the title
-         truncates and Stats is an icon on phones, still named "Stats" for screen readers. -->
+    <!-- Persistent chrome (see the routing skill), reachable from every route incl. mid-game:
+         Back, and the menu with the pages (Stats is a device-wide record, not tied to any one
+         room) and the settings. No title link: Back already leads home, and the app's name sits
+         in the menu. -->
     <header class="mx-auto flex w-full max-w-md items-center gap-1 px-4 pt-2">
       <BackButton v-if="!isHome" class="-ml-2" />
-      <RouterLink
-        :to="{ name: 'home' }"
-        class="text-foreground focus-visible:ring-ring flex h-11 min-w-0 flex-1 items-center rounded-sm text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        <span class="truncate">{{ t('app.title') }}</span>
-      </RouterLink>
-      <div class="flex shrink-0 items-center gap-1">
-        <RouterLink
-          :to="{ name: 'stats' }"
-          class="text-primary focus-visible:ring-ring flex h-11 min-w-11 items-center justify-center gap-1 rounded-sm px-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <ChartColumn aria-hidden="true" class="size-4" />
-          <span class="sr-only sm:not-sr-only">{{ t('nav.stats') }}</span>
-        </RouterLink>
-        <LocaleToggle />
-        <ThemeToggle />
-      </div>
+      <div class="min-w-0 flex-1" />
+      <AppMenu />
     </header>
 
     <div

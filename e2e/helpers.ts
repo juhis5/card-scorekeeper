@@ -106,3 +106,9 @@ export async function playOnlineRound(
   await expect(scoreboardRow(hostPage, joinerName)).toContainText(String(round * 10))
   if (!isLastRound) await expect(roundHeading(joinerPage, round + 1)).toBeVisible()
 }
+
+/** The pages live in the header's menu: open it and follow one. */
+export async function openFromMenu(page: Page, pageName: string): Promise<void> {
+  await page.getByRole('button', { name: 'Menu' }).click()
+  await page.getByRole('dialog').getByRole('link', { name: pageName }).click()
+}
