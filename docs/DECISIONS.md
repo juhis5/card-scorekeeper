@@ -482,3 +482,10 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   had grown to caveats, upload notices, your record, head-to-head and seven global lists; now it
   is this device only, and "Tietoa tilastoista" is an ⓘ by the heading (`InfoPopover`, shared
   with the V–H–T legend).
+- 2026-09-28 — A score save is one write. `setRoundScore` used to read the player's round scores
+  from the server and update the seat's `totalScore` in a batch, so a saved score showed only after
+  a server round trip. The list then jumped under the next tap, which made Firefox's e2e flake on
+  CI (a click whose mouse-up landed on the shifted card), and offline the read held up the save.
+  Nothing read `totalScore`: totals are summed from `roundScores` (the store, `finishGame`, and now
+  the repository's emitted state). The seat field stays (the rules require 0 on create and older
+  prod clients still update it) and can go in a later rules change.
