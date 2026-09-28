@@ -60,7 +60,7 @@ describe('startErrorReporting', () => {
     expect(init).not.toHaveBeenCalled()
   })
 
-  it('reports errors, traces routes and records replays with all text masked', async () => {
+  it('reports errors, traces routes and replays only sessions with an error, all text masked', async () => {
     vi.stubEnv('VITE_SENTRY_DSN', 'https://key@o1.ingest.de.sentry.io/2')
 
     await startErrorReporting(app, router)
@@ -68,7 +68,7 @@ describe('startErrorReporting', () => {
     const options = init.mock.calls[0]?.[0]
     expect(options).toMatchObject({
       tracesSampleRate: 1,
-      replaysSessionSampleRate: 0.1,
+      replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 1,
     })
     options.integrations([])

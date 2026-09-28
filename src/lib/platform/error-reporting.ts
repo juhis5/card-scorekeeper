@@ -1,5 +1,5 @@
 /**
- * Errors, tracing and session replay to Sentry, only in builds that set a DSN (the Vercel ones).
+ * Errors, tracing and replays of sessions with an error to Sentry, only in builds that set a DSN (the Vercel ones).
  * Loaded after the app starts, so neither the first paint nor an offline host waits for it. Room
  * codes are cut from every report, click breadcrumbs (whose labels carry player names) are off,
  * and replays mask all text.
@@ -21,7 +21,7 @@ export function scrubReport<T>(report: T): T {
 export async function startErrorReporting(app: App, router: Router): Promise<void> {
   const dsn = import.meta.env.VITE_SENTRY_DSN
   if (!dsn) return
-  const Sentry = await import('./sentry-client')
+  const Sentry = await import('@sentry/vue')
   Sentry.init({
     app,
     dsn,
@@ -41,8 +41,8 @@ export async function startErrorReporting(app: App, router: Router): Promise<voi
       Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }),
     ],
     tracesSampleRate: 1,
-    // Sentry's usual rates: a tenth of sessions, and every session that hits an error.
-    replaysSessionSampleRate: 0.1,
+    // Replays only of sessions that hit an error: the last minute is kept in memory and sent then.
+    replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 1,
     beforeSend: (event) => scrubReport(event),
     beforeSendTransaction: (event) => scrubReport(event),

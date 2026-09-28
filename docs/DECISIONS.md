@@ -374,11 +374,11 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - Only builds with `VITE_SENTRY_DSN` report: Vercel's Production and Preview, not local or CI,
     where the SDK isn't even bundled. The environment follows the branch (main → production,
     develop → test, other branches → preview), and the release is the commit.
-  - The SDK loads after the app starts, so neither the first paint nor an offline host waits for
-    it. It ships in its own chunk, importing only what's used.
-  - Tracing and session replay are on (the owner enabled them in Sentry): every page load and
-    route change is traced, and replays record a tenth of sessions plus every session with an
-    error. The free plan's replay quota simply stops recording when used up.
+  - The SDK loads after the app starts, in its own chunk, so neither the first paint nor an offline
+    host waits for it. The whole SDK is imported, as the owner asked, not trimmed to what's used.
+  - Tracing and replay are on (the owner enabled them in Sentry): every page load and route
+    change is traced, and replays cover only sessions that hit an error (the last minute is kept
+    in memory and sent then). The free plan's replay quota simply stops recording when used up.
   - Privacy: room codes are cut from every report, trace and breadcrumb; click breadcrumbs are off
     because button labels carry player names; replays mask all text and block media; no user
     info, cookies, bodies or query params (only the User-Agent header). Replay's compression
