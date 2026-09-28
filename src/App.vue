@@ -55,6 +55,8 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
       class="bg-background sticky top-0 z-20 mx-auto flex h-(--app-header-height) w-full max-w-md items-center gap-1 px-4 pt-2"
     >
       <BackButton v-if="!isHome" class="-ml-2" />
+      <!-- The logo on every screen; on Home it sits with the app's name below. -->
+      <img v-if="!isHome" src="/pwa-192.png" alt="" class="mr-1 size-8 shrink-0 rounded-md" />
       <RoomCodeBar v-if="headerRoomCode" :code="headerRoomCode" />
       <!-- Home's own heading says the same to screen readers. -->
       <span
