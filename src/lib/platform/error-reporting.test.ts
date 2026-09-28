@@ -4,12 +4,14 @@ import type { Router } from 'vue-router'
 
 const init = vi.fn()
 const captureException = vi.fn()
+const addEventProcessor = vi.fn()
 const breadcrumbsIntegration = vi.fn((options: unknown) => ({ name: 'Breadcrumbs', options }))
 const browserTracingIntegration = vi.fn((options: unknown) => ({ name: 'BrowserTracing', options }))
 const replayIntegration = vi.fn((options: unknown) => ({ name: 'Replay', options }))
 vi.mock('@sentry/vue', () => ({
   init,
   captureException,
+  addEventProcessor,
   breadcrumbsIntegration,
   browserTracingIntegration,
   replayIntegration,
@@ -75,7 +77,38 @@ describe('startErrorReporting', () => {
     })
     options.integrations([])
     expect(browserTracingIntegration).toHaveBeenCalledWith({ router })
-    expect(replayIntegration).toHaveBeenCalledWith({ maskAllText: true, blockAllMedia: true })
+    expect(replayIntegration).toHaveBeenCalledWith(
+      expect.objectContaining({ maskAllText: true, blockAllMedia: true }),
+    )
+  })
+
+  it("never attaches a failing component's props, which hold players' names and uids", async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://key@o1.ingest.de.sentry.io/2')
+
+    await startErrorReporting(app, router)
+
+    expect(init.mock.calls[0]?.[0]).toMatchObject({ attachProps: false })
+  })
+
+  it('cuts room codes from streamed spans, replay recordings and replay events too', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://key@o1.ingest.de.sentry.io/2')
+    await startErrorReporting(app, router)
+    const options = init.mock.calls[0]?.[0]
+    options.integrations([])
+    const replayOptions = replayIntegration.mock.calls[0]?.[0] as {
+      beforeAddRecordingEvent: (event: unknown) => unknown
+    }
+    const processor = addEventProcessor.mock.calls[0]?.[0] as (event: unknown) => unknown
+
+    expect(options.beforeSendSpan({ attributes: { 'url.full': 'https://x/room/7K4RQ' } })).toEqual({
+      attributes: { 'url.full': 'https://x/room/:code' },
+    })
+    expect(replayOptions.beforeAddRecordingEvent({ data: { href: '/join/7K4RQ' } })).toEqual({
+      data: { href: '/join/:code' },
+    })
+    expect(processor({ urls: ['https://x/room/7K4RQ'] })).toEqual({
+      urls: ['https://x/room/:code'],
+    })
   })
 
   it('reports with click breadcrumbs off and personal data left out', async () => {
@@ -93,7 +126,10 @@ describe('startErrorReporting', () => {
       { name: 'Dedupe' },
       { name: 'Breadcrumbs', options: { dom: false } },
       { name: 'BrowserTracing', options: { router } },
-      { name: 'Replay', options: { maskAllText: true, blockAllMedia: true } },
+      {
+        name: 'Replay',
+        options: expect.objectContaining({ maskAllText: true, blockAllMedia: true }),
+      },
     ])
     expect(breadcrumbsIntegration).toHaveBeenCalledWith({ dom: false })
     expect(options.beforeSend({ request: { url: '/room/7K4RQ' } })).toEqual({

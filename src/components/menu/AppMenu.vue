@@ -45,6 +45,7 @@ const pages = [
   { name: 'stats', labelKey: 'nav.stats' },
   { name: 'highscores', labelKey: 'stats.highscores.heading' },
   { name: 'rules', labelKey: 'rules.heading' },
+  { name: 'privacy', labelKey: 'app.menu.privacy' },
 ] as const
 
 function close(): void {

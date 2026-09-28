@@ -379,8 +379,11 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - Tracing and replay are on (the owner enabled them in Sentry): every page load and route
     change is traced, and replays cover only sessions that hit an error (the last minute is kept
     in memory and sent then). The free plan's replay quota simply stops recording when used up.
-  - Privacy: room codes are cut from every report, trace and breadcrumb; click breadcrumbs are off
-    because button labels carry player names; replays mask all text and block media; no user
+  - Privacy: room codes are cut from every report, streamed span, breadcrumb, replay recording
+    and replay event (2026-09-28: Sentry 11 streams spans, so `beforeSendTransaction` never ran;
+    now `beforeSendSpan`, `beforeAddRecordingEvent` and a global event processor); click
+    breadcrumbs are off because button labels carry player names; component props are off
+    (`attachProps: false`) for the same reason; replays mask all text and block media; no user
     info, cookies, bodies or query params (only the User-Agent header). Replay's compression
     worker needs `blob:` in the CSP's `worker-src`.
   - Source maps: built hidden, uploaded by `@sentry/vite-plugin` with `SENTRY_AUTH_TOKEN` (a
@@ -533,3 +536,9 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     highscore publishes, Tilastot and Ennätykset loads, the reconnect flushes, refused queued
     results, and the online-setup fallbacks. A broken prod backend no longer degrades silently.
   - `tests/e2e/highscores.spec.ts`: a finished online game shows on Ennätykset.
+- 2026-09-28 — Privacy (second audit, PR 5). A Tietosuoja page in the menu says what stays on the
+  device, what Firebase stores (in europe-north1) and for how long a room is joinable, that ids
+  are anonymous, that highscores are public and permanent, that a photo goes to Gemini and isn't
+  kept, and what error reports carry. Sentry's scrubbing now covers streamed spans and replays,
+  and props are off (see the Sentry entry). A malformed `FIREBASE_SERVICE_ACCOUNT` now fails with
+  a fixed message: V8's JSON error quotes the input, which would put key characters in the logs.
