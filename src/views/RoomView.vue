@@ -377,10 +377,19 @@ async function resumeOnlineRoom(code: string): Promise<void> {
   resumeState.value = isResumed ? 'idle' : 'not-seated'
 }
 
+/** Whether the store already holds the game this address names: the local one, or this room. */
+const isStoreOnThisGame = computed(() =>
+  routeCode.value === LOCAL_GAME_ROUTE_CODE
+    ? game.gameId !== null && !isOnline.value
+    : roomCode.value === routeCode.value,
+)
+
 // A reload empties the store. The local sentinel resumes the localStorage game, a room code this
-// device's online seat. Never mixed: an online room must not pick up a stale local game.
+// device's online seat. Never mixed: another game open in the store (Home's other "continue")
+// is left first; a local one stays saved, an online one stays remembered.
 onMounted(async () => {
-  if (hasActiveGame.value || roomCode.value === routeCode.value) return
+  if (isStoreOnThisGame.value) return
+  if (game.gameId !== null) game.leave()
   if (routeCode.value === LOCAL_GAME_ROUTE_CODE) {
     game.resume()
     return
@@ -437,14 +446,8 @@ onMounted(async () => {
         <WifiOff aria-hidden="true" class="size-4 shrink-0" />
         {{ t('room.online.reconnecting') }}
       </p>
-      <p
-        v-else-if="!isOnline"
-        role="status"
-        class="bg-muted text-foreground border-border flex items-center gap-2 rounded-lg border px-4 py-3 text-sm"
-      >
-        <WifiOff aria-hidden="true" class="size-4 shrink-0" />
-        {{ t('room.offline.banner') }}
-      </p>
+      <!-- Seen as the header's icon (LocalGameBadge); said once here for screen readers. -->
+      <p v-else-if="!isOnline" role="status" class="sr-only">{{ t('room.offline.banner') }}</p>
 
       <p
         v-if="connectionError"

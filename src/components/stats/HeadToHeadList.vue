@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import RecordLegend from '@/components/stats/RecordLegend.vue'
 import type { OpponentRecord } from '@/stores/stats'
 
 const { opponents } = defineProps<{ opponents: OpponentRecord[] }>()
@@ -30,7 +31,10 @@ const { t, n } = useI18n()
         <TableRow>
           <TableHead scope="col">{{ t('stats.headToHead.opponent') }}</TableHead>
           <TableHead scope="col" class="text-right">
-            {{ t('stats.headToHead.recordHeader') }}
+            <span class="inline-flex items-center justify-end gap-1">
+              {{ t('stats.headToHead.recordHeader') }}
+              <RecordLegend />
+            </span>
           </TableHead>
         </TableRow>
       </TableHeader>

@@ -393,3 +393,13 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   was taken keeps the current game on screen (a retry finds the seat); blocked storage that throws
   on read means "nothing saved", not a crash; and a local finish builds the host's stats row
   before marking the game finished, so a damaged save can't end up finished with nothing to sync.
+- 2026-09-28 — Small fixes (fifth round):
+  - "Peli kesken" opened the same game from both buttons: the room page showed whatever game was
+    already open in the store, whatever its address said. It now leaves another open game first
+    (a local one stays saved, an online one stays remembered) and opens the game its address
+    names.
+  - The local-game box above the scores became a no-wifi icon in the header (`LocalGameBadge`);
+    a tap shows the same words. The room still says them once to screen readers.
+  - V–H–T in head-to-head gets an ⓘ: voitot, häviöt, tasapelit against that player.
+  - Vitest already runs the unit files in parallel (about 5 s). CI's e2e job now caches the
+    Playwright browsers per version instead of downloading them on every run.

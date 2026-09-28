@@ -7,7 +7,9 @@ import { X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
 import AppMenu from '@/components/menu/AppMenu.vue'
 import BackButton from '@/components/header/BackButton.vue'
+import LocalGameBadge from '@/components/header/LocalGameBadge.vue'
 import RoomCodeBar from '@/components/header/RoomCodeBar.vue'
+import { LOCAL_GAME_ROUTE_CODE } from '@/lib/data/local-game-route'
 import { useAppUpdateStore } from '@/stores/app-update'
 import { useGameStore } from '@/stores/game'
 
@@ -18,6 +20,13 @@ const game = useGameStore()
 /** The online room this device is in, while its page is open. */
 const headerRoomCode = computed(() =>
   route.name === 'room' && game.roomCode === String(route.params.code) ? game.roomCode : null,
+)
+const isLocalRoom = computed(
+  () =>
+    route.name === 'room' &&
+    route.params.code === LOCAL_GAME_ROUTE_CODE &&
+    game.gameId !== null &&
+    !game.isOnline,
 )
 
 // Announces each view's heading, for anyone not following the focus move in router/index.ts.
@@ -52,6 +61,7 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
         {{ t('app.title') }}
       </span>
       <div v-else class="min-w-0 flex-1" />
+      <LocalGameBadge v-if="isLocalRoom" />
       <AppMenu class="-mr-2" />
     </header>
 
