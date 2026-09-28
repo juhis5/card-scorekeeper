@@ -603,3 +603,8 @@ it is.
   rebuilds totals instead of incrementing them, so it is safe to rerun. Credentials come from
   Application Default Credentials, never a key in the repo. `tsx` runs it; esbuild's install
   script stays denied (its binary comes from the per-platform package).
+- 2026-09-28 — Every dependency on its latest release (owner's request): Vitest 5 (with its
+  coverage provider), Playwright 1.63 (and CI's visual image, whose new Chromium moved a few
+  pixels on the finished-game baselines), @vueuse 15, and minor and patch bumps across the rest.
+  Two holds, both in TOOLCHAIN: TypeScript stays on 6 because vue-tsc 3.3.11 fails to load 7,
+  and `@types/node` stays on 24 to match the runtime.
