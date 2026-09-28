@@ -5,10 +5,9 @@ import {
   TOTAL_ROUNDS,
   canFinishGame,
   contractForRound,
-  placements as placementsFor,
   runningTotal,
 } from '../game/rules'
-import { bestAndWorstRound } from '../game/stats'
+import { gamePlayerRows } from '../game/stats'
 import { appendPendingResult } from './pending-results'
 import { cleanPlayerName, isNameTaken, NameTakenError } from '../game/player-names'
 import { browserLocalStorage } from './key-value-storage'
@@ -288,34 +287,18 @@ export class LocalGameRepository implements GameRepository {
 
   /**
    * Only the host's row: the no-room `game_player` rule accepts only a self-write (deviceUuid ==
-   * auth.uid), and co-players' synthetic per-game ids never aggregate anyway. `finalScore` comes
-   * from `roundScores`, not the possibly stale `totalScore`.
+   * auth.uid), and co-players' synthetic per-game ids never aggregate anyway.
    */
   private buildHostGamePlayer(): GamePlayer {
     const { roundScores, players } = this.game.state
-    const hostStanding = placementsFor(players).find(
-      (standing) => standing.player.id === this.game.hostPlayerId,
+    const hostRow = gamePlayerRows(this.game.gameId, players, roundScores).find(
+      (row) => row.deviceUuid === this.game.hostPlayerId,
     )
-    if (!hostStanding) {
+    if (!hostRow) {
       throw new Error('finishGame: host player not found among seated players')
     }
-    const { player: host, placement } = hostStanding
-
-    const points = roundScores
-      .filter((score) => score.playerId === host.id)
-      .map((score) => score.points)
-    // canFinishGame already required a score for every round, the host's included.
-    const { bestRound, worstRound } = bestAndWorstRound(points)
-
-    return {
-      gameId: this.game.gameId,
-      deviceUuid: this.game.hostDeviceUuid,
-      displayName: host.name,
-      finalScore: runningTotal(host.id, roundScores),
-      placement,
-      bestRound,
-      worstRound,
-    }
+    // Keyed by this device for the queue; the flush stamps the uid signed in at upload time.
+    return { ...hostRow, deviceUuid: this.game.hostDeviceUuid }
   }
 
   private persistAndNotify(): void {

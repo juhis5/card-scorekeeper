@@ -1,6 +1,7 @@
 /** Stats derived from `GamePlayer` rows alone, grouped by `gameId`. The math can't tell a real
  * device from a local game's synthetic id, so callers pass only real devices' rows. */
-import type { GamePlayer } from './types'
+import { placements, runningTotal } from './rules'
+import type { GamePlayer, Player, RoundScore } from './types'
 
 export interface PlayerStats {
   deviceUuid: string
@@ -141,4 +142,31 @@ export function nextPlayerTotals(
     qualified: gamesPlayed >= QUALIFYING_GAMES,
     lastEntry: entryId,
   }
+}
+
+/** A finished game's stats rows, one per player, keyed by each player's id. Placed on totals
+ * summed from the round scores, never a stored total: these rows are permanent. Every player has
+ * a score for every round by then (canFinishGame). */
+export function gamePlayerRows(
+  gameId: string,
+  players: readonly Player[],
+  roundScores: RoundScore[],
+): GamePlayer[] {
+  const totalled = players.map((player) => ({
+    ...player,
+    totalScore: runningTotal(player.id, roundScores),
+  }))
+  return placements(totalled).map(({ player, placement }) => {
+    const points = roundScores
+      .filter((score) => score.playerId === player.id)
+      .map((score) => score.points)
+    return {
+      gameId,
+      deviceUuid: player.id,
+      displayName: player.name,
+      finalScore: player.totalScore,
+      placement,
+      ...bestAndWorstRound(points),
+    }
+  })
 }
