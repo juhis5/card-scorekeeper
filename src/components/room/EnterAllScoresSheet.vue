@@ -30,6 +30,9 @@ const { players, round, save } = defineProps<{
   save: (playerId: PlayerId, round: ContractRoundNumber, points: number) => Promise<boolean>
 }>()
 
+/** Closed: the parent places focus, as the button that opened the sheet may be gone by now. */
+const emit = defineEmits<{ closed: [] }>()
+
 const { t, n } = useI18n()
 
 const INPUT_ID = 'enter-all-scores-points'
@@ -93,6 +96,11 @@ function focusFieldOnOpen(event: Event): void {
   document.getElementById(INPUT_ID)?.focus({ preventScroll: true })
 }
 
+function handleCloseAutoFocus(event: Event): void {
+  event.preventDefault()
+  emit('closed')
+}
+
 // Nobody left (entered here, skipped, or entered on their own phones): done.
 watch(current, (player) => {
   if (open.value && player === null) open.value = false
@@ -142,6 +150,7 @@ function skip(): void {
       :show-close-button="false"
       class="mx-auto max-w-md gap-3 rounded-xl p-4 data-[side=top]:inset-x-4 data-[side=top]:top-(--floating-sheet-top) data-[side=top]:border"
       @open-auto-focus="focusFieldOnOpen"
+      @close-auto-focus="handleCloseAutoFocus"
     >
       <SheetHeader class="flex-row items-center justify-between p-0">
         <SheetTitle>

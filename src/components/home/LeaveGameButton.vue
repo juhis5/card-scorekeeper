@@ -3,7 +3,7 @@
  * Single job: the ✕ beside a "Peli kesken" row on Home (fifth round), with its confirm. Deletes
  * the local game, or leaves the online room (ending it for everyone if this device is its host).
  */
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
@@ -54,6 +54,9 @@ async function confirm(): Promise<void> {
   }
   isOpen.value = false
   emit('left')
+  // This button's row goes with the game: keep focus on the page, not <body>.
+  await nextTick()
+  document.getElementById('main-heading')?.focus()
 }
 </script>
 

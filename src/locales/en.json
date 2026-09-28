@@ -289,6 +289,10 @@
       "endedTitle": "The game was ended",
       "endedBody": "The host ended it early. It isn't recorded in stats.",
       "queued": "No connection. The game ends for everyone as soon as this phone is back online."
+    },
+    "unreachable": {
+      "heading": "No connection",
+      "body": "This phone is offline, so the room can't be opened yet. It opens by itself once you're back online."
     }
   },
   "notFound": {

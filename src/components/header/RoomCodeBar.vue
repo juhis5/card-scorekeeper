@@ -18,9 +18,11 @@ const announcement = computed(() => (copied.value === code ? t('invite.codeCopie
 
 <template>
   <div class="flex min-w-0 flex-1 items-center justify-end gap-1">
-    <span class="min-w-0 truncate text-sm font-semibold">
-      {{ t('invite.room') }}
-      <span class="font-mono tracking-wider">{{ code }}</span>
+    <!-- The code is what players read out: it never truncates. On the narrowest phones the word
+         "Huone" goes visually (screen readers still hear it) to make room. -->
+    <span class="flex min-w-0 items-baseline gap-1 text-sm font-semibold">
+      <span class="max-xs:sr-only truncate">{{ t('invite.room') }}</span>
+      <span class="shrink-0 font-mono tracking-wider">{{ code }}</span>
     </span>
     <Button
       variant="ghost"

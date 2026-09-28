@@ -102,5 +102,7 @@ describe('HomeView, leaving a game in progress', () => {
 
     expect(screen.queryByRole('link', { name: 'Continue the game on this device' })).toBeNull()
     expect(new LocalGameRepository().getResumeInfo()).toBeNull()
+    // The ✕ went with the game's row: focus stays on the page, not <body>.
+    expect(document.activeElement?.id).toBe('main-heading')
   })
 })

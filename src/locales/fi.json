@@ -289,6 +289,10 @@
       "endedTitle": "Peli lopetettiin",
       "endedBody": "Järjestäjä lopetti pelin kesken. Sitä ei tallenneta tilastoihin.",
       "queued": "Ei yhteyttä. Peli päättyy kaikilta heti, kun tämä puhelin on taas verkossa."
+    },
+    "unreachable": {
+      "heading": "Ei yhteyttä",
+      "body": "Puhelin on offline-tilassa, joten huonetta ei voi vielä avata. Se aukeaa itsestään, kun yhteys palaa."
     }
   },
   "notFound": {

@@ -25,7 +25,12 @@
           'solarized',
         ]
         var lightThemes = ['captain-light', 'light', 'solarized']
-        var stored = localStorage.getItem('theme')
+        var stored = null
+        try {
+          stored = localStorage.getItem('theme')
+        } catch (error) {
+          // Site data blocked: the default theme, not a blank page.
+        }
         var theme = themes.indexOf(stored) >= 0 ? stored : 'captain'
         var root = document.documentElement
         root.classList.toggle('dark', lightThemes.indexOf(theme) < 0)

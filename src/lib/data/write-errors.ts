@@ -15,6 +15,12 @@ function errorCode(error: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined
 }
 
+/** Firestore couldn't reach the server (offline, or a read that gave up). Worth retrying later. */
+export function isUnavailable(error: unknown): boolean {
+  const code = errorCode(error)
+  return code === 'unavailable' || code === 'deadline-exceeded'
+}
+
 export function isPermissionDenied(error: unknown): boolean {
   return errorCode(error) === 'permission-denied'
 }
