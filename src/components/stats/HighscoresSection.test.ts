@@ -97,6 +97,16 @@ describe('HighscoresSection', () => {
     expect(screen.getByRole('region', { name: 'Hall of shame' }).textContent).toContain('735')
   })
 
+  it('says why a player list is empty: nobody has won, or played enough games', async () => {
+    await renderWith((store) => {
+      store.status = 'loaded'
+    })
+
+    expect(screen.getByText('Nobody has won a game yet.')).toBeTruthy()
+    expect(screen.getAllByText('Nobody has played 5 games yet.')).toHaveLength(2)
+    expect(screen.getByText('No games yet.')).toBeTruthy()
+  })
+
   it('says when the board cannot be read, and retries on request', async () => {
     const store = await renderWith((highscores) => {
       highscores.status = 'error'

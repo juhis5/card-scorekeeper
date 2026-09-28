@@ -168,7 +168,7 @@ function handleKeyDown(event: KeyboardEvent): void {
   <li
     ref="card"
     :data-card-open="isExpanded || undefined"
-    class="bg-card border-border rounded-lg border transition-colors duration-[var(--dur)] motion-reduce:transition-none"
+    class="bg-card border-border rounded-lg border transition-colors duration-(--dur) motion-reduce:transition-none"
     :class="isExpanded ? 'ring-ring ring-2' : 'hover:bg-muted'"
     @keydown="handleKeyDown"
   >

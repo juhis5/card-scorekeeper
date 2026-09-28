@@ -16,7 +16,10 @@ const { t } = useI18n()
     >
       {{ t('notFound.heading') }}
     </h1>
-    <RouterLink :to="{ name: 'home' }" class="text-primary underline underline-offset-4">
+    <RouterLink
+      :to="{ name: 'home' }"
+      class="text-primary inline-flex min-h-11 items-center underline underline-offset-4"
+    >
       {{ t('notFound.backHome') }}
     </RouterLink>
   </main>

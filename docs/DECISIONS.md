@@ -624,3 +624,15 @@ it is.
   Online games only, as only they reach the lists. It watches the three top-10 lists live
   (`watchTop`), so the entries appear the moment the host's publish lands, with no polling; a
   failure just shows nothing and is reported. Ranking is shared with Ennätykset (`rankAt`).
+- 2026-09-29 — Polish from the second audit's Nits.
+  - Rules: an online stats row carries its seat's own name, so a host can't rename a player on
+    the public lists; a public entry is written only by its own player or the room's host, so
+    another player can't create it without its totals and keep that game out of them for good.
+  - Photo count: a 502 (Gemini failed for good) now says to type the total instead of offering a
+    retry that can't work; a 503 (busy quota) still offers it.
+  - Ennätykset: players with no wins stay off "Eniten voittoja", and the win-rate and average
+    lists say nobody has played 5 games yet instead of "no games yet". Its lists are h2 under
+    the page's h1.
+  - Finnish says "isäntä" for the host everywhere; the owned Sheet's close button is translated;
+    the 404 link is 44 px tall; the manifest has an id and lang 'fi'; CI cancels superseded runs.
+  - Kept: `game.addPlayer` is unused in the app, but many tests seat players through it.

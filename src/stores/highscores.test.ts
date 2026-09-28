@@ -80,6 +80,16 @@ const COLLECTIONS: Record<string, { id: string; [field: string]: unknown }[]> = 
       qualified: true,
     },
     {
+      id: 'uid-pena',
+      displayName: 'Pena',
+      gamesPlayed: 1,
+      wins: 0,
+      scoreSum: 200,
+      winRate: 0,
+      averageScore: 200,
+      qualified: false,
+    },
+    {
       id: 'guest-1',
       displayName: 'Mummo',
       gamesPlayed: 2,
@@ -155,7 +165,7 @@ describe('useHighscoresStore, player lists', () => {
       'Juho',
       'Mummo',
     ])
-    expect(highscores.lists.mostGames.map((entry) => entry.value)).toEqual([12, 6, 2])
+    expect(highscores.lists.mostGames.map((entry) => entry.value)).toEqual([12, 6, 2, 1])
     expect(highscores.lists.mostWins.find((entry) => entry.isMine)?.displayName).toBe('Juho')
   })
 
@@ -187,6 +197,16 @@ describe('useHighscoresStore, player lists', () => {
     } finally {
       forged.finishedAt = original
     }
+  })
+
+  it('leaves players with no wins off the most-wins list', async () => {
+    installBoard()
+    const highscores = useHighscoresStore()
+
+    await highscores.load()
+
+    expect(highscores.lists.mostWins.map((entry) => entry.displayName)).not.toContain('Pena')
+    expect(highscores.lists.mostGames.map((entry) => entry.displayName)).toContain('Pena')
   })
 
   it('reads every list ten at a time at most', async () => {

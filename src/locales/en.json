@@ -47,7 +47,8 @@
         "androidAdd": "Choose Install app or Add to Home screen."
       },
       "after": "Then Rommi opens from your home screen like an app."
-    }
+    },
+    "close": "Close"
   },
   "nav": {
     "stats": "Stats",
@@ -389,7 +390,9 @@
         "average": "Average",
         "games": "Games"
       },
-      "games": "{count} game | {count} games"
+      "games": "{count} game | {count} games",
+      "emptyWins": "Nobody has won a game yet.",
+      "emptyQualified": "Nobody has played {min} games yet."
     },
     "queue": {
       "waiting": "{count} game is waiting to upload. | {count} games are waiting to upload.",

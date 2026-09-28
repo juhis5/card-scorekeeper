@@ -47,7 +47,8 @@
         "androidAdd": "Valitse Asenna sovellus tai Lisää aloitusnäytölle."
       },
       "after": "Sen jälkeen Rommi aukeaa aloitusnäytöltä kuin sovellus."
-    }
+    },
+    "close": "Sulje"
   },
   "nav": {
     "stats": "Tilastot",
@@ -277,9 +278,9 @@
       "localTitle": "Poistetaanko tämän laitteen peli?",
       "localBody": "Peliä ei tallenneta tilastoihin eikä ennätyksiin.",
       "playerTitle": "Poistutaanko pelistä?",
-      "playerBody": "Paikkasi jää peliin, ja järjestäjä voi poistaa sen.",
+      "playerBody": "Paikkasi jää peliin, ja isäntä voi poistaa sen.",
       "roomTitle": "Poistutaanko huoneesta {code}?",
-      "roomBody": "Jos olet pelin järjestäjä, peli päättyy kaikilta eikä sitä tallenneta. Muuten paikkasi jää peliin. Ilman yhteyttä peli unohdetaan vain tältä laitteelta.",
+      "roomBody": "Jos olet pelin isäntä, peli päättyy kaikilta eikä sitä tallenneta. Muuten paikkasi jää peliin. Ilman yhteyttä peli unohdetaan vain tältä laitteelta.",
       "confirmEnd": "Lopeta peli",
       "confirmLeave": "Poistu",
       "confirmDelete": "Poista",
@@ -287,7 +288,7 @@
       "leaveRoomLabel": "Poistu huoneesta {code}",
       "deleteLocalLabel": "Poista tämän laitteen peli",
       "endedTitle": "Peli lopetettiin",
-      "endedBody": "Järjestäjä lopetti pelin kesken. Sitä ei tallenneta tilastoihin.",
+      "endedBody": "Isäntä lopetti pelin kesken. Sitä ei tallenneta tilastoihin.",
       "queued": "Ei yhteyttä. Peli päättyy kaikilta heti, kun tämä puhelin on taas verkossa."
     },
     "unreachable": {
@@ -389,7 +390,9 @@
         "average": "Keskiarvo",
         "games": "Pelit"
       },
-      "games": "{count} peli | {count} peliä"
+      "games": "{count} peli | {count} peliä",
+      "emptyWins": "Kukaan ei ole vielä voittanut peliä.",
+      "emptyQualified": "Kukaan ei ole vielä pelannut {min} peliä."
     },
     "queue": {
       "waiting": "{count} peli odottaa lähetystä. | {count} peliä odottaa lähetystä.",

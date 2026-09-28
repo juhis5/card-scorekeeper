@@ -39,6 +39,15 @@ const GROUPS: { id: 'players' | 'games'; lists: ListView[] }[] = [
 
 const { t } = useI18n()
 const highscores = useHighscoresStore()
+
+/** Lists with their own reason for being empty: nobody has won, or played enough games. */
+function emptyTextFor(name: HighscoreListName): string | undefined {
+  if (name === 'mostWins') return t('stats.highscores.emptyWins')
+  if (name === 'bestWinRate' || name === 'bestAverage') {
+    return t('stats.highscores.emptyQualified', { min: QUALIFYING_GAMES })
+  }
+  return undefined
+}
 const shownGroup = ref<(typeof GROUPS)[number]['id']>('players')
 const groupOptions = computed(() =>
   GROUPS.map((group) => ({ value: group.id, label: t(`stats.highscores.tabs.${group.id}`) })),
@@ -81,6 +90,7 @@ onMounted(() => {
         :value-header="t(`stats.highscores.columns.${list.header}`)"
         :value-kind="list.kind"
         :entries="lists[list.name]"
+        :empty-text="emptyTextFor(list.name)"
       />
     </template>
   </div>

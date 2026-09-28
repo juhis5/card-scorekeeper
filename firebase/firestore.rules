@@ -410,9 +410,10 @@ service cloud.firestore {
         && (
           (roomExists(request.resource.data.gameId)
             && isHost(request.resource.data.gameId)
-            && exists(
+            // Under the seat's own name: the public lists copy it, so the host can't rename anyone.
+            && get(
               /databases/$(database)/documents/room/$(request.resource.data.gameId)/players/$(request.resource.data.deviceUuid)
-            ))
+            ).data.name == request.resource.data.displayName)
           || (!roomExists(request.resource.data.gameId)
             && request.resource.data.deviceUuid == request.auth.uid
             && request.auth.uid in request.resource.data.participantUids)
@@ -483,6 +484,9 @@ service cloud.firestore {
         let row = get(/databases/$(database)/documents/game_player/$(entryId)).data;
         let result = get(/databases/$(database)/documents/game_result/$(row.gameId)).data;
         return request.auth.uid in row.participantUids
+          // Its own player or the host (who publishes for guests): another player writing it
+          // without the totals would keep that game out of the owner's totals for good.
+          && (request.auth.uid == row.deviceUuid || request.auth.uid == roomData(row.gameId).hostUid)
           && roomExists(row.gameId)
           && roomData(row.gameId).status == 'finished'
           && row.participantUids.size() >= 2

@@ -27,6 +27,9 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
+        // A stable identity for the installed app, and its main language (the plugin says 'en').
+        id: '/',
+        lang: 'fi',
         name: 'Rommi',
         short_name: 'Rommi',
         description: 'Live scorekeeper for Rommi (Finnish Rummy)',

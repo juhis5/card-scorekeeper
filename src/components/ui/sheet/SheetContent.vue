@@ -4,6 +4,7 @@ import type { DialogContentEmits, DialogContentProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import { XIcon } from '@lucide/vue'
 import { reactiveOmit } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
 import { DialogClose, DialogContent, DialogPortal, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -24,6 +25,8 @@ const props = withDefaults(defineProps<SheetContentProps>(), {
   showCloseButton: true,
 })
 const emits = defineEmits<DialogContentEmits>()
+// Owned copy: the close button's name is translated, unlike upstream's fixed 'Close'.
+const { t } = useI18n()
 
 const delegatedProps = reactiveOmit(props, 'class', 'side', 'showCloseButton')
 
@@ -51,7 +54,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       <DialogClose v-if="showCloseButton" data-slot="sheet-close" as-child>
         <Button variant="ghost" class="absolute top-3 right-3" size="icon-sm">
           <XIcon />
-          <span class="sr-only">Close</span>
+          <span class="sr-only">{{ t('app.close') }}</span>
         </Button>
       </DialogClose>
     </DialogContent>
