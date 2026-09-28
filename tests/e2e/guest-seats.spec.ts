@@ -40,7 +40,7 @@ async function moveOn(hostPage: Page, joinerPage: Page, round: number) {
   if (!isLastRound) await expect(roundHeading(joinerPage, round + 1)).toBeVisible()
 }
 
-const GUEST_POINTS: Record<string, number> = { Mummo: 5, Ripa: 30 }
+const GUEST_POINTS: Record<string, number> = { Mummo: 0, Ripa: 30 }
 
 test.describe('players without a phone', () => {
   test('the host scores guests added at the start and mid-game, through to the stats', async ({

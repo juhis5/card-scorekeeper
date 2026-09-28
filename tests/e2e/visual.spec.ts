@@ -17,7 +17,7 @@ async function openApp(page: Page, theme: (typeof THEMES)[number]): Promise<void
 
 async function startGameWithPlayers(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Uusi peli' }).click()
-  await page.getByRole('switch', { name: 'Vain tällä puhelimella' }).click()
+  await page.getByRole('switch', { name: 'Vain tällä laitteella' }).click()
   await page.getByLabel('Oma nimesi').fill('Juho')
   await page.getByRole('button', { name: 'Aloita peli' }).click()
   for (const name of ['Mummo', 'Jani']) {

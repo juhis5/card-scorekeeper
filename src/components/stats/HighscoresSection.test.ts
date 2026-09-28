@@ -60,7 +60,7 @@ describe('HighscoresSection', () => {
       store.status = 'loaded'
     })
 
-    expect(screen.getByRole('tab', { name: 'Players', selected: true })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Players', pressed: true })).toBeTruthy()
     const wins = screen.getByRole('region', { name: 'Most wins' })
     expect(within(wins).getAllByRole('row')[1]?.textContent).toMatch(/^1Juho · you20 games12$/)
     expect(screen.getByRole('region', { name: 'Best win rate' }).textContent).toContain('58%')
@@ -80,8 +80,9 @@ describe('HighscoresSection', () => {
       store.status = 'loaded'
     })
 
-    await fireEvent.mouseDown(screen.getByRole('tab', { name: 'Games' }))
-    await fireEvent.click(screen.getByRole('tab', { name: 'Games' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Games' }))
+    expect(screen.getByRole('button', { name: 'Games', pressed: true })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Most wins' })).toBeNull()
 
     const best = screen.getByRole('region', { name: 'Best game' })
     expect(

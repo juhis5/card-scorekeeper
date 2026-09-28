@@ -40,7 +40,7 @@ test.describe('play again', () => {
 
       // Round 1: the host enters every score, so this device has seen Alice's number.
       await enterRoundScore(hostPage, 'Host', 1, 20)
-      await enterRoundScore(hostPage, 'Alice', 1, 10)
+      await enterRoundScore(hostPage, 'Alice', 1, 0)
       await enterRoundScore(hostPage, GUEST_NAME, 1, GUEST_POINTS)
       await hostPage.getByRole('button', { name: 'Next round' }).click()
       await expect(roundHeading(joinerPage, 2)).toBeVisible()

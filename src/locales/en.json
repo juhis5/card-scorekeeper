@@ -74,8 +74,8 @@
       "replaceStart": "Start new game",
       "replaceKeep": "Keep playing",
       "hint": "Add the others in the game, or they join with the room code.",
-      "thisPhoneOnly": "This phone only",
-      "thisPhoneOnlyHint": "Everyone's points go in on this phone and nobody joins. Works without a connection."
+      "thisPhoneOnly": "This device only",
+      "thisPhoneOnlyHint": "Everyone's points go in on this device and nobody joins. Works without a connection."
     },
     "join": {
       "roomCodeLabel": "Room code",
@@ -193,7 +193,8 @@
     "next": {
       "button": "Next round",
       "waiting": "Still waiting for scores from {names}.",
-      "severalZeros": "Only one player can score 0 in a round. Check round {rounds}."
+      "severalZeros": "Only one player can score 0 in a round. Check round {rounds}.",
+      "noWinner": "Round {rounds} has no winner: whoever went out scores 0."
     },
     "finish": {
       "button": "Finish game"

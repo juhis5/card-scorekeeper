@@ -133,7 +133,7 @@ describe('GameSetup, this phone only', () => {
     localRepository.mockReturnValue(offlineMode())
     const router = renderGameSetup()
 
-    await fireEvent.click(screen.getByRole('switch', { name: 'This phone only' }))
+    await fireEvent.click(screen.getByRole('switch', { name: 'This device only' }))
     expect(screen.getByText(/nobody joins/)).toBeTruthy()
     await startAs('Juho')
 

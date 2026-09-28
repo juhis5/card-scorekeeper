@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  roundsWithoutWinner,
   roundsWithSeveralZeros,
   ACE_VALUE,
   FACE_CARD_VALUE,
@@ -313,6 +314,25 @@ describe('roundsWithSeveralZeros', () => {
     ]
 
     expect(roundsWithSeveralZeros(['alice', 'bob'], scores, 2)).toEqual([])
+  })
+})
+
+describe('roundsWithoutWinner', () => {
+  it('finds a round everyone has scored where nobody has 0: someone always goes out', () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 10 },
+      { playerId: 'bob', round: 1, points: 20 },
+      { playerId: 'alice', round: 2, points: 0 },
+      { playerId: 'bob', round: 2, points: 20 },
+    ]
+
+    expect(roundsWithoutWinner(['alice', 'bob'], scores, 2)).toEqual([1])
+  })
+
+  it('waits for a round to be fully scored before calling it', () => {
+    const scores: RoundScore[] = [{ playerId: 'alice', round: 1, points: 10 }]
+
+    expect(roundsWithoutWinner(['alice', 'bob'], scores, 1)).toEqual([])
   })
 })
 

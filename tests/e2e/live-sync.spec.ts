@@ -46,13 +46,14 @@ test.describe('two-client live score sync', () => {
       await expect(scoreboardRow(hostPage, joinerName)).not.toContainText('15')
 
       // 3. And the other way round.
-      await enterRoundScore(hostPage, hostName, 1, 20)
+      await enterRoundScore(hostPage, hostName, 1, 0)
       await expect(scoreboardRow(joinerPage, hostName)).toContainText('Entered')
 
       // 4. Next round reveals round 1 on both boards.
       await hostPage.getByRole('button', { name: 'Next round' }).click()
       await expect(scoreboardRow(hostPage, joinerName)).toContainText('15')
-      await expect(scoreboardRow(joinerPage, hostName)).toContainText('20')
+      await expect(scoreboardRow(joinerPage, hostName)).not.toContainText('Entered')
+      await expect(scoreboardRow(joinerPage, hostName)).toContainText('0')
     } finally {
       await hostContext.close()
       await joinerContext.close()

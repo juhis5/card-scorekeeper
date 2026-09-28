@@ -26,6 +26,7 @@ import {
   isEveryRoundScored,
   missingRounds,
   pointsFor,
+  roundsWithoutWinner,
   roundsWithSeveralZeros,
   TOTAL_ROUNDS,
 } from '@/lib/game/rules'
@@ -135,12 +136,32 @@ const roundsToCheck = computed(() =>
     currentRound.value,
   ),
 )
-const roundsToCheckText = computed(() =>
-  new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
-    roundsToCheck.value.map((round) => n(round)),
+const roundsWithNoWinner = computed(() =>
+  roundsWithoutWinner(
+    standings.value.map((standing) => standing.player.id),
+    roundScores.value,
+    currentRound.value,
   ),
 )
-const canAdvance = computed(() => allPlayersScored.value && roundsToCheck.value.length === 0)
+function listRounds(rounds: readonly number[]): string {
+  return new Intl.ListFormat(locale.value, { type: 'conjunction' }).format(
+    rounds.map((round) => n(round)),
+  )
+}
+const roundsToCheckText = computed(() => listRounds(roundsToCheck.value))
+const roundsWithNoWinnerText = computed(() => listRounds(roundsWithNoWinner.value))
+const hasEnteredOwnScores = computed(
+  () =>
+    myPlayerId.value !== null &&
+    missingRounds(myPlayerId.value, roundScores.value, currentRound.value).length === 0,
+)
+/** Exactly one 0 per round: the player who went out. */
+const canAdvance = computed(
+  () =>
+    allPlayersScored.value &&
+    roundsToCheck.value.length === 0 &&
+    roundsWithNoWinner.value.length === 0,
+)
 
 /** Scores entered on this device, as "playerId-round": the host sees those numbers on others'
  * cards, while scores players entered themselves read "scored" until the reveal. Lost on reload. */
@@ -567,6 +588,13 @@ onMounted(async () => {
       <p v-if="isHost && roundsToCheck.length > 0" role="status" class="text-destructive text-sm">
         {{ t('room.next.severalZeros', { rounds: roundsToCheckText }) }}
       </p>
+      <p
+        v-if="isHost && roundsWithNoWinner.length > 0"
+        role="status"
+        class="text-destructive text-sm"
+      >
+        {{ t('room.next.noWinner', { rounds: roundsWithNoWinnerText }) }}
+      </p>
 
       <!-- Not sticky while a card is open: with the keyboard up, an iPhone shows sticky bars
            right above it, over the field being typed into. -->
@@ -603,7 +631,12 @@ onMounted(async () => {
           {{ t('room.finish.button') }}
         </Button>
       </div>
-      <p v-else role="status" class="text-muted-foreground py-2 text-center text-sm">
+      <!-- Only once this player's own points are in: before that, there's nothing to wait for. -->
+      <p
+        v-else-if="hasEnteredOwnScores"
+        role="status"
+        class="text-muted-foreground py-2 text-center text-sm"
+      >
         {{ t('room.online.waitingForHost') }}
       </p>
     </template>
