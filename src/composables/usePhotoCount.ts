@@ -66,7 +66,9 @@ const REASON_BY_STATUS: Readonly<Record<number, PhotoCountFailureReason>> = {
   413: 'image-processing',
   422: 'invalid-response',
   429: 'rate-limited',
-  502: 'unavailable',
+  // 502 is the function's "Gemini failed for good" (a bad key, a retired model): type the total.
+  // 503 is a busy quota, which a retry can get past.
+  502: 'server-error',
   503: 'unavailable',
   504: 'timeout',
 }

@@ -184,7 +184,7 @@ describe('usePhotoCount().countCards, HTTP failure statuses', () => {
     [429, 'rate-limited'],
     [413, 'image-processing'],
     [422, 'invalid-response'],
-    [502, 'unavailable'],
+    [502, 'server-error'],
     [503, 'unavailable'],
     [504, 'timeout'],
     [500, 'server-error'],

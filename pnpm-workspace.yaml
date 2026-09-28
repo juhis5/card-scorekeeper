@@ -19,5 +19,3 @@ allowBuilds:
   # native build step would be pure waste.
   sharp: false
   vue-demi: true
-minimumReleaseAgeExclude:
-  - lint-staged@17.2.0

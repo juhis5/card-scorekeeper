@@ -25,6 +25,7 @@ const {
   valueHeader,
   valueKind = 'count',
   entries,
+  emptyText,
 } = defineProps<{
   id: string
   title: string
@@ -32,6 +33,8 @@ const {
   valueHeader: string
   valueKind?: HighscoreValueKind
   entries: HighscoreEntry[]
+  /** Said when the list is empty; "no games yet" unless the list has a reason of its own. */
+  emptyText?: string
 }>()
 
 const { t, locale } = useI18n()
@@ -52,7 +55,7 @@ const countFormat = computed(() => new Intl.NumberFormat(locale.value))
 
 <template>
   <section :aria-labelledby="`${id}-heading`" class="flex flex-col gap-1">
-    <h3 :id="`${id}-heading`" class="font-semibold">{{ title }}</h3>
+    <h2 :id="`${id}-heading`" class="font-semibold">{{ title }}</h2>
     <p class="text-muted-foreground text-sm">{{ description }}</p>
     <Table>
       <TableHeader>
@@ -64,7 +67,7 @@ const countFormat = computed(() => new Intl.NumberFormat(locale.value))
       </TableHeader>
       <TableBody>
         <TableEmpty v-if="entries.length === 0" :colspan="3">
-          {{ t('stats.highscores.empty') }}
+          {{ emptyText ?? t('stats.highscores.empty') }}
         </TableEmpty>
         <TableRow v-for="entry in entries" :key="entry.id" :class="{ 'bg-muted': entry.isMine }">
           <TableCell class="text-muted-foreground tabular-nums">

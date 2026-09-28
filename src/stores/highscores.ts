@@ -36,13 +36,14 @@ export type HighscoreListName =
   | 'mostGames'
 export type HighscoresStatus = 'loading' | 'loaded' | 'error'
 
-type ListQuery = TopQuery
+/** `positiveOnly`: rows with 0 (a player with no wins) don't belong on the list. */
+type ListQuery = TopQuery & { positiveOnly?: boolean }
 
 export const HIGHSCORE_LISTS: Record<HighscoreListName, ListQuery> = {
   bestGames: { collection: 'leaderboard', field: 'finalScore', direction: 'asc' },
   worstGames: { collection: 'leaderboard', field: 'finalScore', direction: 'desc' },
   biggestRounds: { collection: 'leaderboard', field: 'worstRound', direction: 'desc' },
-  mostWins: { collection: 'player_totals', field: 'wins', direction: 'desc' },
+  mostWins: { collection: 'player_totals', field: 'wins', direction: 'desc', positiveOnly: true },
   bestWinRate: {
     collection: 'player_totals',
     field: 'winRate',
@@ -64,7 +65,8 @@ function isValidDate(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value))
 }
 
-function toEntries(rows: TopDoc[], list: ListQuery, uid: string): HighscoreEntry[] {
+function toEntries(docs: TopDoc[], list: ListQuery, uid: string): HighscoreEntry[] {
+  const rows = list.positiveOnly ? docs.filter((doc) => Number(doc.data[list.field]) > 0) : docs
   const values = rows.map((row) => row.data[list.field])
   return rows.map(({ id, data }, index) => ({
     id,

@@ -1562,6 +1562,17 @@ describe('leaderboard: the public highscores', () => {
     await assertFails(writeEntryAs(ALICE_UID, { ...entryFixture(), placement: 1 }))
   })
 
+  it("lets the host publish a player's entry, and no other player", async () => {
+    await assertSucceeds(writeEntryAs(HOST_UID))
+  })
+
+  it("denies another player of the game publishing someone's entry", async () => {
+    await seedFinishedOnlineGame('BCDEF', {}, { participantUids: [HOST_UID, ALICE_UID, 'bob-uid'] })
+    const bob = testEnv.authenticatedContext('bob-uid').firestore()
+
+    await assertFails(setDoc(doc(bob, `leaderboard/BCDEF_${ALICE_UID}`), entryFixture()))
+  })
+
   it('denies an entry for a stats row that does not exist, or from someone not in the game', async () => {
     const db = testEnv.authenticatedContext(ALICE_UID).firestore()
     await assertFails(setDoc(doc(db, `leaderboard/${ONLINE_GAME}_nobody`), entryFixture()))
@@ -2043,7 +2054,10 @@ describe('game_result/game_player create authorization for a room-backed game', 
   beforeEach(async () => {
     await seed(async (db) => {
       await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
-      await setDoc(doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`), playerFixture(ALICE_UID))
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`),
+        playerFixture(ALICE_UID, { name: 'Alice' }),
+      )
     })
   })
 
@@ -2071,6 +2085,21 @@ describe('game_result/game_player create authorization for a room-backed game', 
 
     await assertSucceeds(
       setDoc(doc(host, `game_player/${ROOM_CODE}_${ALICE_UID}`), roomRow(ALICE_UID)),
+    )
+  })
+
+  it("denies the host a stats row under another name than the player's seat, which the public lists copy", async () => {
+    await seed(async (db) => setDoc(doc(db(), `game_result/${ROOM_CODE}`), roomResult()))
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(host, `game_player/${ROOM_CODE}_${ALICE_UID}`),
+        gamePlayerFixture(ROOM_CODE, ALICE_UID, {
+          participantUids: ROOM_PARTICIPANTS,
+          displayName: 'Mallory',
+        }),
+      ),
     )
   })
 

@@ -10,6 +10,11 @@ on:
     branches: [main, develop]
   workflow_dispatch: # run by hand on any branch
 
+# A newer push to the same branch or PR supersedes a running check.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
