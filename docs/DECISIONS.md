@@ -366,3 +366,21 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   sign-in took 0.1 s, but the first Firestore read on a cold connection took 2.7 s, so the host
   landed in a local game that nobody can join. A slow phone network hits the same. "Checking the
   connection…" shows meanwhile, and a device known to be offline still skips the wait.
+- 2026-09-28 — Error reports go to Sentry (fourth round). Better Stack takes the same SDK and has
+  more free room, but Sentry's source-map upload and issue grouping won; switching later only
+  changes the DSN.
+  - Free Developer plan, EU region (`ingest.de.sentry.io`), org `juho-lahtinen`, project `rommi`.
+    One user: the owner. The app's players aren't counted, only errors (5,000 a month).
+  - Only builds with `VITE_SENTRY_DSN` report: Vercel's Production and Preview, not local or CI,
+    where the SDK isn't even bundled. The environment follows the branch (main → production,
+    develop → test, other branches → preview), and the release is the commit.
+  - The SDK loads after the app starts, so neither the first paint nor an offline host waits for
+    it, and only the parts used ship (about 37 KB gzipped, in its own chunk).
+  - Privacy: room codes are cut from every report and breadcrumb; click breadcrumbs are off
+    because button labels carry player names; no user info, cookies, bodies or query params (only
+    the User-Agent header); no session replay or performance tracing.
+  - Source maps: built hidden, uploaded by `@sentry/vite-plugin` with `SENTRY_AUTH_TOKEN` (a
+    Vercel secret), then deleted, so browsers never get them. `@sentry/cli`'s install script is
+    denied in pnpm-workspace.yaml; its binary comes from the per-platform package.
+  - The CSP allows `https://*.ingest.de.sentry.io`. The Sentry MCP server is set up locally for
+    reading issues.

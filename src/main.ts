@@ -10,6 +10,7 @@ import { i18n } from './i18n'
 import { useIdentityStore } from './stores/identity'
 import { useInstallStore } from './stores/install'
 import { applyStoredTheme } from './composables/useTheme'
+import { startErrorReporting } from './lib/platform/error-reporting'
 import { flushPendingResultsOnLaunch } from './lib/data/reconnect-flush'
 
 const app = createApp(App)
@@ -27,6 +28,7 @@ app.use(router)
 app.use(i18n)
 
 app.mount('#app')
+void startErrorReporting(app)
 applyStoredTheme()
 
 // Push results of games finished offline. Not awaited, so it never delays mount; a failure
