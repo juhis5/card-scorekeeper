@@ -177,6 +177,16 @@ describe('ScoreCard', () => {
     expect(document.activeElement).toBe(headerButton())
   })
 
+  it('ignores the keyup of the Enter that opened the card, so it neither saves nor errors', async () => {
+    const { emitted } = renderCard()
+
+    await expandCard()
+    await fireEvent.keyUp(scoreInput(), { key: 'Enter' })
+
+    expect(emitted().commit).toBeUndefined()
+    expect(screen.queryByText('Enter the points first.')).toBeNull()
+  })
+
   it('returns focus to the card header after committing with Enter', async () => {
     renderCard()
 
@@ -184,7 +194,7 @@ describe('ScoreCard', () => {
     const input = screen.getByLabelText("Alice's round 1 score")
     input.focus()
     await fireEvent.update(input, '10')
-    await fireEvent.keyUp(input, { key: 'Enter' })
+    await fireEvent.keyDown(input, { key: 'Enter' })
     await flushPromises()
 
     expect(document.activeElement).toBe(headerButton())
@@ -260,7 +270,7 @@ describe('ScoreCard, the Save button', () => {
     expect(screen.getByRole('alert').textContent).toBe('Enter the points first.')
 
     await fireEvent.update(scoreInput(), '')
-    await fireEvent.keyUp(scoreInput(), { key: 'Enter' })
+    await fireEvent.keyDown(scoreInput(), { key: 'Enter' })
     expect(screen.getByRole('alert').textContent).toBe('Enter the points first.')
     expect(emitted().commit).toBeUndefined()
   })
@@ -383,7 +393,7 @@ describe('ScoreCard, discarding and saving a draft', () => {
 
     await expandCard()
     await fireEvent.update(scoreInput(), '25')
-    await keyThenRemovalBlur(() => fireEvent.keyUp(scoreInput(), { key: 'Enter' }))
+    await keyThenRemovalBlur(() => fireEvent.keyDown(scoreInput(), { key: 'Enter' }))
 
     expect(emitted().commit).toEqual([[ALICE.id, 1, 25]])
   })

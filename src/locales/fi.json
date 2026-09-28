@@ -286,7 +286,8 @@
       "leaveRoomLabel": "Poistu huoneesta {code}",
       "deleteLocalLabel": "Poista tämän laitteen peli",
       "endedTitle": "Peli lopetettiin",
-      "endedBody": "Järjestäjä lopetti pelin kesken. Sitä ei tallenneta tilastoihin."
+      "endedBody": "Järjestäjä lopetti pelin kesken. Sitä ei tallenneta tilastoihin.",
+      "queued": "Ei yhteyttä. Peli päättyy kaikilta heti, kun tämä puhelin on taas verkossa."
     }
   },
   "notFound": {

@@ -18,6 +18,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { TimeoutError } from '@/lib/platform/timeout'
 import { useGameStore } from '@/stores/game'
 
 const emit = defineEmits<{ done: [] }>()
@@ -29,7 +30,8 @@ const { isHost, isOnline } = storeToRefs(game)
 
 const isOpen = ref(false)
 const isBusy = ref(false)
-const hasFailed = ref(false)
+/** 'queued': the end timed out but stays queued, so it lands once the phone is online again. */
+const failure = ref<'failed' | 'queued' | null>(null)
 
 const copy = computed(() => {
   if (!isHost.value) {
@@ -56,7 +58,7 @@ const copy = computed(() => {
 })
 
 function openConfirm(): void {
-  hasFailed.value = false
+  failure.value = null
   isOpen.value = true
 }
 
@@ -66,8 +68,8 @@ async function confirm(): Promise<void> {
   try {
     if (isHost.value) await game.abandonGame()
     else game.leaveGame()
-  } catch {
-    hasFailed.value = true
+  } catch (error) {
+    failure.value = error instanceof TimeoutError ? 'queued' : 'failed'
     return
   } finally {
     isBusy.value = false
@@ -89,8 +91,8 @@ async function confirm(): Promise<void> {
       <AlertDialogDescription class="text-muted-foreground text-sm">
         {{ copy.body }}
       </AlertDialogDescription>
-      <p v-if="hasFailed" role="alert" class="text-destructive text-sm">
-        {{ t('room.end.failed') }}
+      <p v-if="failure" role="alert" class="text-destructive text-sm">
+        {{ failure === 'queued' ? t('room.end.queued') : t('room.end.failed') }}
       </p>
       <div class="flex justify-end gap-2">
         <AlertDialogCancel class="h-11">{{ t('room.end.cancel') }}</AlertDialogCancel>

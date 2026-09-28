@@ -500,3 +500,8 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - Next/Finish wait at most 5 s for a just-saved score. Offline, a Firestore write's promise
     never settles, so instead of a silent busy button that fires on reconnect they say "no
     connection". advanceRound is bounded too; retrying it is safe because it is idempotent.
+- 2026-09-28 — Input edges (second audit, PR 2b). Enter saves on keydown, not keyup: Enter on a
+  card header opened it and the same key's keyup then saved or said "enter the points first". A
+  held Enter or an IME confirmation doesn't save. A photo retake clears the previous result and
+  only the newest read counts, so a hidden old total can't be confirmed. A timed-out end game says
+  it ends once the phone is back online (the write stays queued), not that it failed.

@@ -159,12 +159,28 @@ function openFilePicker(): void {
   fileInputRef.value.click()
 }
 
+/** Bumped by every pick and by closing, so a read that settles late never replaces a newer one or
+ * reopens a closed sheet's result. */
+let readGeneration = 0
+
+/** A retake drops the previous result first: its total must not stay confirmable, hidden, while
+ * the new photo is read. */
+function clearResult(): void {
+  cards.value = []
+  cardValues.value = []
+  total.value = null
+  status.value = 'idle'
+}
+
 async function handleFileChange(event: Event): Promise<void> {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return // picker cancelled
 
+  const generation = ++readGeneration
+  clearResult()
   const result = await countCards(roomCode, file)
+  if (generation !== readGeneration) return
   if (!result.ok) {
     failureReason.value = result.reason
     status.value = 'error'
@@ -184,14 +200,16 @@ async function handleFileChange(event: Event): Promise<void> {
 }
 
 function handleConfirm(): void {
-  if (total.value === null || !isTotalValid.value) return
+  if (isPending.value || total.value === null || !isTotalValid.value) return
   emit('confirm', total.value)
   isOpen.value = false
 }
 
 function handleOpenChange(open: boolean): void {
   isOpen.value = open
-  if (!open) status.value = 'idle'
+  if (open) return
+  readGeneration += 1
+  status.value = 'idle'
 }
 </script>
 
@@ -297,7 +315,7 @@ function handleOpenChange(open: boolean): void {
 
         <SheetFooter>
           <Button
-            v-if="status === 'ready'"
+            v-if="status === 'ready' && !isPending"
             type="button"
             class="h-11"
             :disabled="!isTotalValid"

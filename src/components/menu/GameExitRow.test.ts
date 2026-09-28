@@ -7,6 +7,7 @@ import GameExitRow from './GameExitRow.vue'
 import { i18n, setLocale } from '@/i18n'
 import type { GameRepository } from '@/lib/data/repository'
 import type { GameState } from '@/lib/game/types'
+import { TimeoutError } from '@/lib/platform/timeout'
 import { useGameStore } from '@/stores/game'
 
 function onlineRoom(): GameRepository & { abandonGame: ReturnType<typeof vi.fn> } {
@@ -83,6 +84,21 @@ describe('GameExitRow', () => {
 
     expect(screen.getByRole('alert').textContent).toContain("Couldn't end the game")
     expect(router.currentRoute.value.name).toBe('room')
+  })
+
+  it('says a timed-out end is still on its way rather than that it failed', async () => {
+    const room = onlineRoom()
+    room.abandonGame.mockRejectedValue(new TimeoutError(10_000))
+    await useGameStore().start(room, { hostDeviceUuid: 'd', hostDisplayName: 'Juho' })
+    await renderRow()
+
+    await fireEvent.click(screen.getByRole('button', { name: /^End the game/ }))
+    await fireEvent.click(screen.getByRole('button', { name: 'End the game' }))
+    await flushPromises()
+
+    const alert = screen.getByRole('alert').textContent
+    expect(alert).toContain('ends for everyone as soon as this phone is back online')
+    expect(alert).not.toContain("Couldn't end the game")
   })
 
   it('lets a player leave without ending it for the others', async () => {

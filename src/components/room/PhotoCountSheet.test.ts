@@ -178,6 +178,47 @@ describe('PhotoCountSheet, a successful read', () => {
   })
 })
 
+describe('PhotoCountSheet, retaking a photo', () => {
+  const FIRST = { ok: true, cards: [{ rank: 'K', suit: 'hearts', value: 10 }], total: 10 }
+
+  async function retake(): Promise<void> {
+    const fileInput = screen.getByTestId('photo-count-file') as HTMLInputElement
+    await fireEvent.change(fileInput, { target: { files: [makeFile()] } })
+  }
+
+  it('offers no way to confirm the previous total while the new photo is read', async () => {
+    countCardsMock.mockResolvedValueOnce(FIRST).mockReturnValueOnce(new Promise(() => {}))
+    const { emitted } = renderSheet()
+    await selectAPhoto()
+    await flushPromises()
+
+    await retake()
+
+    expect(screen.queryByRole('button', { name: 'Use this total' })).toBeNull()
+    expect(emitted().confirm).toBeUndefined()
+  })
+
+  it('shows only the newest photo when an older read settles last', async () => {
+    let settleFirst: (value: unknown) => void = () => {}
+    countCardsMock
+      .mockReturnValueOnce(new Promise((resolve) => (settleFirst = resolve)))
+      .mockResolvedValueOnce({
+        ok: true,
+        cards: [{ rank: '4', suit: 'clubs', value: 5 }],
+        total: 5,
+      })
+    renderSheet()
+    await selectAPhoto()
+
+    await retake()
+    await flushPromises()
+    settleFirst(FIRST)
+    await flushPromises()
+
+    expect((screen.getByLabelText('Total') as HTMLInputElement).value).toBe('5')
+  })
+})
+
 describe('PhotoCountSheet, a failed read', () => {
   it('shows a friendly error and a retry action instead of a raw error', async () => {
     countCardsMock.mockResolvedValue({ ok: false, reason: 'invalid-response' })
