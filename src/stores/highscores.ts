@@ -64,6 +64,12 @@ const LISTS: Record<HighscoreListName, ListQuery> = {
 
 type Document = { id: string; data: () => Record<string, unknown> }
 
+/** Entries are public and older ones predate the rules' format check: an unreadable date is left
+ * out, since formatting it would throw and blank the whole list. */
+function isValidDate(value: unknown): value is string {
+  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+}
+
 function toEntries(docs: Document[], list: ListQuery, uid: string): HighscoreEntry[] {
   const rows = docs.map((doc) => ({ id: doc.id, data: doc.data() }))
   return rows.map(({ id, data }) => ({
@@ -72,7 +78,7 @@ function toEntries(docs: Document[], list: ListQuery, uid: string): HighscoreEnt
     rank: rows.findIndex((row) => row.data[list.field] === data[list.field]) + 1,
     displayName: String(data.displayName),
     value: Number(data[list.field]),
-    ...(typeof data.finishedAt === 'string' && { finishedAt: data.finishedAt }),
+    ...(isValidDate(data.finishedAt) && { finishedAt: data.finishedAt }),
     ...(typeof data.gamesPlayed === 'number' && { gamesPlayed: data.gamesPlayed }),
     // A leaderboard entry is `{game}_{player}`; a totals doc is the player's own id.
     isMine: list.collection === 'player_totals' ? id === uid : id.endsWith(`_${uid}`),

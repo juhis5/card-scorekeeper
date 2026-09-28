@@ -146,6 +146,23 @@ function gamePlayerFixture(
   }
 }
 
+/** A finished online game, as the host's Finish leaves it: its room, its result and a stats row
+ * for Alice, two players at the table. Only such a game reaches the public lists. */
+async function seedFinishedOnlineGame(
+  gameId: string,
+  row: Partial<Record<string, unknown>> = {},
+  { roomStatus = 'finished', participantUids = [HOST_UID, ALICE_UID] } = {},
+) {
+  await seed(async (db) => {
+    await setDoc(doc(db(), `room/${gameId}`), roomFixture({ code: gameId, status: roomStatus }))
+    await setDoc(doc(db(), `game_result/${gameId}`), gameResultFixture({ gameId, participantUids }))
+    await setDoc(
+      doc(db(), `game_player/${gameId}_${ALICE_UID}`),
+      gamePlayerFixture(gameId, ALICE_UID, { participantUids, ...row }),
+    )
+  })
+}
+
 let testEnv: RulesTestEnvironment
 
 beforeAll(async () => {
@@ -248,6 +265,21 @@ describe('roundScores own-write trust model', () => {
         roundScoreFixture(ALICE_UID),
       ),
     )
+    const bob = testEnv.authenticatedContext('bob-uid').firestore()
+
+    await assertFails(
+      updateDoc(doc(bob, `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`), { points: 995 }),
+    )
+  })
+
+  it("denies a seated player (not the host) updating another seated player's roundScore", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}/players/bob-uid`), playerFixture('bob-uid'))
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/roundScores/${ALICE_UID}_1`),
+        roundScoreFixture(ALICE_UID),
+      )
+    })
     const bob = testEnv.authenticatedContext('bob-uid').firestore()
 
     await assertFails(
@@ -529,6 +561,26 @@ describe('players create validation', () => {
 
   it('denies a starting totalScore other than 0', async () => {
     await assertFails(seatAlice(playerFixture(ALICE_UID, { totalScore: -999 })))
+  })
+
+  it("denies a seat in a room that's over, so nobody sits down in a finished game", async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ status: 'finished', currentRound: 5 })),
+    )
+    await assertFails(seatAlice(playerFixture(ALICE_UID)))
+
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ status: 'abandoned' })),
+    )
+    await assertFails(seatAlice(playerFixture(ALICE_UID)))
+  })
+
+  it('lets a late joiner sit down while the game is being played', async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ status: 'playing', currentRound: 3 })),
+    )
+
+    await assertSucceeds(seatAlice(playerFixture(ALICE_UID)))
   })
 })
 
@@ -1472,7 +1524,8 @@ describe('play again: the host brings everyone along to the next room', () => {
 })
 
 describe('leaderboard: the public highscores', () => {
-  const ENTRY_ID = `${GAME_ID}_${ALICE_UID}`
+  const ONLINE_GAME = 'PQRST'
+  const ENTRY_ID = `${ONLINE_GAME}_${ALICE_UID}`
 
   function entryFixture(overrides: Partial<Record<string, unknown>> = {}) {
     return {
@@ -1485,10 +1538,7 @@ describe('leaderboard: the public highscores', () => {
   }
 
   beforeEach(async () => {
-    await seed(async (db) => {
-      await setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture())
-      await setDoc(doc(db(), `game_player/${ENTRY_ID}`), gamePlayerFixture(GAME_ID, ALICE_UID))
-    })
+    await seedFinishedOnlineGame(ONLINE_GAME)
   })
 
   function writeEntryAs(uid: string, fields: Record<string, unknown> = entryFixture()) {
@@ -1512,8 +1562,37 @@ describe('leaderboard: the public highscores', () => {
 
   it('denies an entry for a stats row that does not exist, or from someone not in the game', async () => {
     const db = testEnv.authenticatedContext(ALICE_UID).firestore()
-    await assertFails(setDoc(doc(db, `leaderboard/${GAME_ID}_nobody`), entryFixture()))
+    await assertFails(setDoc(doc(db, `leaderboard/${ONLINE_GAME}_nobody`), entryFixture()))
     await assertFails(writeEntryAs('mallory-uid'))
+  })
+
+  it("denies a local game's entry: its three docs are self-written, so anyone could script one", async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture())
+      await setDoc(
+        doc(db(), `game_player/${GAME_ID}_${ALICE_UID}`),
+        gamePlayerFixture(GAME_ID, ALICE_UID),
+      )
+    })
+    const db = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(setDoc(doc(db, `leaderboard/${GAME_ID}_${ALICE_UID}`), entryFixture()))
+  })
+
+  it('denies an entry while its room is not finished', async () => {
+    await seedFinishedOnlineGame('LMNPQ', {}, { roomStatus: 'playing' })
+    await seedFinishedOnlineGame('RSTUV', {}, { roomStatus: 'abandoned' })
+    const db = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(setDoc(doc(db, `leaderboard/LMNPQ_${ALICE_UID}`), entryFixture()))
+    await assertFails(setDoc(doc(db, `leaderboard/RSTUV_${ALICE_UID}`), entryFixture()))
+  })
+
+  it('denies an entry from a game with one player at the table', async () => {
+    await seedFinishedOnlineGame('WXYZ2', {}, { participantUids: [ALICE_UID] })
+    const db = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(setDoc(doc(db, `leaderboard/WXYZ2_${ALICE_UID}`), entryFixture()))
   })
 
   it('keeps entries as they are: no edits, no deletes', async () => {
@@ -1631,8 +1710,8 @@ describe('ending a game early: the host abandons it', () => {
 })
 
 describe('player_totals: the running totals behind the global player lists', () => {
-  const FIRST_GAME = GAME_ID
-  const SECOND_GAME = 'c4a1d3b5-6e7f-4a81-9b02-3c4d5e6f7a81'
+  const FIRST_GAME = 'PQRST'
+  const SECOND_GAME = 'LMNPQ'
 
   function entryOf(gameId: string, finalScore: number) {
     return {
@@ -1658,13 +1737,7 @@ describe('player_totals: the running totals behind the global player lists', () 
   }
 
   async function seedGame(gameId: string, row: Partial<Record<string, unknown>> = {}) {
-    await seed(async (db) => {
-      await setDoc(doc(db(), `game_result/${gameId}`), gameResultFixture({ gameId }))
-      await setDoc(
-        doc(db(), `game_player/${gameId}_${ALICE_UID}`),
-        gamePlayerFixture(gameId, ALICE_UID, row),
-      )
-    })
+    await seedFinishedOnlineGame(gameId, row)
   }
 
   /** Publishes a game's highscore entry and Alice's new totals in one write, as the app does. */
@@ -1925,6 +1998,18 @@ describe('game_player value bounds', () => {
 })
 
 describe('game_result field sanity', () => {
+  it('denies a finishedAt that is not an ISO timestamp, which would break every list showing it', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+    const result = doc(alice, `game_result/${GAME_ID}`)
+
+    await assertFails(setDoc(result, gameResultFixture({ finishedAt: 'x' })))
+    await assertFails(setDoc(result, gameResultFixture({ finishedAt: 'x'.repeat(100_000) })))
+    await assertFails(setDoc(result, gameResultFixture({ finishedAt: '2026-01-01' })))
+    await assertSucceeds(
+      setDoc(result, gameResultFixture({ finishedAt: '2026-01-01T00:00:00.000Z' })),
+    )
+  })
+
   it('denies a totalRounds that is not the fixed 5-round game', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 

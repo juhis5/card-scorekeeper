@@ -17,7 +17,7 @@ import {
 } from 'firebase/firestore'
 import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
-import { writeGameResult } from './firestore-stats'
+import { publishHighscores, writeGameResult } from './firestore-stats'
 import { cleanPlayerName, NameTakenError, playerNameKey } from '../game/player-names'
 import {
   generateRoomCode as defaultGenerateRoomCode,
@@ -29,6 +29,7 @@ import {
   GameIncompleteError,
   TOTAL_ROUNDS,
   canFinishGame,
+  isGameOver,
   placements as placementsFor,
   runningTotal,
 } from '../game/rules'
@@ -356,7 +357,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     const data = room.data() as RoomDocData | undefined
     if (!data) return 'missing'
     if (data.expiresAt.toMillis() <= this.now()) return 'expired'
-    return data.status === 'finished' || data.status === 'abandoned' ? 'finished' : 'open'
+    return isGameOver(data.status) ? 'finished' : 'open'
   }
 
   /** A refused read means not seated: rules without the own-seat `get` only let members read. */
@@ -550,6 +551,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     // refuses every write, so a failed stats write leaves Finish retryable.
     await writeGameResult(this.db, result, gamePlayers)
     await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
+    await publishHighscores(this.db, result, gamePlayers)
 
     return result
   }

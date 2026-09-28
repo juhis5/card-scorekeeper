@@ -121,8 +121,9 @@ in their own game.
   games.
 - Ennätykset, its own page: public top-10 lists. Pelit: best game, worst game, biggest round
   from `leaderboard`. Pelaajat: most wins, best win rate, best average, most games from
-  `player_totals` (rate and average need 5 games). An entry that can't be written is left out and
-  never blocks the game.
+  `player_totals` (rate and average need 5 games). Only finished online games with at least two
+  players (guests included) count, published after the room is finished; local games count in
+  Tilastot only. An entry that can't be written is left out and never blocks the game.
 
 ## Photo count
 

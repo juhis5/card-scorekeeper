@@ -1,5 +1,5 @@
-/** A finished game's permanent records and highscore entries, written by the online finishGame
- * and by the reconnect flush for games finished offline. */
+/** A finished game's permanent records, written by the online finishGame and by the reconnect
+ * flush for games finished offline, and the online game's highscore entries. */
 import { doc, getDoc, runTransaction, setDoc, type Firestore } from 'firebase/firestore'
 import { nextPlayerTotals, type PlayerTotals } from '../game/stats'
 import type { GamePlayer, GameResult } from '../game/types'
@@ -43,11 +43,7 @@ async function ensureGamePlayerWritten(
 /** Repeats a stats row on the public highscores and adds it to the player's running totals, in
  * one transaction: the rules count a row in the totals only in the write that publishes its entry,
  * and a transaction retries when two games finish with the same player at once. */
-async function publishHighscores(
-  db: Firestore,
-  result: GameResult,
-  player: GamePlayer,
-): Promise<void> {
+async function publishEntry(db: Firestore, result: GameResult, player: GamePlayer): Promise<void> {
   const entryId = `${player.gameId}_${player.deviceUuid}`
   const entryRef = doc(db, `leaderboard/${entryId}`)
   const totalsRef = doc(db, `player_totals/${player.deviceUuid}`)
@@ -81,12 +77,18 @@ export async function writeGameResult(
   // Before the player rows, not batched: their rule checks this doc exists(), and a rule doesn't
   // see a sibling write in the same batch.
   await ensureGameResultWritten(db, result, participantUids)
+  await Promise.all(players.map((player) => ensureGamePlayerWritten(db, player, participantUids)))
+}
+
+/** An online game's rows on the public lists. Only after its room is finished: the rules count an
+ * online game with two or more players only once it's over, and never a local one. Highscores are
+ * an extra, so a refused entry is dropped and never fails the game. */
+export async function publishHighscores(
+  db: Firestore,
+  result: GameResult,
+  players: GamePlayer[],
+): Promise<void> {
   await Promise.all(
-    players.map(async (player) => {
-      await ensureGamePlayerWritten(db, player, participantUids)
-      // Highscores are an extra: a failed entry (say, rules without the leaderboard yet) must
-      // never keep a game from finishing, so it's dropped, not retried.
-      await publishHighscores(db, result, player).catch(() => undefined)
-    }),
+    players.map((player) => publishEntry(db, result, player).catch(() => undefined)),
   )
 }

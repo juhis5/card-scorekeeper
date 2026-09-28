@@ -3,6 +3,9 @@
  * plain data in. Identity comes only from the verified token, never from the request body.
  */
 
+import { isGameOver } from '../../src/lib/game/rules.js'
+import type { GameStatus } from '../../src/lib/game/types.js'
+
 export type AuthResult = { ok: true; uid: string } | { ok: false }
 
 /** No token, or an `auth/...` rejection (invalid, expired, malformed), is `{ ok: false }`, a 401.
@@ -28,7 +31,7 @@ function isFirebaseAuthError(error: unknown): boolean {
   return typeof code === 'string' && code.startsWith('auth/')
 }
 
-export type RoomStatus = 'waiting' | 'playing' | 'finished'
+export type RoomStatus = GameStatus
 
 /** Built from the Firestore reads by `getRoomSnapshot`. */
 export interface RoomSnapshot {
@@ -42,11 +45,11 @@ export interface RoomSnapshot {
 export type RoomGateFailureReason = 'not-found' | 'finished' | 'expired' | 'not-member'
 export type RoomGateResult = { ok: true } | { ok: false; reason: RoomGateFailureReason }
 
-/** The room must exist, be live (not finished or expired) and have the caller seated. Any failure
- * is a 403. */
+/** The room must exist, be live (not finished, ended early or expired) and have the caller
+ * seated. Any failure is a 403. */
 export function evaluateRoomGate(room: RoomSnapshot, nowMs: number): RoomGateResult {
   if (!room.exists) return { ok: false, reason: 'not-found' }
-  if (room.status === 'finished') return { ok: false, reason: 'finished' }
+  if (room.status !== null && isGameOver(room.status)) return { ok: false, reason: 'finished' }
   if (room.expiresAtMs === null || room.expiresAtMs <= nowMs) {
     return { ok: false, reason: 'expired' }
   }
