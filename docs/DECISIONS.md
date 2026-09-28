@@ -436,3 +436,18 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     and Pelit (best game, hall of shame, biggest round).
   - Totals start with this release; at the release they're built once from the production games,
     together with the highscore entries.
+- 2026-09-29 — App icon and the Kapteeni themes. The owner asked for icons like the Captain Morgan
+  logo; that's a registered trademark, so the icon is an original design in the same spirit:
+  a tricorn over a vintage serif R in a gold frame, on label red (concept B). `node
+  scripts/render-icons.mjs` renders the PWA icons, the maskable one (the mark without the frame,
+  inside Android's safe circle), the iPhone icon and the favicon; it needs the network for the R's
+  typeface. The logo also sits beside "Rommi" in Home's header.
+  - Kapteeni is the new default theme, matching the icon: brown-black, gold actions with dark
+    text, label-red brand. Kapteeni vaalea: cream paper, label-red actions. Red isn't the dark
+    theme's action colour because danger is red too; danger uses a separate coral (dark) or
+    orange-red (light), always with an icon or words. A new `--brand` token (primary elsewhere)
+    colours the app's name and the leader's crown.
+  - The emerald themes stay as Vihreä and Vihreä vaalea (ids `dark` and `light`, so a stored
+    choice keeps working). Only a device with no stored choice moves to Kapteeni. The manifest
+    and `theme-color` are brown-black to match; the contrast test covers both new palettes and
+    the brand colour in every theme.

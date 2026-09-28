@@ -57,7 +57,12 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
       <BackButton v-if="!isHome" class="-ml-2" />
       <RoomCodeBar v-if="headerRoomCode" :code="headerRoomCode" />
       <!-- Home's own heading says the same to screen readers. -->
-      <span v-else-if="isHome" aria-hidden="true" class="min-w-0 flex-1 text-lg font-semibold">
+      <span
+        v-else-if="isHome"
+        aria-hidden="true"
+        class="text-brand flex min-w-0 flex-1 items-center gap-2 text-lg font-semibold"
+      >
+        <img src="/pwa-192.png" alt="" class="size-8 rounded-md" />
         {{ t('app.title') }}
       </span>
       <div v-else class="min-w-0 flex-1" />

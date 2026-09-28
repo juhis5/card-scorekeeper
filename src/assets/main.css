@@ -30,6 +30,7 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand: var(--brand);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -70,6 +71,8 @@
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
+  /* The app's own colour: its name and the leader's crown. Kapteeni sets it apart from primary. */
+  --brand: var(--primary);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -203,6 +206,52 @@
   --border: #d9d2bd;
   --input: #d9d2bd;
   --ring: #1f6aa3;
+}
+
+/* Kapteeni (the default, matching the icon): old-bottle brown-black, gold actions, label-red
+   brand; the coral red is only for danger. Kapteeni vaalea: cream paper with label-red actions. */
+.theme-captain {
+  --background: #16100c;
+  --foreground: #f3e9da;
+  --card: #221812;
+  --card-foreground: #f3e9da;
+  --popover: #221812;
+  --popover-foreground: #f3e9da;
+  --primary: #d4a84f;
+  --primary-foreground: #1a120c;
+  --secondary: #2e2219;
+  --secondary-foreground: #f3e9da;
+  --muted: #2e2219;
+  --muted-foreground: #c2b09b;
+  --accent: #2e2219;
+  --accent-foreground: #f3e9da;
+  --destructive: #f26b5b;
+  --border: #3d2e22;
+  --input: #3d2e22;
+  --ring: #d4a84f;
+  --brand: #e0574a;
+}
+
+.theme-captain-light {
+  --background: #f6efe1;
+  --foreground: #23180f;
+  --card: #fffaf1;
+  --card-foreground: #23180f;
+  --popover: #fffaf1;
+  --popover-foreground: #23180f;
+  --primary: #8f1d1d;
+  --primary-foreground: #fff8ec;
+  --secondary: #ede2cf;
+  --secondary-foreground: #23180f;
+  --muted: #ede2cf;
+  --muted-foreground: #6b5644;
+  --accent: #ede2cf;
+  --accent-foreground: #23180f;
+  --destructive: #b8420f;
+  --border: #dccbb1;
+  --input: #dccbb1;
+  --ring: #8f1d1d;
+  --brand: #8f1d1d;
 }
 
 /* Shared by every theme. Gate non-essential motion on `motion-reduce:`. */

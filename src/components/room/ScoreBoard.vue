@@ -67,7 +67,7 @@ function isLeader(row: BoardRow): boolean {
       >
         <th scope="row" class="px-2 py-1.5 text-left align-middle font-normal">
           <div class="flex min-w-0 items-center gap-2">
-            <Crown v-if="isLeader(row)" aria-hidden="true" class="text-primary size-4 shrink-0" />
+            <Crown v-if="isLeader(row)" aria-hidden="true" class="text-brand size-4 shrink-0" />
             <span class="truncate">{{ row.player.name }}</span>
             <span
               v-if="row.player.isGuest"

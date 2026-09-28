@@ -1,11 +1,11 @@
 /**
- * Snapshots of the key screens, in Finnish, dark and light. Runs only in Playwright's Linux image,
+ * Snapshots of the key screens, in Finnish, in Kapteeni and Vihreä, dark and light. Runs only in Playwright's Linux image,
  * where the baselines are made (`pnpm test:visual`, `pnpm test:visual:update`). A local game, so
  * nothing changes between runs.
  */
 import { expect, test, type Page } from '@playwright/test'
 
-const THEMES = ['dark', 'light'] as const
+const THEMES = ['captain', 'captain-light', 'dark', 'light'] as const
 
 test.use({ locale: 'fi-FI', viewport: { width: 390, height: 844 } })
 

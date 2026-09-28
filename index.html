@@ -9,15 +9,24 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"
     />
-    <meta name="theme-color" content="#0b0f14" />
+    <meta name="theme-color" content="#16100c" />
     <title>Rommi</title>
     <script>
       // Same lists as src/lib/platform/themes.ts: the theme is on before the first paint.
       ;(function () {
-        var themes = ['dark', 'light', 'jani', 'nord', 'dracula', 'solarized']
-        var lightThemes = ['light', 'solarized']
+        var themes = [
+          'captain',
+          'captain-light',
+          'dark',
+          'light',
+          'jani',
+          'nord',
+          'dracula',
+          'solarized',
+        ]
+        var lightThemes = ['captain-light', 'light', 'solarized']
         var stored = localStorage.getItem('theme')
-        var theme = themes.indexOf(stored) >= 0 ? stored : 'dark'
+        var theme = themes.indexOf(stored) >= 0 ? stored : 'captain'
         var root = document.documentElement
         root.classList.toggle('dark', lightThemes.indexOf(theme) < 0)
         if (theme !== 'dark' && theme !== 'light') root.classList.add('theme-' + theme)

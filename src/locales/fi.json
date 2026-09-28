@@ -4,8 +4,10 @@
     "theme": {
       "label": "Teema",
       "names": {
-        "dark": "Tumma",
-        "light": "Vaalea",
+        "captain": "Kapteeni",
+        "captain-light": "Kapteeni vaalea",
+        "dark": "Vihreä",
+        "light": "Vihreä vaalea",
         "jani": "Jani",
         "nord": "Nord",
         "dracula": "Dracula",
