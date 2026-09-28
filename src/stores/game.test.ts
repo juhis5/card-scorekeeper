@@ -86,7 +86,10 @@ class FakeGameRepository implements GameRepository {
     this.lastRemovedPlayerId = playerId
   }
 
-  async advanceRound(): Promise<void> {
+  advancedFrom: number[] = []
+
+  async advanceRound(fromRound: ContractRoundNumber): Promise<void> {
+    this.advancedFrom.push(fromRound)
     this.emit({ ...this.state, currentRound: 2 })
   }
 
@@ -381,6 +384,16 @@ describe('useGameStore.advanceRound', () => {
 
     expect(game.currentRound).toBe(2)
   })
+
+  it('tells the repository which round it moves on from, so a repeat is a no-op', async () => {
+    const game = useGameStore()
+    const repository = new FakeGameRepository()
+    await game.start(repository, HOST_CONFIG)
+
+    await game.advanceRound()
+
+    expect(repository.advancedFrom).toEqual([1])
+  })
 })
 
 describe('useGameStore.finishGame', () => {
@@ -557,7 +570,7 @@ describe('useGameStore full game flow with LocalGameRepository', () => {
 
     for (const round of ALL_ROUNDS) {
       await game.setRoundScore({ playerId: hostId, round, points: 50 })
-      await game.setRoundScore({ playerId: alice, round, points: 5 })
+      await game.setRoundScore({ playerId: alice, round, points: 0 })
       await game.setRoundScore({ playerId: bob, round, points: 15 })
       await game.setRoundScore({ playerId: carol, round, points: 10 })
       if (round < 5) await game.advanceRound()

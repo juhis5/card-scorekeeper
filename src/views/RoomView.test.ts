@@ -62,14 +62,35 @@ class FailingRepository extends LocalGameRepository {
     return super.setRoundScore(input)
   }
 
-  override async advanceRound(): Promise<void> {
+  override async advanceRound(fromRound: ContractRoundNumber): Promise<void> {
     if (this.failure) throw this.failure
-    return super.advanceRound()
+    return super.advanceRound(fromRound)
   }
 
   override async finishGame(): Promise<GameResult> {
     if (this.failure) throw this.failure
     return super.finishGame()
+  }
+}
+
+/** Like Firestore: a save shows at once, but its promise settles only when released (the
+ * server's ack). Counts advances, to catch a double tap advancing twice. */
+class SlowAckRepository extends LocalGameRepository {
+  advances = 0
+  private releases: (() => void)[] = []
+
+  override async setRoundScore(input: SetRoundScoreInput): Promise<void> {
+    await super.setRoundScore(input)
+    return new Promise((resolve) => this.releases.push(resolve))
+  }
+
+  override async advanceRound(fromRound: ContractRoundNumber): Promise<void> {
+    this.advances += 1
+    return super.advanceRound(fromRound)
+  }
+
+  releaseSaves(): void {
+    this.releases.splice(0).forEach((release) => release())
   }
 }
 
@@ -172,8 +193,8 @@ class FakeOnlineRepository implements GameRepository {
     this.emit()
   }
 
-  async advanceRound(): Promise<void> {
-    const nextRound = Math.min(this.state.currentRound + 1, 5) as ContractRoundNumber
+  async advanceRound(fromRound: ContractRoundNumber): Promise<void> {
+    const nextRound = Math.min(fromRound + 1, 5) as ContractRoundNumber
     this.state = { ...this.state, currentRound: nextRound }
     this.emit()
   }
@@ -401,7 +422,7 @@ describe('RoomView moving to the next round', () => {
     const aliceId = await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
     await seed.setRoundScore({ playerId: created.hostPlayerId, round: 1, points: 20 })
     await seed.setRoundScore({ playerId: aliceId, round: 1, points: 0 })
-    await seed.advanceRound()
+    await seed.advanceRound(1)
     seed.leave()
 
     const { container } = await renderRoom()
@@ -638,6 +659,58 @@ describe('RoomView finishing the game', () => {
         .getAllByRole('button', { name: /^Enter .+'s score$/ })
         .map((card) => card.getAttribute('aria-label')),
     ).toEqual(["Enter Host's score", "Enter Alice's score", "Enter Bob's score"])
+  })
+})
+
+describe('RoomView Next while a save is still going through', () => {
+  async function startSlowGame(): Promise<SlowAckRepository> {
+    let count = 0
+    const repository = new SlowAckRepository({
+      now: () => '2026-01-01T00:00:00.000Z',
+      newId: () => `id-${++count}`,
+      storage: makeMemoryStorage(),
+    })
+    const game = useGameStore()
+    await game.start(repository, { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
+    await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    await renderRoom()
+    await enterScore('Host', 1, 20)
+    await enterScore('Alice', 1, 0)
+    return repository
+  }
+
+  it('advances once however many times Next is tapped before the save settles', async () => {
+    const repository = await startSlowGame()
+    const next = screen.getByRole('button', { name: 'Next round' })
+
+    await fireEvent.click(next)
+    await fireEvent.click(next)
+    await fireEvent.click(next)
+    repository.releaseSaves()
+    await flushPromises()
+
+    expect(repository.advances).toBe(1)
+    expect(screen.getByRole('heading', { name: 'Round 2 scores' })).toBeTruthy()
+  })
+
+  it('says there is no connection instead of advancing later by itself', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const repository = await startSlowGame()
+
+      await fireEvent.click(screen.getByRole('button', { name: 'Next round' }))
+      await vi.advanceTimersByTimeAsync(5_000)
+      await flushPromises()
+
+      expect(screen.getByRole('alert').textContent).toContain('No connection')
+      expect(repository.advances).toBe(0)
+      repository.releaseSaves()
+      await flushPromises()
+      expect(repository.advances).toBe(0)
+      expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

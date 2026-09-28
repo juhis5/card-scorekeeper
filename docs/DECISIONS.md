@@ -489,3 +489,14 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   Nothing read `totalScore`: totals are summed from `roundScores` (the store, `finishGame`, and now
   the repository's emitted state). The seat field stays (the rules require 0 on create and older
   prod clients still update it) and can go in a later rules change.
+- 2026-09-28 — Round flow can't double-fire or lock (second audit, PR 2).
+  - Next/Finish set their busy flag before waiting for the last save; `advanceRound(fromRound)`
+    writes `fromRound + 1` with no read, so a repeat (double tap, retry, second tab) writes the
+    same round. The rules already accept an unchanged round.
+  - "No zero" is judged only for the round being closed. Owner's choice: a removed player's
+    scores are still deleted, so an earlier round can lose its zero; it passed when it closed.
+  - `finishGame` checks `canFinishGame` itself, on fresh reads (online) or its state (local), and
+    throws `GameIncompleteError` before writing anything permanent.
+  - Next/Finish wait at most 5 s for a just-saved score. Offline, a Firestore write's promise
+    never settles, so instead of a silent busy button that fires on reconnect they say "no
+    connection". advanceRound is bounded too; retrying it is safe because it is idempotent.

@@ -23,6 +23,7 @@ import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { provideOpenCard } from '@/composables/useSingleOpenCard'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/data/local-game-route'
 import {
+  canCloseRound,
   isEveryRoundScored,
   missingRounds,
   pointsFor,
@@ -31,6 +32,7 @@ import {
   TOTAL_ROUNDS,
 } from '@/lib/game/rules'
 import { isPermissionDenied } from '@/lib/data/write-errors'
+import { TimeoutError, withTimeout } from '@/lib/platform/timeout'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/data/repository'
 import type { ContractRoundNumber, Player, Standing } from '@/lib/game/types'
@@ -156,11 +158,12 @@ const hasEnteredOwnScores = computed(
     missingRounds(myPlayerId.value, roundScores.value, currentRound.value).length === 0,
 )
 /** Exactly one 0 per round: the player who went out. */
-const canAdvance = computed(
-  () =>
-    allPlayersScored.value &&
-    roundsToCheck.value.length === 0 &&
-    roundsWithNoWinner.value.length === 0,
+const canAdvance = computed(() =>
+  canCloseRound(
+    standings.value.map((standing) => standing.player.id),
+    roundScores.value,
+    currentRound.value,
+  ),
 )
 
 /** Scores entered on this device, as "playerId-round": the host sees those numbers on others'
@@ -188,6 +191,8 @@ function isOwnCard(playerId: PlayerId): boolean {
  * so the watcher below stays quiet instead of racing it. */
 let isLocalChangeInFlight = false
 let pendingSave: Promise<void> = Promise.resolve()
+/** How long Next and Finish wait for a just-saved score before saying there's no connection. */
+const PENDING_SAVE_WAIT_MS = 5_000
 /** Shown when Next or Finish is tapped before every score is in. */
 const isWaitingHintShown = ref(false)
 const waitingForNames = computed(() =>
@@ -267,9 +272,12 @@ function canRemove(playerId: PlayerId): boolean {
   return isHost.value && playerId !== myPlayerId.value
 }
 
-/** The rules refuse every write to an expired room; any other failure is worth retrying. */
+/** The rules refuse every write to an expired room; a timeout means no connection; any other
+ * failure is worth retrying. */
 function describeSaveFailure(error: unknown, retryMessage: string): string {
-  return isPermissionDenied(error) ? t('room.saveError.closed') : retryMessage
+  if (isPermissionDenied(error)) return t('room.saveError.closed')
+  if (error instanceof TimeoutError) return t('room.saveError.offline')
+  return retryMessage
 }
 
 /** Resolves false when the score didn't save (the reason is in `saveError`). */
@@ -333,17 +341,26 @@ async function handleRemovePlayer(player: Player): Promise<void> {
   scoreEntryHeading.value?.focus()
 }
 
-/** Waits for a score saved just before the tap. A typed but unsaved number doesn't count. */
+/** Waits, briefly, for a score saved just before the tap. Offline the save never settles, so
+ * this gives up and says so rather than advancing later on its own. */
 async function isReadyToAdvance(): Promise<boolean> {
-  await pendingSave
+  try {
+    await withTimeout(pendingSave, PENDING_SAVE_WAIT_MS)
+  } catch (error) {
+    if (!(error instanceof TimeoutError)) throw error
+    saveError.value = t('room.saveError.offline')
+    return false
+  }
   isWaitingHintShown.value = !allPlayersScored.value
   return canAdvance.value
 }
 
+/** Busy before the first await, so taps made while a save settles can't advance twice. */
 async function handleNextRound(): Promise<void> {
-  if (isAdvancing.value || !(await isReadyToAdvance())) return
+  if (isAdvancing.value) return
   isAdvancing.value = true
   try {
+    if (!(await isReadyToAdvance())) return
     await game.advanceRound()
     saveError.value = ''
   } catch (error) {
@@ -354,9 +371,10 @@ async function handleNextRound(): Promise<void> {
 }
 
 async function handleFinish(): Promise<void> {
-  if (isFinishing.value || !(await isReadyToAdvance())) return
+  if (isFinishing.value) return
   isFinishing.value = true
   try {
+    if (!(await isReadyToAdvance())) return
     // No announcement here: WinnerBanner is its own live region and announces on mount.
     await game.finishGame()
     saveError.value = ''

@@ -17,7 +17,7 @@ photo count reads a picture of the cards left in a hand and suggests the points.
 - Played with 2 decks (sometimes 3), jokers included, so duplicate cards are normal. Scoring
   counts every physical card left in the hand when someone goes out.
 - Card values: 2–9 = 5, 10 = 10, J/Q/K = 10, Ace = 15, Joker = 25. A round score is a multiple
-  of 5, at most 1000. Only the player who went out scores 0: at most one zero per round.
+  of 5, at most 1000. Only the player who went out scores 0: exactly one zero per round.
 - Five fixed rounds, each with a contract: two sets of three; a set and a flush; three sets; a
   flush and two sets; two flushes and a set. A set is 3+ cards of one rank, suits may repeat. A
   flush is 4+ cards in sequence in one suit; an ace is 1 or 14, never both. The contract is a
@@ -44,7 +44,12 @@ photo count reads a picture of the cards left in a hand and suggests the points.
 One score card is open at a time and saves only on ✓ or Enter; a tap outside drops the typed
 number. The scoreboard has five round columns and a total. During a round it shows only who has
 entered (✓, live); numbers, totals and ranking update when the host taps Next (or Finish). Next
-and Finish wait until everyone has a score for every round so far and no round has two zeros.
+and Finish wait until everyone has a score for every round so far, no round has two zeros, and
+the round being closed has its zero (`canCloseRound`; closed rounds aren't judged again, so
+removing a player can't lock the game). Finish is checked once more on fresh data before any
+stats are written (`canFinishGame`). A double tap moves on one round only, and if a just-saved
+score hasn't reached the server within 5 s, Next says there's no connection instead of moving on
+later by itself.
 
 ## Online games
 

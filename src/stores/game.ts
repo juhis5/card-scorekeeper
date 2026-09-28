@@ -230,7 +230,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   async function advanceRound(): Promise<void> {
-    await requireRepository().advanceRound()
+    await requireRepository().advanceRound(state.value.currentRound)
   }
 
   /** Host only: ends the game early for everyone, unrecorded, and leaves it on this device. */

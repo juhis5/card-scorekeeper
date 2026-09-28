@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
+  canCloseRound,
+  canFinishGame,
   roundsWithoutWinner,
   roundsWithSeveralZeros,
   ACE_VALUE,
@@ -318,21 +320,103 @@ describe('roundsWithSeveralZeros', () => {
 })
 
 describe('roundsWithoutWinner', () => {
-  it('finds a round everyone has scored where nobody has 0: someone always goes out', () => {
+  it('flags the round being closed when everyone has scored and nobody has 0', () => {
     const scores: RoundScore[] = [
-      { playerId: 'alice', round: 1, points: 10 },
+      { playerId: 'alice', round: 1, points: 0 },
       { playerId: 'bob', round: 1, points: 20 },
-      { playerId: 'alice', round: 2, points: 0 },
+      { playerId: 'alice', round: 2, points: 10 },
       { playerId: 'bob', round: 2, points: 20 },
     ]
 
-    expect(roundsWithoutWinner(['alice', 'bob'], scores, 2)).toEqual([1])
+    expect(roundsWithoutWinner(['alice', 'bob'], scores, 2)).toEqual([2])
   })
 
   it('waits for a round to be fully scored before calling it', () => {
     const scores: RoundScore[] = [{ playerId: 'alice', round: 1, points: 10 }]
 
     expect(roundsWithoutWinner(['alice', 'bob'], scores, 1)).toEqual([])
+  })
+
+  it('leaves closed rounds alone, so removing the player who went out never locks the game', () => {
+    // Alice went out in round 1 and was removed in round 3, taking her scores with her.
+    const scores: RoundScore[] = [
+      { playerId: 'bob', round: 1, points: 20 },
+      { playerId: 'carol', round: 1, points: 15 },
+      { playerId: 'bob', round: 2, points: 0 },
+      { playerId: 'carol', round: 2, points: 5 },
+      { playerId: 'bob', round: 3, points: 0 },
+      { playerId: 'carol', round: 3, points: 10 },
+    ]
+
+    expect(roundsWithoutWinner(['bob', 'carol'], scores, 3)).toEqual([])
+  })
+})
+
+describe('canCloseRound', () => {
+  const players = ['alice', 'bob']
+
+  it('lets a round close once everyone has scored it and exactly one player has 0', () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 0 },
+      { playerId: 'bob', round: 1, points: 20 },
+    ]
+
+    expect(canCloseRound(players, scores, 1)).toBe(true)
+  })
+
+  it('keeps it open while a score is missing', () => {
+    expect(canCloseRound(players, [{ playerId: 'alice', round: 1, points: 0 }], 1)).toBe(false)
+  })
+
+  it('keeps it open with two zeros', () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 0 },
+      { playerId: 'bob', round: 1, points: 0 },
+    ]
+
+    expect(canCloseRound(players, scores, 1)).toBe(false)
+  })
+
+  it('keeps it open with no zero', () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 5 },
+      { playerId: 'bob', round: 1, points: 20 },
+    ]
+
+    expect(canCloseRound(players, scores, 1)).toBe(false)
+  })
+
+  it("keeps it open while a late joiner's missed round is unscored", () => {
+    const scores: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 0 },
+      { playerId: 'alice', round: 2, points: 0 },
+      { playerId: 'bob', round: 2, points: 20 },
+    ]
+
+    expect(canCloseRound(players, scores, 2)).toBe(false)
+  })
+
+  it('never closes a round nobody is seated for', () => {
+    expect(canCloseRound([], [], 1)).toBe(false)
+  })
+})
+
+describe('canFinishGame', () => {
+  const fullGame: RoundScore[] = ([1, 2, 3, 4, 5] as const).flatMap((round) => [
+    { playerId: 'alice', round, points: 0 },
+    { playerId: 'bob', round, points: 20 },
+  ])
+
+  it('finishes only in the last round, once it can close', () => {
+    expect(canFinishGame(['alice', 'bob'], fullGame, 5)).toBe(true)
+  })
+
+  it('never finishes before the last round, whatever is scored', () => {
+    expect(canFinishGame(['alice', 'bob'], fullGame, 3)).toBe(false)
+  })
+
+  it('never finishes with a seated player who has no scores (a seat that just arrived)', () => {
+    expect(canFinishGame(['alice', 'bob', 'carol'], fullGame, 5)).toBe(false)
   })
 })
 
