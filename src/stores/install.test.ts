@@ -55,6 +55,19 @@ describe('useInstallStore', () => {
     expect(install.canPrompt).toBe(false)
   })
 
+  it('does nothing when asked to install again before the browser offers a new prompt', async () => {
+    const target = fakeWindow()
+    const install = useInstallStore()
+    install.listen(target)
+    const event = installPromptEvent()
+    target.dispatchEvent(event)
+
+    await install.promptInstall()
+    await install.promptInstall()
+
+    expect(event.prompt).toHaveBeenCalledTimes(1)
+  })
+
   it('offers the steps on an iPhone, where no browser has an install prompt', () => {
     const install = useInstallStore()
 

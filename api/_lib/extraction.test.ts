@@ -77,6 +77,14 @@ describe('parseModelCards', () => {
     expect(parseModelCards({ cards: [{ rank: 'Joker', suit: 'clubs', value: 25 }] })).toBeNull()
   })
 
+  it('rejects a card entry that is not an object', () => {
+    expect(parseModelCards({ cards: ['4 of diamonds'] })).toBeNull()
+  })
+
+  it('rejects a card entry that is null', () => {
+    expect(parseModelCards({ cards: [null] })).toBeNull()
+  })
+
   it('rejects the whole batch if any single card is malformed', () => {
     const raw = {
       cards: [

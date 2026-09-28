@@ -8,6 +8,7 @@ import type {
   AddGuestInput,
   AddPlayerInput,
   CreatedGame,
+  CreatedOnlineGame,
   GameConfig,
   GameRepository,
   ReplayableGameRepository,
@@ -711,10 +712,10 @@ class FakeReplayableRepository extends FakeGameRepository implements ReplayableG
   linksWhenCarrying: string[] | null = null
   finishedRoom: FakeReplayableRepository | null = null
 
-  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame> {
+  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedOnlineGame> {
     const created = await this.createGame(config)
     this.callOrder.splice(-1, 1, `createNextGame:${previousRoomCode}`)
-    return created
+    return { ...created, roomCode: created.roomCode ?? 'NEXT2' }
   }
 
   async linkNextRoom(nextRoomCode: string): Promise<void> {
@@ -794,6 +795,12 @@ describe('useGameStore.playAgain online', () => {
     expect(game.status).toBe('finished')
   })
 
+  it('has no next room to offer until the host starts one', async () => {
+    const { game } = await finishedOnlineGame()
+
+    expect(game.nextRoomCode).toBeNull()
+  })
+
   it("exposes the finished room's link to the next room, and whether this device is seated there", async () => {
     const { game, finished } = await finishedOnlineGame()
 
@@ -848,6 +855,18 @@ describe('useGameStore ending a game early', () => {
 
     expect(room.abandonCalls).toBe(0)
     expect(lastRoom()).toBeNull()
+    expect(room.leaveCalls).toBe(1)
+  })
+
+  it('keeps offering a remembered online room when a local game is left', async () => {
+    rememberRoom('ABCDE')
+    const game = useGameStore()
+    const room = new FakeGameRepository()
+    await game.start(room, HOST_CONFIG)
+
+    game.leaveGame()
+
+    expect(lastRoom()).toBe('ABCDE')
     expect(room.leaveCalls).toBe(1)
   })
 

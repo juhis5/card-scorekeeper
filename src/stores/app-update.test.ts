@@ -56,4 +56,12 @@ describe('useAppUpdateStore', () => {
 
     expect(checkForUpdatesRegularly).toHaveBeenCalledWith(registration)
   })
+
+  it('schedules no update checks when the service worker registers without a registration', () => {
+    useAppUpdateStore()
+
+    registerOptions.onRegisteredSW?.('/sw.js', undefined)
+
+    expect(checkForUpdatesRegularly).not.toHaveBeenCalled()
+  })
 })

@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useIdentityStore } from './identity'
 
 beforeEach(() => {
   setActivePinia(createPinia())
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 describe('useIdentityStore.ensureDeviceUuid', () => {
@@ -28,6 +32,17 @@ describe('useIdentityStore.ensureDeviceUuid', () => {
 
     expect(identity.deviceUuid).toBe('uuid-1')
     expect(calls).toBe(1)
+  })
+
+  it('generates a random UUID by default', () => {
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+      '00000000-0000-4000-8000-000000000000',
+    )
+    const identity = useIdentityStore()
+
+    identity.ensureDeviceUuid()
+
+    expect(identity.deviceUuid).toBe('00000000-0000-4000-8000-000000000000')
   })
 })
 

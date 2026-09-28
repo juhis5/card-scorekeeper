@@ -11,6 +11,7 @@ import type {
   AddGuestInput,
   AddPlayerInput,
   CreatedGame,
+  CreatedOnlineGame,
   GameConfig,
   ReplayableGameRepository,
   Unsubscribe,
@@ -65,9 +66,10 @@ class FakeRoom implements ReplayableGameRepository {
     return () => this.listeners.delete(onChange)
   }
 
-  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame> {
+  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedOnlineGame> {
     this.previousRoomCode = previousRoomCode
-    return this.createGame(config)
+    const created = await this.createGame(config)
+    return { ...created, roomCode: created.roomCode ?? 'NEXT2' }
   }
 
   async linkNextRoom(nextRoomCode: string): Promise<void> {

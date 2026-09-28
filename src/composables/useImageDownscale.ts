@@ -43,11 +43,12 @@ export interface UseImageDownscaleDeps {
 function readBlobAsBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
+    // readAsDataURL: `result` is the data URL once `load` fires, and `error` is set by `error`.
     reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
+      const result = String(reader.result)
       resolve(result.slice(result.indexOf(',') + 1))
     }
-    reader.onerror = () => reject(reader.error ?? new Error('failed to read image data'))
+    reader.onerror = () => reject(reader.error)
     reader.readAsDataURL(blob)
   })
 }

@@ -26,8 +26,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint:check # eslint without --fix, so fixable violations fail too
       - run: pnpm format:check
-      - run: pnpm test:run
-      - run: pnpm test:api # fully mocked, no emulator or credentials
+      # Unit and api suites (fully mocked, no emulator or credentials), with the coverage gates.
+      - run: pnpm test:coverage
       - run: pnpm test:api-load # compiles /api like Vercel and imports it in Node's ESM loader
       - run: pnpm build # typecheck + build
 

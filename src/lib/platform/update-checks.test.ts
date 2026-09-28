@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { checkForUpdatesRegularly, UPDATE_CHECK_INTERVAL_MS } from './update-checks'
 
 function fakePage({ visible = true, online = true } = {}) {
@@ -12,6 +12,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('checkForUpdatesRegularly', () => {
@@ -60,5 +61,41 @@ describe('checkForUpdatesRegularly', () => {
     await Promise.resolve()
 
     expect(registration.update).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('checkForUpdatesRegularly, on the real page', () => {
+  it('watches the document and the device connection when none are given', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const registration = { update: vi.fn().mockResolvedValue(undefined) }
+    onTestFinished(checkForUpdatesRegularly(registration))
+
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(registration.update).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips a check while the device reports it is offline', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    const registration = { update: vi.fn().mockResolvedValue(undefined) }
+    onTestFinished(checkForUpdatesRegularly(registration))
+
+    vi.advanceTimersByTime(UPDATE_CHECK_INTERVAL_MS)
+
+    expect(registration.update).not.toHaveBeenCalled()
+  })
+
+  it('stops listening to the document when told to', () => {
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    const registration = { update: vi.fn().mockResolvedValue(undefined) }
+    const stop = checkForUpdatesRegularly(registration)
+
+    stop()
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(registration.update).not.toHaveBeenCalled()
   })
 })

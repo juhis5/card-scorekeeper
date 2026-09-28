@@ -2,7 +2,7 @@
  * A round's numbers show only once it's complete; until then the board only says who has entered.
  * Totals and ranking count revealed rounds only, so they change per round, not with every score.
  */
-import { CONTRACTS, pointsFor, standings, TOTAL_ROUNDS } from './rules'
+import { CONTRACTS, pointsFor, rankByTotal, TOTAL_ROUNDS } from './rules'
 import type { ContractRoundNumber, Player, RoundScore } from './types'
 
 export type RoundCell = { kind: 'points'; points: number } | { kind: 'entered' } | { kind: 'empty' }
@@ -43,15 +43,16 @@ export function boardRows(
   completedRounds: number,
 ): BoardRow[] {
   const rows = players.map((player) => rowFor(player, roundScores, completedRounds))
-  const rowsById = new Map(rows.map((row) => [row.player.id, row]))
 
-  const ranked = standings(
-    rows.filter((row) => row.isComplete).map((row) => ({ ...row.player, totalScore: row.total })),
-  ).map(({ player, placement }): BoardRow => {
-    const row = rowsById.get(player.id)
-    if (!row) throw new Error(`boardRows: no row for ${player.id}`)
-    return { player: row.player, cells: row.cells, total: row.total, placement }
-  })
+  const ranked = rankByTotal(
+    rows.filter((row) => row.isComplete),
+    (row) => row.total,
+  ).map(({ item: row, placement }): BoardRow => ({
+    player: row.player,
+    cells: row.cells,
+    total: row.total,
+    placement,
+  }))
 
   const unranked = rows
     .filter((row) => !row.isComplete)

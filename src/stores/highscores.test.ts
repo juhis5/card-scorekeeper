@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 const ensureSignedInMock = vi.fn()
@@ -114,6 +114,11 @@ beforeEach(() => {
   ensureSignedInMock.mockResolvedValue(ME)
 })
 
+// In afterEach, so a failing assertion can't leave `navigator` stubbed.
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
 describe('useHighscoresStore, game records', () => {
   it('loads the best games, the hall of shame and the biggest rounds', async () => {
     installBoard()
@@ -196,6 +201,16 @@ describe('useHighscoresStore, player lists', () => {
 })
 
 describe('useHighscoresStore, failures', () => {
+  it('says so without reading the board when the device is offline', async () => {
+    vi.stubGlobal('navigator', { onLine: false })
+    const highscores = useHighscoresStore()
+
+    await expect(highscores.load()).resolves.toBeUndefined()
+
+    expect(highscores.status).toBe('error')
+    expect(getDocsMock).not.toHaveBeenCalled()
+  })
+
   it('says so when the board cannot be read, and a retry can succeed', async () => {
     getDocsMock.mockRejectedValueOnce(new Error('unavailable'))
     const highscores = useHighscoresStore()

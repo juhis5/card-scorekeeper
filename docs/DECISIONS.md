@@ -573,3 +573,10 @@ it is.
     truncates (`xs` breakpoint, 24rem).
   - Reopening an online room offline on a cold cache says "No connection" and retries on the
     `online` event, instead of "This room isn't open on this device".
+- 2026-09-28 — Coverage gates (owner's target, second audit PR 8). 100% lines, branches,
+  functions and statements on `src/lib`, `src/stores`, `src/composables` and `api/_lib`; a floor
+  that only rises on components and views; enforced in CI by `pnpm test:coverage`. The owner
+  asked for 100% and invited pushback: 100% everywhere would mostly buy tests that execute
+  template lines without checking them, so the UI gets a ratchet instead. Excluded, with the
+  reason in `vitest.config.ts`: the owned shadcn `ui/` copies and pure SDK/runtime wiring that
+  the emulator suites, `test:api-load` and production exercise.

@@ -13,7 +13,7 @@ import {
   standings as standingsFor,
   winners as winnersFor,
 } from '@/lib/game/rules'
-import { hasPersistedGame, LocalGameRepository } from '@/lib/data/local-repository'
+import { LocalGameRepository } from '@/lib/data/local-repository'
 import { forgetRoom, rememberRoom } from '@/lib/data/last-room'
 import { boardRows } from '@/lib/game/scoreboard'
 import type { KeyValueStorage } from '@/lib/data/local-repository'
@@ -138,10 +138,8 @@ export const useGameStore = defineStore('game', () => {
     const finishedRoomCode = roomCode.value
     if (finishedRoomCode && isReplayable(finished) && isReplayable(nextRepo)) {
       const created = await nextRepo.createNextGame(config, finishedRoomCode)
-      if (created.roomCode) {
-        // A refused link (an expired room) doesn't stop the next game: its code is on screen.
-        await finished.linkNextRoom(created.roomCode).catch(() => undefined)
-      }
+      // A refused link (an expired room) doesn't stop the next game: its code is on screen.
+      await finished.linkNextRoom(created.roomCode).catch(() => undefined)
       // Nor a failed carry: the link is set once, so a retry would point the others at a room
       // the host isn't in. Their phones still offer "Join the next game".
       await nextRepo.carrySeats().catch(() => undefined)
@@ -197,7 +195,6 @@ export const useGameStore = defineStore('game', () => {
   /** Resumes the saved local game after a reload. False when busy or nothing is saved. */
   function resume(deps: { storage?: KeyValueStorage } = {}): boolean {
     if (repository) return false
-    if (!hasPersistedGame(deps.storage)) return false
 
     const repo = new LocalGameRepository({ storage: deps.storage })
     const resumed = repo.getResumeInfo()

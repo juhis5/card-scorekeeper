@@ -1,5 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { usePhotoCount } from './usePhotoCount'
+
+const { auth } = vi.hoisted(() => ({
+  auth: { currentUser: null as { getIdToken: () => Promise<string> } | null },
+}))
+vi.mock('@/lib/data/firebase', () => ({ getFirebaseAuth: () => auth }))
+
+afterEach(() => {
+  auth.currentUser = null
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 const DOWNSCALED = { base64: 'ZmFrZQ==', mimeType: 'image/jpeg' }
 
@@ -109,7 +120,48 @@ describe('usePhotoCount().countCards, authentication', () => {
   })
 })
 
+describe('usePhotoCount().countCards, the signed-in Firebase user by default', () => {
+  it("sends the signed-in user's ID token as the Bearer token", async () => {
+    auth.currentUser = { getIdToken: async () => 'firebase-id-token' }
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { cards: [], total: 0 }))
+    const { countCards } = usePhotoCount({ downscale: async () => DOWNSCALED, fetchImpl })
+
+    await countCards('ABCDE', makeFile())
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/count',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer firebase-id-token' }),
+      }),
+    )
+  })
+
+  it('returns unauthenticated without calling fetch when nobody is signed in', async () => {
+    const fetchImpl = vi.fn()
+    const { countCards } = usePhotoCount({ downscale: async () => DOWNSCALED, fetchImpl })
+
+    const result = await countCards('ABCDE', makeFile())
+
+    expect(result).toEqual({ ok: false, reason: 'unauthenticated' })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+})
+
 describe('usePhotoCount().countCards, image downscaling', () => {
+  it('downscales the photo itself by default, reporting image-processing when it cannot decode it', async () => {
+    const createImageBitmap = vi.fn().mockRejectedValue(new Error('undecodable image'))
+    vi.stubGlobal('createImageBitmap', createImageBitmap)
+    const file = makeFile()
+    const fetchImpl = vi.fn()
+    const { countCards } = usePhotoCount({ getIdToken: async () => 'id-token-abc', fetchImpl })
+
+    const result = await countCards('ABCDE', file)
+
+    expect(createImageBitmap).toHaveBeenCalledWith(file, expect.anything())
+    expect(result).toEqual({ ok: false, reason: 'image-processing' })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
   it('returns an image-processing failure when downscaling rejects', async () => {
     const fetchImpl = vi.fn()
     const { countCards } = usePhotoCount({
@@ -160,6 +212,30 @@ describe('usePhotoCount().countCards, HTTP failure statuses', () => {
     expect(result).toEqual({ ok: false, reason: 'invalid-response' })
   })
 
+  it('returns invalid-response when the success body is JSON null', async () => {
+    const { countCards } = usePhotoCount({
+      getIdToken: async () => 'id-token-abc',
+      downscale: async () => DOWNSCALED,
+      fetchImpl: async () => jsonResponse(200, null),
+    })
+
+    const result = await countCards('ABCDE', makeFile())
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-response' })
+  })
+
+  it('returns invalid-response when a listed card is not an object', async () => {
+    const { countCards } = usePhotoCount({
+      getIdToken: async () => 'id-token-abc',
+      downscale: async () => DOWNSCALED,
+      fetchImpl: async () => jsonResponse(200, { cards: [null], total: 0 }),
+    })
+
+    const result = await countCards('ABCDE', makeFile())
+
+    expect(result).toEqual({ ok: false, reason: 'invalid-response' })
+  })
+
   it('returns invalid-response when the success body is not valid JSON', async () => {
     const { countCards } = usePhotoCount({
       getIdToken: async () => 'id-token-abc',
@@ -175,6 +251,48 @@ describe('usePhotoCount().countCards, HTTP failure statuses', () => {
 })
 
 describe('usePhotoCount().countCards, network failures', () => {
+  it('posts with the browser fetch by default', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { cards: [], total: 0 }))
+    vi.stubGlobal('fetch', fetchImpl)
+    const { countCards } = usePhotoCount({
+      getIdToken: async () => 'id-token-abc',
+      downscale: async () => DOWNSCALED,
+    })
+
+    const result = await countCards('ABCDE', makeFile())
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      '/api/count',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(result).toEqual({ ok: true, cards: [], total: 0 })
+  })
+
+  it('aborts a request still unanswered after 20 seconds, not before, and reports a timeout', async () => {
+    vi.useFakeTimers()
+    const abortError = Object.assign(new Error('The operation was aborted'), {
+      name: 'AbortError',
+    })
+    let signal: AbortSignal | undefined
+    const fetchImpl = (_url: RequestInfo | URL, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        signal = init?.signal ?? undefined
+        signal?.addEventListener('abort', () => reject(abortError))
+      })
+    const { countCards } = usePhotoCount({
+      getIdToken: async () => 'id-token-abc',
+      downscale: async () => DOWNSCALED,
+      fetchImpl,
+    })
+
+    const outcome = countCards('ABCDE', makeFile())
+    await vi.advanceTimersByTimeAsync(19_999)
+    expect(signal?.aborted).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(1)
+    expect(await outcome).toEqual({ ok: false, reason: 'timeout' })
+  })
+
   it('maps an aborted request to a timeout failure', async () => {
     const abortError = Object.assign(new Error('The operation was aborted'), {
       name: 'AbortError',

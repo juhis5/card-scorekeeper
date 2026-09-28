@@ -51,6 +51,7 @@ import type {
   AddGuestInput,
   AddPlayerInput,
   CreatedGame,
+  CreatedOnlineGame,
   GameConfig,
   PlayerId,
   ReplayableGameRepository,
@@ -162,7 +163,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
 
   /** The room records the finished one, which is what lets the host seat its players here (see
    * firestore.rules' isCarriedSeat). */
-  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame> {
+  async createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedOnlineGame> {
     const created = await this.createRoom(config, { previousRoomCode })
     this.previousRoomCode = previousRoomCode
     return created
@@ -171,46 +172,53 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
   private async createRoom(
     config: GameConfig,
     extraFields: Pick<RoomDocData, 'previousRoomCode'>,
-  ): Promise<CreatedGame> {
+  ): Promise<CreatedOnlineGame> {
     await ensureSignedIn(this.auth)
     const hostUid = this.requireUid()
-
-    for (let attempt = 1; attempt <= MAX_CREATE_GAME_ATTEMPTS; attempt += 1) {
-      const roomCode = this.generateRoomCode()
-      const nowMs = this.now()
+    for (let attempt = 1; attempt < MAX_CREATE_GAME_ATTEMPTS; attempt += 1) {
       try {
-        await withTimeout(
-          setDoc(doc(this.db, `room/${roomCode}`), {
-            code: roomCode,
-            status: 'waiting',
-            currentRound: 1,
-            hostUid,
-            createdAt: Timestamp.fromMillis(nowMs),
-            expiresAt: Timestamp.fromMillis(nowMs + ROOM_TTL_MS),
-            ...extraFields,
-          }),
-          this.writeTimeoutMs,
-        )
-        // After the room, not batched with it: the seat rule get()s the room, and get() doesn't
-        // see a sibling write in the same batch.
-        await withTimeout(
-          this.takeSeat(roomCode, hostUid, {
-            name: cleanPlayerName(config.hostDisplayName),
-            deviceUuid: config.hostDeviceUuid,
-            joinOrder: 0,
-          }),
-          this.writeTimeoutMs,
-        )
-        this.roomCode = roomCode
-        return { gameId: roomCode, roomCode, hostPlayerId: hostUid }
+        return await this.createRoomWithFreshCode(config, extraFields, hostUid)
       } catch (error) {
         // A code collision shows up as permission-denied: an existing room makes this an update,
         // which only its host may do. Retrying beats pre-reading, which would race anyway.
-        if (!isPermissionDenied(error) || attempt === MAX_CREATE_GAME_ATTEMPTS) throw error
+        if (!isPermissionDenied(error)) throw error
       }
     }
-    // Unreachable: the last attempt returns or throws.
-    throw new Error('createGame: exhausted room-code attempts')
+    // The last attempt passes any refusal on.
+    return this.createRoomWithFreshCode(config, extraFields, hostUid)
+  }
+
+  private async createRoomWithFreshCode(
+    config: GameConfig,
+    extraFields: Pick<RoomDocData, 'previousRoomCode'>,
+    hostUid: string,
+  ): Promise<CreatedOnlineGame> {
+    const roomCode = this.generateRoomCode()
+    const nowMs = this.now()
+    await withTimeout(
+      setDoc(doc(this.db, `room/${roomCode}`), {
+        code: roomCode,
+        status: 'waiting',
+        currentRound: 1,
+        hostUid,
+        createdAt: Timestamp.fromMillis(nowMs),
+        expiresAt: Timestamp.fromMillis(nowMs + ROOM_TTL_MS),
+        ...extraFields,
+      }),
+      this.writeTimeoutMs,
+    )
+    // After the room, not batched with it: the seat rule get()s the room, and get() doesn't
+    // see a sibling write in the same batch.
+    await withTimeout(
+      this.takeSeat(roomCode, hostUid, {
+        name: cleanPlayerName(config.hostDisplayName),
+        deviceUuid: config.hostDeviceUuid,
+        joinOrder: 0,
+      }),
+      this.writeTimeoutMs,
+    )
+    this.roomCode = roomCode
+    return { gameId: roomCode, roomCode, hostPlayerId: hostUid }
   }
 
   async addPlayer(input: AddPlayerInput): Promise<PlayerId> {

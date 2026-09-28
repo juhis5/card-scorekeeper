@@ -68,6 +68,13 @@ describe('readPendingResults', () => {
     expect(readPendingResults(storage)).toEqual([])
   })
 
+  it('returns an empty array when the stored JSON is not a list', () => {
+    const storage = makeMemoryStorage()
+    storage.setItem(PENDING_RESULTS_STORAGE_KEY, JSON.stringify(pendingResult('g1')))
+
+    expect(readPendingResults(storage)).toEqual([])
+  })
+
   it('drops malformed entries mixed into an otherwise-valid stored array', () => {
     const storage = makeMemoryStorage()
     const valid = pendingResult('g1')

@@ -179,6 +179,14 @@ describe('handleCountRequest', () => {
     expect(result.status).toBe(502)
   })
 
+  it('reports a Gemini client that throws a non-Error value as 502 model_unavailable', async () => {
+    const deps = createDeps({
+      geminiClient: { extractCards: vi.fn().mockRejectedValue('socket hang up') },
+    })
+    const result = await handleCountRequest(validRequest(), deps)
+    expect(result).toEqual({ status: 502, body: { error: 'model_unavailable' } })
+  })
+
   it('returns a clean error for malformed model output', async () => {
     const deps = createDeps({
       geminiClient: { extractCards: vi.fn().mockResolvedValue('not valid json') },

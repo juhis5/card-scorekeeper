@@ -29,6 +29,28 @@ function sentRequest() {
 }
 
 describe('createGeminiClient', () => {
+  it("returns the model's raw text for the handler to parse", async () => {
+    generateContentMock.mockResolvedValue({ text: '{"cards":[],"total":0}' })
+
+    const text = await createGeminiClient('key', 'gemini-3.8-flash').extractCards(
+      'aGVsbG8=',
+      'image/jpeg',
+    )
+
+    expect(text).toBe('{"cards":[],"total":0}')
+  })
+
+  it('returns an empty string when the response carries no text', async () => {
+    generateContentMock.mockResolvedValue({ text: undefined })
+
+    const text = await createGeminiClient('key', 'gemini-3.8-flash').extractCards(
+      'aGVsbG8=',
+      'image/jpeg',
+    )
+
+    expect(text).toBe('')
+  })
+
   it('uses the model it was configured with', async () => {
     await createGeminiClient('key', 'gemini-3.8-flash').extractCards('aGVsbG8=', 'image/jpeg')
 

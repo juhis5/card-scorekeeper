@@ -117,4 +117,15 @@ describe('toRoomSnapshot', () => {
     const playerDoc = { exists: false }
     expect(toRoomSnapshot(roomDoc, playerDoc).isMember).toBe(false)
   })
+
+  it('maps a room doc that exists but has no data as having no status or expiry', () => {
+    const roomDoc = { exists: true, data: () => undefined }
+    const playerDoc = { exists: true }
+    expect(toRoomSnapshot(roomDoc, playerDoc)).toEqual({
+      exists: true,
+      status: null,
+      expiresAtMs: null,
+      isMember: true,
+    })
+  })
 })

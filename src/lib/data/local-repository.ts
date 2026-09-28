@@ -304,9 +304,8 @@ export class LocalGameRepository implements GameRepository {
     const points = roundScores
       .filter((score) => score.playerId === host.id)
       .map((score) => score.points)
-    // No rounds shouldn't happen, but mustn't throw.
-    const { bestRound, worstRound } =
-      points.length > 0 ? bestAndWorstRound(points) : { bestRound: 0, worstRound: 0 }
+    // canFinishGame already required a score for every round, the host's included.
+    const { bestRound, worstRound } = bestAndWorstRound(points)
 
     return {
       gameId: this.game.gameId,

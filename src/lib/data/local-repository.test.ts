@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   hasPersistedGame,
   hasUnfinishedPersistedGame,
@@ -108,6 +108,20 @@ describe('LocalGameRepository.subscribe', () => {
 
     expect(emissions).toHaveLength(2)
     expect(emissions[1]?.players.map((p) => p.name)).toEqual(['Host', 'Alice'])
+  })
+
+  it('stops emitting to a listener that unsubscribed, while others keep hearing changes', async () => {
+    const repository = makeRepository()
+    await repository.createGame(HOST_CONFIG)
+    const unsubscribed: GameState[] = []
+    const unsubscribe = repository.subscribe((state) => unsubscribed.push(state))
+    const stillSubscribed = recordEmissions(repository)
+
+    unsubscribe()
+    await repository.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+
+    expect(unsubscribed).toHaveLength(1)
+    expect(stillSubscribed).toHaveLength(2)
   })
 })
 
@@ -595,5 +609,51 @@ describe('LocalGameRepository.leave', () => {
     await repository.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
     expect(emissions).toHaveLength(countAfterSubscribe)
+  })
+})
+
+describe('LocalGameRepository without injected deps', () => {
+  afterEach(() => {
+    localStorage.clear()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it("saves to the browser's localStorage, so a new repository resumes the game", async () => {
+    const created = await new LocalGameRepository().createGame(HOST_CONFIG)
+
+    expect(hasPersistedGame()).toBe(true)
+    expect(new LocalGameRepository().getResumeInfo()).toEqual({
+      gameId: created.gameId,
+      hostPlayerId: created.hostPlayerId,
+    })
+  })
+
+  it('gives the game and the host seat ids from crypto.randomUUID', async () => {
+    vi.spyOn(crypto, 'randomUUID')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000001')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000002')
+
+    const created = await new LocalGameRepository().createGame(HOST_CONFIG)
+
+    expect(created.gameId).toBe('00000000-0000-4000-8000-000000000001')
+    expect(created.hostPlayerId).toBe('00000000-0000-4000-8000-000000000002')
+  })
+
+  it('stamps the finished game with the real clock and clears the unfinished game', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-01T12:00:00.000Z'))
+    const repository = new LocalGameRepository()
+    const created = await repository.createGame(HOST_CONFIG)
+    for (const round of ALL_ROUNDS) {
+      await repository.setRoundScore({ playerId: created.hostPlayerId, round, points: 0 })
+      if (round < 5) await repository.advanceRound(round)
+    }
+    expect(hasUnfinishedPersistedGame()).toBe(true)
+
+    const result = await repository.finishGame()
+
+    expect(result.finishedAt).toBe('2026-03-01T12:00:00.000Z')
+    expect(hasUnfinishedPersistedGame()).toBe(false)
   })
 })

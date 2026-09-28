@@ -82,6 +82,23 @@ describe('boardRows', () => {
     expect(rows[2]?.cells[0]).toEqual({ kind: 'empty' })
   })
 
+  it('orders the players with a revealed round still to fill by their total, lowest first', () => {
+    const lateJoiners: RoundScore[] = [
+      { playerId: 'alice', round: 1, points: 0 },
+      { playerId: 'alice', round: 2, points: 10 },
+      { playerId: 'bob', round: 2, points: 30 },
+      { playerId: 'carol', round: 2, points: 5 },
+    ]
+
+    const rows = boardRows([ALICE, BOB, CAROL], lateJoiners, 2)
+
+    expect(rows.map((row) => [row.player.id, row.total, row.placement])).toEqual([
+      ['alice', 10, 1],
+      ['carol', 5, null],
+      ['bob', 30, null],
+    ])
+  })
+
   it('ranks everyone first at 0 before any round is revealed', () => {
     const rows = boardRows([ALICE, BOB], scores, 0)
 

@@ -35,4 +35,19 @@ describe('useGameConnectivity, broken Firebase setup (CLAUDE.md "offline-capable
     expect(mode).toEqual({ kind: 'unreachable' })
     vi.unstubAllGlobals()
   })
+
+  it('reports unreachable for Play again rather than starting a local game', async () => {
+    vi.stubGlobal('navigator', { onLine: true })
+
+    const mode = await useGameConnectivity().nextRoomRepository()
+
+    expect(mode).toEqual({ kind: 'unreachable' })
+    vi.unstubAllGlobals()
+  })
+
+  it('returns no repository to resume a room with, instead of throwing', async () => {
+    const repository = await useGameConnectivity().resumeRepository('7K4RQ')
+
+    expect(repository).toBeNull()
+  })
 })

@@ -87,4 +87,19 @@ describe('useSingleOpenCard', () => {
 
     expect(first.onDismiss).not.toHaveBeenCalled()
   })
+
+  it('still dismisses on a tap outside for a card shown outside a room', async () => {
+    const cards: Record<string, Card> = {}
+    render(
+      defineComponent({
+        setup: () => () => h('main', [h(card('lone', cards)), h('button', 'Elsewhere')]),
+      }),
+    )
+    const { lone } = cards as Record<'lone', Card>
+    lone.isOpen.value = true
+
+    await fireEvent.pointerUp(screen.getByText('Elsewhere'))
+
+    expect(lone.onDismiss).toHaveBeenCalledTimes(1)
+  })
 })

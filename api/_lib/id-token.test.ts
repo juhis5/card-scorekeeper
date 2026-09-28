@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   createLocalJWKSet,
   exportJWK,
@@ -62,6 +62,10 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
   )
 }
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 describe('createIdTokenVerifier', () => {
   it("returns the token's user id for a valid Firebase ID token", async () => {
     const verify = verifier()
@@ -103,6 +107,16 @@ describe('createIdTokenVerifier', () => {
       .setExpirationTime(NOW_SECONDS + 3600)
       .sign(secret)
     expect(await rejection(verifier()(token))).toMatchObject({ code: 'auth/invalid-id-token' })
+  })
+
+  it('checks expiry against the system clock when no clock is injected', async () => {
+    const token = await signToken()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date((NOW_SECONDS + 7200) * 1000))
+
+    const verify = createIdTokenVerifier({ projectId: PROJECT_ID, keys })
+
+    expect(await rejection(verify(token))).toMatchObject({ code: 'auth/id-token-expired' })
   })
 
   it('rethrows a failure to fetch the public keys, so it surfaces as a server error', async () => {
