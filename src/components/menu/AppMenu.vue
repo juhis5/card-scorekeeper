@@ -43,6 +43,7 @@ const isOpen = ref(false)
 const pages = [
   { name: 'home', labelKey: 'app.menu.home' },
   { name: 'stats', labelKey: 'nav.stats' },
+  { name: 'highscores', labelKey: 'stats.highscores.heading' },
   { name: 'rules', labelKey: 'rules.heading' },
 ] as const
 

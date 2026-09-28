@@ -55,7 +55,6 @@ test.describe('a full online game', () => {
         .getByText('Games played', { exact: true })
         .locator('xpath=following-sibling::dd[1]')
       await expect(gamesPlayed).toHaveText('1')
-      // Scoped to Head-to-head: the highscores below list players from every game.
       await expect(
         hostPage.getByRole('region', { name: 'Head-to-head' }).getByRole('row', { name: /Alice/ }),
       ).toBeVisible()

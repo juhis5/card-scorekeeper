@@ -478,3 +478,7 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     unbounded upload would stay "in flight" and block every later try.
   - A refused game gets Yritä uudelleen, not only Poista: a refusal can be the rules being behind
     (a release not yet deployed), so after a rules fix it may go through. Poista asks first.
+- 2026-09-28 — Ennätykset got its own page (`/highscores`, a menu row after Tilastot). Tilastot
+  had grown to caveats, upload notices, your record, head-to-head and seven global lists; now it
+  is this device only, and "Tietoa tilastoista" is an ⓘ by the heading (`InfoPopover`, shared
+  with the V–H–T legend).

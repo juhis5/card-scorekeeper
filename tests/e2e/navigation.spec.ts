@@ -34,6 +34,14 @@ test.describe('Back and Continue game', () => {
     await expect(page.getByRole('img', { name: 'joker' })).toBeVisible()
   })
 
+  test('the menu opens the highscores on their own page', async ({ page }) => {
+    await page.goto('/')
+    await openFromMenu(page, 'Highscores')
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Highscores' })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'Highscores' })).toBeVisible()
+  })
+
   test('Back from a page opened directly goes Home instead of leaving the app', async ({
     page,
   }) => {

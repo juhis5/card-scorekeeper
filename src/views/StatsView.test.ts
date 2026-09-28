@@ -109,8 +109,7 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
 }
 
 function renderStatsView() {
-  // The highscores load on their own (components/stats/HighscoresSection.test.ts).
-  return render(StatsView, { global: { plugins: [i18n], stubs: { HighscoresSection: true } } })
+  return render(StatsView, { global: { plugins: [i18n] } })
 }
 
 beforeEach(() => {
@@ -145,11 +144,20 @@ describe('StatsView', () => {
     expect(load).toHaveBeenCalledTimes(2)
   })
 
-  it('always states the identity caveats, regardless of load state', () => {
+  it('keeps the identity caveats behind the ⓘ by the heading, regardless of load state', async () => {
     ensureSignedInMock.mockReturnValue(new Promise(() => {})) // never resolves, so it stays loading
     renderStatsView()
+    expect(screen.queryByText(/new device or cleared browser storage starts fresh/i)).toBeNull()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'About these stats' }))
 
     expect(screen.getByText(/new device or cleared browser storage starts fresh/i)).toBeTruthy()
+  })
+
+  it('leaves the highscores to their own page', () => {
+    renderStatsView()
+
+    expect(screen.queryByRole('group', { name: 'Highscores' })).toBeNull()
   })
 
   it('shows a loading status while the store is fetching', async () => {

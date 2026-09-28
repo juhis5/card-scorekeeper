@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import RecordLegend from '@/components/stats/RecordLegend.vue'
+import InfoPopover from '@/components/shared/InfoPopover.vue'
 import type { OpponentRecord } from '@/stores/stats'
 
 const { opponents } = defineProps<{ opponents: OpponentRecord[] }>()
@@ -33,7 +33,10 @@ const { t, n } = useI18n()
           <TableHead scope="col" class="text-right">
             <span class="inline-flex items-center justify-end gap-1">
               {{ t('stats.headToHead.recordHeader') }}
-              <RecordLegend />
+              <InfoPopover
+                :label="t('stats.headToHead.legendLabel')"
+                :text="t('stats.headToHead.legend')"
+              />
             </span>
           </TableHead>
         </TableRow>

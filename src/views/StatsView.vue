@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * This device's record, head-to-head per opponent, then the global highscores. The identity
- * caveats show whatever the load state, since they apply either way.
+ * This device's record and head-to-head per opponent. The identity caveats sit behind the ⓘ by
+ * the heading whatever the load state, since they apply either way. Highscores have their own page.
  */
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
+import InfoPopover from '@/components/shared/InfoPopover.vue'
 import HeadToHeadList from '@/components/stats/HeadToHeadList.vue'
-import HighscoresSection from '@/components/stats/HighscoresSection.vue'
 import ResultQueueNotice from '@/components/stats/ResultQueueNotice.vue'
 import StatSummary from '@/components/stats/StatSummary.vue'
 import { Button } from '@/components/ui/button'
@@ -31,21 +31,16 @@ onMounted(() => {
 
 <template>
   <main class="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 p-4">
-    <h1
-      id="main-heading"
-      tabindex="-1"
-      class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
-    >
-      {{ t('stats.heading') }}
-    </h1>
-
-    <section
-      aria-labelledby="stats-caveats-heading"
-      class="bg-muted border-border rounded-lg border px-4 py-3 text-sm"
-    >
-      <h2 id="stats-caveats-heading" class="font-semibold">{{ t('stats.caveats.heading') }}</h2>
-      <p class="text-muted-foreground mt-1">{{ t('stats.caveats.body') }}</p>
-    </section>
+    <div class="flex items-center justify-between gap-2">
+      <h1
+        id="main-heading"
+        tabindex="-1"
+        class="focus-visible:ring-ring rounded-sm text-2xl font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {{ t('stats.heading') }}
+      </h1>
+      <InfoPopover :label="t('stats.caveats.heading')" :text="t('stats.caveats.body')" />
+    </div>
 
     <ResultQueueNotice @uploaded="statsStore.load()" />
 
@@ -70,7 +65,5 @@ onMounted(() => {
         <HeadToHeadList :opponents="opponents" />
       </template>
     </template>
-
-    <HighscoresSection />
   </main>
 </template>
