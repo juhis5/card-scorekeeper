@@ -1,6 +1,6 @@
 ---
 name: component-library
-description: How to use shadcn-vue (Reka UI + Tailwind v4) as the component library — setup, adding components, when to use a library component vs build custom, and keeping a11y intact. Read before building any UI element that has a common primitive (dialog, sheet, toast, select, switch, tabs, table, tooltip, dropdown).
+description: How to use shadcn-vue (Reka UI + Tailwind v4) as the component library — setup, adding components, when to use a library component vs build custom, and keeping a11y intact. Read before building any UI element that has a common primitive (dialog, sheet, popover, radio group, switch, segmented toggle, table, select, dropdown).
 ---
 
 # Component library — shadcn-vue (Reka UI + Tailwind v4)
@@ -13,27 +13,31 @@ After `create-vue` + Tailwind v4 are in place:
 
 ```bash
 pnpm dlx shadcn-vue@latest init          # sets components.json, lib/utils.ts (cn), the CSS theme
-pnpm dlx shadcn-vue@latest add button dialog sheet input label sonner table
+pnpm dlx shadcn-vue@latest add <name>              # one at a time, as needed
 ```
 
 - Verify the current commands/flags against shadcn-vue docs — versions here are directional ("use latest").
 - Components land in `src/components/ui/`. The `cn()` helper (clsx + tailwind-merge) lives in `src/lib/utils.ts` (kept at the top of `lib/`, where the shadcn CLI expects it).
-- The theme (CSS variables in `:root` + `.dark`) is set here — see the `design-system` skill for our dark-first values.
+- The theme (CSS variables in `src/assets/main.css`) is ours now — see the `design-system` skill. Never let `add` overwrite `button/` (customized).
 
 ## The rule: reach for a primitive first
 
 Before hand-building anything, check if it's a solved primitive. Add it, don't rebuild it:
 
-| Need | shadcn-vue component |
-|------|----------------------|
-| Confirm / destructive action (remove player, end game) | `AlertDialog` |
-| Bottom sheet on mobile | `Sheet` (side="bottom") — prefer over `Dialog` on phones |
-| Toasts (see `error-ux`) | `Sonner` (or `Toast`) |
-| Theme toggle (see `design-system`) | `Switch` or `Button` |
-| The scoreboard | `Table` |
-| Round navigation (1→5) | `Tabs` / stepper |
-| Field + validation (room code, score) | `Input` + `Label` + form field |
-| Confirm photo-count result | `Dialog` / `Sheet` with the card list |
+What's in the repo (`src/components/ui/`): `alert-dialog button card input label popover radio-group sheet switch table`, plus two shared components in `src/components/shared/`.
+
+| Need | Component |
+|------|-----------|
+| Confirm / destructive action (remove player, end or leave a game) | `AlertDialog` |
+| Mobile sheet (photo-count confirm, Enter all, invite, menu) | `Sheet` — there is no `Dialog`; use a `Sheet` or `AlertDialog` |
+| The scoreboard, head-to-head, highscore lists | `Table` |
+| Field + validation (room code, name, score) | `Input` + `Label` |
+| On/off setting ("Vain tällä laitteella") | `Switch` |
+| Pick one of several (theme picker) | `RadioGroup` |
+| Two-way view switch (Liity \| Uusi peli, Pelaajat \| Pelit) | `shared/SegmentedToggle.vue` (pressed buttons in a labelled group; the shadcn tabs were removed) |
+| An ⓘ explanation | `shared/InfoPopover.vue` (over `Popover`) |
+| Home / Join form surfaces | `Card` |
+| Error / status feedback (see `error-ux`) | inline `role="alert"` / `role="status"` text; no toast library |
 
 ## Custom components compose primitives
 
@@ -56,4 +60,4 @@ Before hand-building anything, check if it's a solved primitive. Add it, don't r
 
 ## This project (card-scorekeeper)
 
-Likely set: `button input label table sheet dialog alert-dialog sonner switch tabs`. Scoreboard = `Table`; round nav = `Tabs`; photo-count confirm = `Dialog`/`Sheet`; remove-player/end-game = `AlertDialog`; sync/error feedback = `Sonner`; theme toggle = `Switch`. The offline banner is custom (styled from `design-system` tokens) but announced per `a11y-mobile`.
+Scoreboard = `Table`; photo-count confirm = `PhotoCountSheet` (a `Sheet`); remove-player/end-game = `AlertDialog`; theme picker = `RadioGroup`; view toggles = `SegmentedToggle`; error feedback = inline alerts. There is no round navigation: the host moves on with Next. The local-game badge (`LocalGameBadge`) is a `Popover` in the header, announced per `a11y-mobile`. Add a new primitive only when a real need shows up.

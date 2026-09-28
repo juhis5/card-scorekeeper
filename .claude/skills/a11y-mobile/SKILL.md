@@ -29,11 +29,11 @@ Retrofitting a11y is painful; bake it in. This app is used one-handed at a card 
 ## Live regions — important for live scores
 
 - Announce meaningful live changes via `aria-live="polite"` so a player not staring at the screen still knows: "Maiju: 15 points saved" on save, and when a round is revealed "Round 2 results: Maiju leads with 30 points. You're in place 2." plus the next contract, in one message. Never announce a ranking before its round is revealed. Announce sparingly (not every keystroke or every write).
-- Toasts + status ("reading your cards…") also go through a polite live region. Reserve `assertive` for urgent errors.
+- Status ("reading your cards…") also goes through a polite live region (`role="status"`); inline errors use `role="alert"`. There are no toasts. Put announcements in a region that already exists in the DOM: one inserted with its text already in it is often not read. Reserve `assertive` for urgent errors.
 
 ## Color & contrast
 
-- Text contrast ≥ 4.5:1 (≥ 3:1 large), both themes.
+- Text contrast ≥ 4.5:1 (≥ 3:1 large), in every theme (`src/assets/theme-contrast.test.ts` checks the token pairs).
 - **Never encode meaning in color alone.** The leader, a negative/penalty, "your turn", the offline state — each needs text or an icon too, not just color. Card tables are often in mixed lighting.
 
 ## Motion
@@ -48,4 +48,4 @@ Retrofitting a11y is painful; bake it in. This app is used one-handed at a card 
 
 ## This project (card-scorekeeper)
 
-The **scoreboard** is the a11y-critical surface: a real table with headers (player / round / total), sorted ascending (leader first) with the leader marked by text/icon not just color. Live score changes announced politely. The offline banner and "whose turn / current contract" must be readable by a screen reader, not conveyed by color or position alone.
+The **scoreboard** is the a11y-critical surface: a real table with headers (player / round / total), sorted ascending (leader first) with the leader marked by text/icon not just color. Live score changes announced politely. The local-game badge and "whose turn / current contract" must be readable by a screen reader, not conveyed by color or position alone.

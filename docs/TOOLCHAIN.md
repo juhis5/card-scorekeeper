@@ -10,10 +10,12 @@ reproducibility — listed below.
   24.16). Pinned in **`.nvmrc`** (`24`) as the single source of truth:
   - locally: `nvm use` (picks the installed 24.x).
   - CI: `actions/setup-node` with `node-version-file: .nvmrc`.
-- **Why 24, not 22:** 22 is the *previous* LTS. 24 is the current LTS — CI must match the
-  runtime we build on. We do **not** use the odd-numbered "Current" line (25) — it isn't
-  meant for production.
-- Declared in `package.json`: `"engines": { "node": ">=24" }`.
+- **Why 24:** it's the Active LTS, and CI must match the runtime we build on. We don't use a
+  "Current" line (26 as of September 2026): it isn't meant for production. Move to the next LTS
+  on purpose, bumping `.nvmrc` and `engines` together.
+- Declared in `package.json`: `"engines": { "node": "24.x" }`. Not `>=24`: Vercel picks the
+  newest Node major a `>=` range allows, so the build and `/api` would move to a new major
+  unnoticed while CI still tests 24.
 
 ## Package manager — pnpm (pinned exactly)
 
@@ -48,6 +50,9 @@ resolved versions, giving reproducible installs without hand-pinning:
 
 | Pinned (reproducibility) | Floating (latest stable) |
 |---|---|
-| Node major — `.nvmrc` | all npm dependencies |
+| Node major — `.nvmrc` and `engines` (`24.x`) | every other npm dependency (`^`) |
 | pnpm exact — `packageManager` | (lockfile captures exact resolved versions) |
 | GitHub Actions — commit SHA | |
+| TypeScript `~6.0` — vue-tsc/Volar has no TypeScript 7 support yet; lift it once it does | |
+| Prettier exact — a patch release can reformat the whole repo; bump it on purpose, with `pnpm format` in the same commit | |
+| Playwright — the `visual` job's Docker image tag must equal `@playwright/test` | |

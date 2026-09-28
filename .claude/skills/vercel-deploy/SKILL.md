@@ -39,7 +39,7 @@ Two very different classes — don't mix them up:
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_*` | **Public** | Client | Firebase web config is public by design; security is Firestore rules. `VITE_` = shipped to browser, that's fine here. |
 | `GEMINI_API_KEY` | Secret | Server only | Free-tier, no billing. Never `VITE_`. |
 | `GEMINI_MODEL` | Config | Server only | Optional; overrides the default Gemini model when Google renames or retires one. |
-| `FIREBASE_SERVICE_ACCOUNT` | Secret | Server only | Admin SDK creds (JSON) for the room-validation check. Never `VITE_`, never in the client. |
+| `FIREBASE_SERVICE_ACCOUNT` | Secret | Server only | Service-account JSON: its `project_id` checks caller ID tokens (`jose`), the Admin SDK reads the room. Never `VITE_`, never in the client. |
 
 - The public/secret split is the thing to get right: web config in `VITE_*`, admin creds + Gemini key server-only.
 - Commit `.env.example` with the names. `.env*` gitignored.
@@ -59,7 +59,7 @@ We host the FE on Vercel (consistency with schedule-app; Firestore is host-agnos
    - `pnpm exec firebase deploy --only firestore,auth --project <id>` enables the Firestore API, creates the `(default)` database at `firebase.json`'s `location` (europe-north1; permanent, and omitting it means the US), deploys rules and indexes, and turns on anonymous sign-in.
    - `pnpm exec firebase apps:sdkconfig web <appId> --project <id>` prints the values for `VITE_FIREBASE_*`.
    - Always pass `--project`. Never run `firebase use`: it saves an active project for the folder, which overrides the `demo-card-scorekeeper` project the emulator suites need.
-   - Rules: a PR's rules go to staging before it merges into `develop`, and to prod before the release that carries them (see the git-workflow skill).
+   - Rules and indexes after that: `pnpm exec firebase deploy --only firestore:rules,firestore:indexes --project <id>`. A PR's go to staging before it merges into `develop`, and to prod before the release that carries them (see the git-workflow skill and `docs/RELEASE.md`).
 2. Push the repo to GitHub.
 3. Vercel → Import Project → pick the repo (Vite preset).
 4. Add env vars, prod project values scoped to Production and staging values scoped to Preview: `VITE_FIREBASE_*` (all), `ENABLE_EXPERIMENTAL_COREPACK=1` (so Vercel uses the exact pnpm from `packageManager`), and if photo-count is on, `GEMINI_API_KEY` + `FIREBASE_SERVICE_ACCOUNT` (and `GEMINI_MODEL` only to override the default). Create the Gemini key in a separate Google Cloud project, restricted to the Generative Language API, with no billing.
