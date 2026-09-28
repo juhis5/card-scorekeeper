@@ -32,15 +32,13 @@ import {
   TOTAL_ROUNDS,
   canFinishGame,
   isGameOver,
-  placements as placementsFor,
   runningTotal,
 } from '../game/rules'
-import { bestAndWorstRound } from '../game/stats'
+import { gamePlayerRows } from '../game/stats'
 import { withTimeout } from '../platform/timeout'
 import { isPermissionDenied } from './write-errors'
 import type {
   ContractRoundNumber,
-  GamePlayer,
   GameResult,
   GameState,
   GameStatus,
@@ -533,36 +531,15 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       throw new GameIncompleteError()
     }
 
-    // From roundScores, not the player-writable totalScore: a permanent stats row must be exact.
-    const rankedPlayers = players.map((player) => ({
-      ...player,
-      totalScore: runningTotal(player.id, roundScores),
-    }))
-
     const result: GameResult = {
       gameId: roomCode,
       finishedAt: new Date(this.now()).toISOString(),
       totalRounds: TOTAL_ROUNDS,
     }
 
-    const gamePlayers: GamePlayer[] = placementsFor(rankedPlayers).map(({ player, placement }) => {
-      const points = roundScores
-        .filter((score) => score.playerId === player.id)
-        .map((score) => score.points)
-      const { bestRound, worstRound } = bestAndWorstRound(points)
-      return {
-        gameId: roomCode,
-        // The auth uid that keys the player doc, never the localStorage device_uuid: the rules
-        // check exists(room/{gameId}/players/{deviceUuid}), so a device_uuid would let the host
-        // forge a stats row for someone never seated.
-        deviceUuid: player.id,
-        displayName: player.name,
-        finalScore: player.totalScore,
-        placement,
-        bestRound,
-        worstRound,
-      }
-    })
+    // Keyed by the auth uid that keys each seat, never a device id: the rules check the seat
+    // exists (players/{deviceUuid}), so the host can't forge a row for someone never seated.
+    const gamePlayers = gamePlayerRows(roomCode, players, roundScores)
 
     // Stats first: players may open Stats the moment the room is finished, and a finished room
     // refuses every write, so a failed stats write leaves Finish retryable.

@@ -3,7 +3,7 @@
 Layers, each split by area. Dependencies point inward: views → components/stores → lib.
 
 - `lib/game/` — pure domain: `rules.ts` (the 5 contracts, card values, scoring, the one-zero rule), `types.ts`, standings, names, room codes, stats math. No Vue, no network. Strict TDD.
-- `lib/data/` — I/O: the `GameRepository` interface (`repository.ts`) with `local-repository.ts` (offline, localStorage) and `firestore-repository.ts` (online), Firebase setup, stats + highscore writes, the reconnect flush.
+- `lib/data/` — I/O: the `GameRepository` interface (`repository.ts`) with `local-repository.ts` (offline, localStorage) and `firestore-repository.ts` (online), Firebase setup, stats + highscore writes (`firestore-stats.ts`) and reads (`stats-reads.ts`), the reconnect flush.
 - `lib/platform/` — browser helpers: connectivity probe, timeouts, scrolling under the keyboard, install guide, themes, update checks.
 - `lib/utils.ts` — `cn()`; stays here because the shadcn CLI imports it from this path.
 - `stores/` — Pinia setup stores that orchestrate: `game` (over a `GameRepository`), `identity`, `stats`, `highscores`, `result-queue` (offline games not yet uploaded), `install`, `app-update`.

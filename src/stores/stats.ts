@@ -4,14 +4,10 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { probeBackendReachable } from '@/lib/platform/connectivity'
 import { headToHead, playerStats } from '@/lib/game/stats'
 import type { HeadToHeadRecord, PlayerStats } from '@/lib/game/stats'
-import type { GamePlayer, GameResult } from '@/lib/game/types'
+import type { GamePlayer } from '@/lib/game/types'
 import { reportHandledError } from '@/lib/platform/error-reporting'
-
-/** Firestore's `in` operator compares against at most 30 values per query. */
-const IN_QUERY_CHUNK_SIZE = 30
 
 export type StatsStatus = 'loading' | 'loaded' | 'empty' | 'error'
 
@@ -21,14 +17,6 @@ export interface OpponentRecord {
    * `game_result.finishedAt` decides. */
   displayName: string
   record: HeadToHeadRecord
-}
-
-function chunk<T>(items: readonly T[], size: number): T[][] {
-  const chunks: T[][] = []
-  for (let index = 0; index < items.length; index += size) {
-    chunks.push(items.slice(index, index + size))
-  }
-  return chunks
 }
 
 /** The displayName from the most recently finished of `rows` (ISO timestamps sort as strings). */
@@ -76,72 +64,17 @@ export const useStatsStore = defineStore('stats', () => {
   async function load(): Promise<void> {
     status.value = 'loading'
     try {
-      const [
-        { getDb, getFirebaseAuth, ensureSignedIn, checkBackendReachable },
-        { collection, query, where, getDocs },
-      ] = await Promise.all([import('@/lib/data/firebase'), import('firebase/firestore')])
-
-      const db = getDb()
-      const reachable = await probeBackendReachable({
-        checkBackend: () => checkBackendReachable(getFirebaseAuth(), db),
-      })
-      if (!reachable) {
+      const { connectIfReachable, readPlayedGames } = await import('@/lib/data/stats-reads')
+      const connection = await connectIfReachable()
+      if (!connection) {
         status.value = 'error'
         return
       }
-
-      const uid = await ensureSignedIn()
-
-      // Every stats query filters on participantUids: firestore.rules only lets a player list
-      // rows of games they played, and a query must prove that to be allowed.
-      const asParticipant = where('participantUids', 'array-contains', uid)
-      const ownSnapshot = await getDocs(
-        query(collection(db, 'game_player'), where('deviceUuid', '==', uid), asParticipant),
-      )
-      const ownRows = ownSnapshot.docs.map((snapshotDoc) => snapshotDoc.data() as GamePlayer)
-
-      if (ownRows.length === 0) {
-        stats.value = playerStats(uid, [])
-        opponents.value = []
-        status.value = 'empty'
-        return
-      }
-
-      const gameIdChunks = chunk(
-        [...new Set(ownRows.map((row) => row.gameId))],
-        IN_QUERY_CHUNK_SIZE,
-      )
-
-      // Every row of those games gives the opponents; the results give their finish times.
-      // Results by participant, not `documentId() in`: production refuses that with this filter,
-      // though the emulator allows it.
-      const [playerSnapshots, resultSnapshot] = await Promise.all([
-        Promise.all(
-          gameIdChunks.map((ids) =>
-            getDocs(
-              query(collection(db, 'game_player'), where('gameId', 'in', ids), asParticipant),
-            ),
-          ),
-        ),
-        getDocs(query(collection(db, 'game_result'), asParticipant)),
-      ])
-
-      const rowsByDocId = new Map<string, GamePlayer>()
-      for (const snapshot of playerSnapshots) {
-        for (const snapshotDoc of snapshot.docs) {
-          rowsByDocId.set(snapshotDoc.id, snapshotDoc.data() as GamePlayer)
-        }
-      }
-      const allRows = [...rowsByDocId.values()]
-
-      const finishedAtByGameId = new Map<string, string>()
-      for (const snapshotDoc of resultSnapshot.docs) {
-        finishedAtByGameId.set(snapshotDoc.id, (snapshotDoc.data() as GameResult).finishedAt)
-      }
-
-      stats.value = playerStats(uid, allRows)
-      opponents.value = buildOpponentRecords(uid, allRows, finishedAtByGameId)
-      status.value = 'loaded'
+      const { uid } = connection
+      const { rows, finishedAtByGameId } = await readPlayedGames(connection)
+      stats.value = playerStats(uid, rows)
+      opponents.value = buildOpponentRecords(uid, rows, finishedAtByGameId)
+      status.value = rows.length === 0 ? 'empty' : 'loaded'
     } catch (error) {
       reportHandledError(error, 'load-stats')
       status.value = 'error'

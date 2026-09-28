@@ -177,9 +177,8 @@ describe('StatsView', () => {
     installFixtureGetDocs(ROWS)
     renderStatsView()
 
-    await flushPromises()
-
-    expect(screen.getByText('Summary')).toBeTruthy()
+    // findBy: the store loads its reads lazily, which can take more than a flush under load.
+    expect(await screen.findByText('Summary')).toBeTruthy()
     expect(screen.getByText('Games played')).toBeTruthy()
     expect(screen.getByText('Head-to-head')).toBeTruthy()
     expect(screen.getByText('Bob')).toBeTruthy()
@@ -191,25 +190,21 @@ describe('StatsView', () => {
     installFixtureGetDocs([])
     renderStatsView()
 
-    await flushPromises()
-
-    expect(screen.getByText('No finished games yet — play a game!')).toBeTruthy()
+    expect(await screen.findByText('No finished games yet — play a game!')).toBeTruthy()
   })
 
   it('shows an error message with a retry action when the device is offline, and retry can recover', async () => {
     vi.stubGlobal('navigator', { onLine: false })
     renderStatsView()
-    await flushPromises()
 
-    expect(screen.getByRole('alert').textContent).toContain("Couldn't load your stats")
+    expect((await screen.findByRole('alert')).textContent).toContain("Couldn't load your stats")
     const retryButton = screen.getByRole('button', { name: 'Retry' })
 
     vi.stubGlobal('navigator', { onLine: true })
     ensureSignedInMock.mockResolvedValue(ME)
     installFixtureGetDocs(ROWS)
     await fireEvent.click(retryButton)
-    await flushPromises()
 
-    expect(screen.getByText('Summary')).toBeTruthy()
+    expect(await screen.findByText('Summary')).toBeTruthy()
   })
 })

@@ -5,7 +5,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { probeBackendReachable } from '@/lib/platform/connectivity'
+import type { TopDoc, TopQuery } from '@/lib/data/stats-reads'
 import { reportHandledError } from '@/lib/platform/error-reporting'
 
 /** Also the most firestore.rules lets one query read. */
@@ -35,13 +35,7 @@ export type HighscoreListName =
   | 'mostGames'
 export type HighscoresStatus = 'loading' | 'loaded' | 'error'
 
-interface ListQuery {
-  collection: 'leaderboard' | 'player_totals'
-  field: string
-  direction: 'asc' | 'desc'
-  /** Win rate and average rank only players with enough games. */
-  qualifiedOnly?: boolean
-}
+type ListQuery = TopQuery
 
 const LISTS: Record<HighscoreListName, ListQuery> = {
   bestGames: { collection: 'leaderboard', field: 'finalScore', direction: 'asc' },
@@ -63,16 +57,13 @@ const LISTS: Record<HighscoreListName, ListQuery> = {
   mostGames: { collection: 'player_totals', field: 'gamesPlayed', direction: 'desc' },
 }
 
-type Document = { id: string; data: () => Record<string, unknown> }
-
 /** Entries are public and older ones predate the rules' format check: an unreadable date is left
  * out, since formatting it would throw and blank the whole list. */
 function isValidDate(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value))
 }
 
-function toEntries(docs: Document[], list: ListQuery, uid: string): HighscoreEntry[] {
-  const rows = docs.map((doc) => ({ id: doc.id, data: doc.data() }))
+function toEntries(rows: TopDoc[], list: ListQuery, uid: string): HighscoreEntry[] {
   return rows.map(({ id, data }) => ({
     id,
     // The list is sorted, so the first entry with this value holds the shared rank.
@@ -106,32 +97,18 @@ export const useHighscoresStore = defineStore('highscores', () => {
   async function load(): Promise<void> {
     status.value = 'loading'
     try {
-      const [
-        { getDb, getFirebaseAuth, ensureSignedIn, checkBackendReachable },
-        { collection, getDocs, limit, orderBy, query, where },
-      ] = await Promise.all([import('@/lib/data/firebase'), import('firebase/firestore')])
-      const db = getDb()
-      const reachable = await probeBackendReachable({
-        checkBackend: () => checkBackendReachable(getFirebaseAuth(), db),
-      })
-      if (!reachable) {
+      const { connectIfReachable, readTop } = await import('@/lib/data/stats-reads')
+      const connection = await connectIfReachable()
+      if (!connection) {
         status.value = 'error'
         return
       }
-      const uid = await ensureSignedIn()
-      const top = async ([name, list]: [HighscoreListName, ListQuery]) => {
-        const snapshot = await getDocs(
-          query(
-            collection(db, list.collection),
-            ...(list.qualifiedOnly ? [where('qualified', '==', true)] : []),
-            orderBy(list.field, list.direction),
-            limit(HIGHSCORE_LIMIT),
-          ),
-        )
-        return [name, toEntries(snapshot.docs as Document[], list, uid)] as const
-      }
+      const { db, uid } = connection
       const loaded = await Promise.all(
-        (Object.entries(LISTS) as [HighscoreListName, ListQuery][]).map(top),
+        (Object.entries(LISTS) as [HighscoreListName, ListQuery][]).map(async ([name, list]) => {
+          const docs = await readTop(db, list, HIGHSCORE_LIMIT)
+          return [name, toEntries(docs, list, uid)] as const
+        }),
       )
       lists.value = { ...emptyLists(), ...Object.fromEntries(loaded) }
       status.value = 'loaded'

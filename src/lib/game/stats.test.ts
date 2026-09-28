@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  gamePlayerRows,
   bestAndWorstRound,
   headToHead,
   nextPlayerTotals,
@@ -322,5 +323,57 @@ describe('nextPlayerTotals', () => {
     expect(totals?.qualified).toBe(false)
 
     expect(nextPlayerTotals(totals, row(3, 100), 'last_uid').qualified).toBe(true)
+  })
+})
+
+describe('gamePlayerRows', () => {
+  const players = [
+    { id: 'host', name: 'Host', totalScore: 0 },
+    { id: 'alice', name: 'Alice', totalScore: 999 },
+    { id: 'bob', name: 'Bob', totalScore: 0 },
+  ]
+  const scores = [
+    { playerId: 'host', round: 1, points: 20 },
+    { playerId: 'alice', round: 1, points: 0 },
+    { playerId: 'bob', round: 1, points: 20 },
+    { playerId: 'host', round: 2, points: 0 },
+    { playerId: 'alice', round: 2, points: 15 },
+    { playerId: 'bob', round: 2, points: 5 },
+  ] as const
+
+  it('places everyone on totals summed from the round scores, never a stored total', () => {
+    const rows = gamePlayerRows('g1', players, [...scores])
+
+    expect(rows.map((row) => [row.displayName, row.finalScore, row.placement])).toEqual([
+      ['Alice', 15, 1],
+      ['Host', 20, 2],
+      ['Bob', 25, 3],
+    ])
+  })
+
+  it("gives each row the game, the player's key, and their own best and worst round", () => {
+    const rows = gamePlayerRows('g1', players, [...scores])
+
+    expect(rows.find((row) => row.deviceUuid === 'bob')).toEqual({
+      gameId: 'g1',
+      deviceUuid: 'bob',
+      displayName: 'Bob',
+      finalScore: 25,
+      placement: 3,
+      bestRound: 5,
+      worstRound: 20,
+    })
+  })
+
+  it('shares a placement on equal totals', () => {
+    const tied = [
+      { playerId: 'host', round: 1, points: 0 },
+      { playerId: 'alice', round: 1, points: 10 },
+      { playerId: 'bob', round: 1, points: 10 },
+    ] as const
+
+    const rows = gamePlayerRows('g1', players, [...tied])
+
+    expect(rows.map((row) => row.placement)).toEqual([1, 2, 2])
   })
 })

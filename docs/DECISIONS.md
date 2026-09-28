@@ -590,3 +590,10 @@ it is.
     score save stays unbounded on purpose (it shows at once, and Next waits at most 5 s for it).
   - Safari's 7-day storage cap for sites that aren't installed is stated where it matters
     (Tilastot's ⓘ, the privacy page, PLAN); installing is the fix.
+- 2026-09-28 — One way to build stats rows, and store reads in lib/data (second audit, PR 10).
+  `gamePlayerRows` in lib/game/stats.ts builds a finished game's rows for both repositories
+  (ranked on totals from the round scores; before, the local one ranked on stored totals). The
+  Tilastot and Ennätykset reads moved out of their stores into `lib/data/stats-reads.ts`
+  (`connectIfReachable`, `readPlayedGames`, `readTop`); the stores only map results to state,
+  as the layering says. Still to do: `deviceUuid` names three different ids (the identity
+  store's, a seat field and the stats key), which touches the Firestore schema the rules check.
