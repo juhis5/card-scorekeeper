@@ -129,8 +129,11 @@ export interface FirestoreGameRepositoryDeps {
   storage?: KeyValueStorage
 }
 
-/** Offline writes wait forever, so the writes the user waits on get a bound and the caller can
- * fall back. */
+/** Offline writes wait forever, so every write the user waits on (create, join, add a guest,
+ * remove, advance, finish, abandon, Play again) gets this bound and the caller can say so. A
+ * timed-out write still lands once the connection is back, so each of these is safe to retry.
+ * A score save is the exception: Firestore shows it at once from its local cache, and Next waits
+ * at most a few seconds for it (RoomView). */
 const DEFAULT_WRITE_TIMEOUT_MS = 10_000
 
 export class FirestoreGameRepository implements ResumableGameRepository, ReplayableGameRepository {
@@ -501,7 +504,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     CONTRACTS.forEach(({ round }) => {
       batch.delete(doc(this.db, `room/${roomCode}/roundScores/${playerId}_${round}`))
     })
-    await batch.commit()
+    await withTimeout(batch.commit(), this.writeTimeoutMs)
   }
 
   /** No read first, and bounded: a repeat writes the same round, so retrying a timed-out advance
@@ -564,9 +567,15 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     // Stats first: players may open Stats the moment the room is finished, and a finished room
     // refuses every write, so a failed stats write leaves Finish retryable.
     // A retry reuses what the first attempt stored: the rules match entries against it.
-    const stored = await writeGameResult(this.db, result, gamePlayers)
+    const stored = await withTimeout(
+      writeGameResult(this.db, result, gamePlayers),
+      this.writeTimeoutMs,
+    )
     if (room.status !== 'finished') {
-      await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
+      await withTimeout(
+        updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' }),
+        this.writeTimeoutMs,
+      )
     }
     const unpublished = await publishHighscores(this.db, stored, gamePlayers)
     if (unpublished.length > 0) {

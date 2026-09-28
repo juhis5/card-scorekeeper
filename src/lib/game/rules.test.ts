@@ -6,13 +6,8 @@ import {
   isGameOver,
   roundsWithoutWinner,
   roundsWithSeveralZeros,
-  ACE_VALUE,
-  FACE_CARD_VALUE,
-  JOKER_VALUE,
-  LOW_NUMBER_CARD_VALUE,
   MAX_ROUND_SCORE,
   ROUND_SCORE_STEP,
-  TEN_VALUE,
   TOTAL_ROUNDS,
   cardValue,
   completedRounds,
@@ -66,13 +61,23 @@ describe('isValidRoundScore', () => {
 })
 
 describe('cardValue', () => {
-  it('values number cards 2–9 at 5 points, and 10 at 10 points', () => {
-    const lowRanks: Card['rank'][] = ['2', '3', '4', '5', '6', '7', '8', '9']
+  // Literal points, not the constants: a test that compares a value with itself can't catch a
+  // changed rule.
+  it.each([
+    ['2', 5],
+    ['5', 5],
+    ['9', 5],
+    ['10', 10],
+    ['J', 10],
+    ['Q', 10],
+    ['K', 10],
+    ['A', 15],
+  ] as const)('values a %s at %i points', (rank, points) => {
+    expect(cardValue({ rank, suit: 'clubs' })).toBe(points)
+  })
 
-    lowRanks.forEach((rank) => {
-      expect(cardValue({ rank, suit: 'clubs' } as Card)).toBe(LOW_NUMBER_CARD_VALUE)
-    })
-    expect(cardValue({ rank: '10', suit: 'clubs' })).toBe(TEN_VALUE)
+  it('values a Joker at 25 points', () => {
+    expect(cardValue({ rank: 'Joker', suit: null })).toBe(25)
   })
 
   it('makes every card value a multiple of ROUND_SCORE_STEP, so every hand total is valid', () => {
@@ -100,20 +105,6 @@ describe('cardValue', () => {
       expect(cardValue(card) % ROUND_SCORE_STEP).toBe(0)
     })
   })
-
-  it('values J, Q, and K at 10 points each', () => {
-    expect(cardValue({ rank: 'J', suit: 'hearts' })).toBe(FACE_CARD_VALUE)
-    expect(cardValue({ rank: 'Q', suit: 'hearts' })).toBe(FACE_CARD_VALUE)
-    expect(cardValue({ rank: 'K', suit: 'hearts' })).toBe(FACE_CARD_VALUE)
-  })
-
-  it('values an Ace at 15 points', () => {
-    expect(cardValue({ rank: 'A', suit: 'spades' })).toBe(ACE_VALUE)
-  })
-
-  it('values a Joker at 25 points', () => {
-    expect(cardValue({ rank: 'Joker', suit: null })).toBe(JOKER_VALUE)
-  })
 })
 
 describe('roundTotal', () => {
@@ -126,6 +117,27 @@ describe('roundTotal', () => {
     ]
 
     expect(roundTotal(hand)).toBe(55)
+  })
+
+  it('sums a hand with a 10 and an ace to 55 points (10 + 15 + 5 + 25)', () => {
+    const hand: Card[] = [
+      { rank: '10', suit: 'clubs' },
+      { rank: 'A', suit: 'spades' },
+      { rank: '3', suit: 'diamonds' },
+      { rank: 'Joker', suit: null },
+    ]
+
+    expect(roundTotal(hand)).toBe(55)
+  })
+
+  it('tells aces from face cards: two aces and a king are 40 points', () => {
+    const hand: Card[] = [
+      { rank: 'A', suit: 'hearts' },
+      { rank: 'A', suit: 'clubs' },
+      { rank: 'K', suit: 'spades' },
+    ]
+
+    expect(roundTotal(hand)).toBe(40)
   })
 
   it('counts every copy of a repeated card — the game is played with 2–3 decks', () => {

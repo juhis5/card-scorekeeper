@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   assertFails,
   assertSucceeds,
@@ -35,6 +35,8 @@ import {
   TOTAL_ROUNDS,
 } from '@/lib/game/rules'
 import { playerNameKey } from '@/lib/game/player-names'
+import { nextPlayerTotals, QUALIFYING_GAMES, type PlayerTotals } from '@/lib/game/stats'
+import type { GamePlayer } from '@/lib/game/types'
 
 const RULES_PATH = path.resolve(
   fileURLToPath(new URL('.', import.meta.url)),
@@ -1753,6 +1755,23 @@ describe('player_totals: the running totals behind the global player lists', () 
     batch.set(doc(db, `player_totals/${ALICE_UID}`), fields)
     return batch.commit()
   }
+
+  // The client's nextPlayerTotals and QUALIFYING_GAMES against the rules' addsUp, so neither can
+  // change alone: a mismatch would silently drop every publish from then on.
+  it('accepts the totals the app computes, up to and past the qualifying game', async () => {
+    const codes = ['QAAAA', 'QBBBB', 'QCCCC', 'QDDDD', 'QEEEE', 'QFFFF']
+    let previous: PlayerTotals | null = null
+    for (const [index, gameId] of codes.slice(0, QUALIFYING_GAMES + 1).entries()) {
+      const placement = index % 2 === 0 ? 1 : 2
+      await seedGame(gameId, { placement })
+      const row = gamePlayerFixture(gameId, ALICE_UID, { placement })
+      const next = nextPlayerTotals(previous, row as GamePlayer, `${gameId}_${ALICE_UID}`)
+
+      await assertSucceeds(publish(gameId, { ...next }, { finalScore: row.finalScore as number }))
+      previous = next
+    }
+    expect(previous?.qualified).toBe(true)
+  })
 
   it("starts a player's totals from their first game, published with its entry", async () => {
     await seedGame(FIRST_GAME)

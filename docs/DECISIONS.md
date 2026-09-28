@@ -580,3 +580,13 @@ it is.
   template lines without checking them, so the UI gets a ratchet instead. Excluded, with the
   reason in `vitest.config.ts`: the owned shadcn `ui/` copies and pure SDK/runtime wiring that
   the emulator suites, `test:api-load` and production exercise.
+- 2026-09-28 — Leftovers from the second audit (PR 9).
+  - Card values are tested against literal points, plus hands a swapped ace/face value or a
+    changed 10 would break; the old tests compared each constant with itself.
+  - `playerStats` is tested with an opponent holding every extreme, so only the device's own rows
+    count. A rules test publishes QUALIFYING_GAMES + 1 games with totals from `nextPlayerTotals`,
+    so the client and the rules' `addsUp` can't drift apart.
+  - Every write the user waits on is now bounded, removing a player and finishing included; a
+    score save stays unbounded on purpose (it shows at once, and Next waits at most 5 s for it).
+  - Safari's 7-day storage cap for sites that aren't installed is stated where it matters
+    (Tilastot's ⓘ, the privacy page, PLAN); installing is the fix.
