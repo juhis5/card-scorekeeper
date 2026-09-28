@@ -375,10 +375,14 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     where the SDK isn't even bundled. The environment follows the branch (main → production,
     develop → test, other branches → preview), and the release is the commit.
   - The SDK loads after the app starts, so neither the first paint nor an offline host waits for
-    it, and only the parts used ship (about 37 KB gzipped, in its own chunk).
-  - Privacy: room codes are cut from every report and breadcrumb; click breadcrumbs are off
-    because button labels carry player names; no user info, cookies, bodies or query params (only
-    the User-Agent header); no session replay or performance tracing.
+    it. It ships in its own chunk, importing only what's used.
+  - Tracing and session replay are on (the owner enabled them in Sentry): every page load and
+    route change is traced, and replays record a tenth of sessions plus every session with an
+    error. The free plan's replay quota simply stops recording when used up.
+  - Privacy: room codes are cut from every report, trace and breadcrumb; click breadcrumbs are off
+    because button labels carry player names; replays mask all text and block media; no user
+    info, cookies, bodies or query params (only the User-Agent header). Replay's compression
+    worker needs `blob:` in the CSP's `worker-src`.
   - Source maps: built hidden, uploaded by `@sentry/vite-plugin` with `SENTRY_AUTH_TOKEN` (a
     Vercel secret), then deleted, so browsers never get them. `@sentry/cli`'s install script is
     denied in pnpm-workspace.yaml; its binary comes from the per-platform package.

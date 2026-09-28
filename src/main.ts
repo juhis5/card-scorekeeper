@@ -28,7 +28,7 @@ app.use(router)
 app.use(i18n)
 
 app.mount('#app')
-void startErrorReporting(app)
+void startErrorReporting(app, router)
 applyStoredTheme()
 
 // Push results of games finished offline. Not awaited, so it never delays mount; a failure
