@@ -33,7 +33,8 @@
       "home": "Etusivu",
       "language": "Kieli",
       "settings": "Asetukset",
-      "thisGame": "Tämä peli"
+      "thisGame": "Tämä peli",
+      "privacy": "Tietosuoja"
     },
     "install": {
       "label": "Asenna sovellus",
@@ -475,6 +476,36 @@
       "J": "jätkä",
       "Q": "kuningatar",
       "K": "kuningas"
+    }
+  },
+  "privacy": {
+    "heading": "Tietosuoja",
+    "lede": "Mitä tietoja Rommi käsittelee ja missä. Sovelluksessa ei ole tiliä, sähköpostia eikä puhelinnumeroa.",
+    "sections": {
+      "device": {
+        "title": "Tällä laitteella",
+        "body": "Nimesi, kesken oleva peli, lähetystä odottavat tulokset sekä teema ja kieli tallennetaan tämän laitteen selaimeen. Selaimen tietojen tyhjentäminen poistaa ne."
+      },
+      "online": {
+        "title": "Verkkopelit",
+        "body": "Verkkopelissä huoneen koodi, pelaajien nimet ja pisteet tallentuvat Googlen Firebase-palveluun Suomessa (europe-north1). Huoneeseen pääsee koodilla kuusi tuntia sen avaamisesta."
+      },
+      "identity": {
+        "title": "Tunnistus",
+        "body": "Jokainen laite saa nimettömän tunnisteen. Tilastosi ja pelisi liitetään siihen, ei nimeesi tai henkilöllisyyteesi."
+      },
+      "public": {
+        "title": "Ennätykset ovat julkisia",
+        "body": "Päättyneen verkkopelin pelaajien nimet ja pisteet näkyvät Ennätykset-sivulla kaikille sovelluksen käyttäjille, eikä niitä voi poistaa. Käytä halutessasi lempinimeä."
+      },
+      "photo": {
+        "title": "Korttien kuvaus",
+        "body": "Jos lasket pisteet kuvasta, kuva lähetetään Googlen Gemini-palveluun korttien tunnistamista varten. Sovellus ei tallenna kuvaa."
+      },
+      "errors": {
+        "title": "Virheraportit",
+        "body": "Kun sovelluksessa tapahtuu virhe, siitä lähtee raportti Sentry-palveluun EU:ssa. Raporttiin voi liittyä tallenne virhettä edeltäneestä hetkestä, jossa kaikki teksti on peitetty. Nimiä ja huonekoodeja ei lähetetä."
+      }
     }
   }
 }

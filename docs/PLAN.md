@@ -38,7 +38,7 @@ photo count reads a picture of the cards left in a hand and suggests the points.
   says so first when the room has finished, expired or doesn't exist.
 - **Stats** (`/stats`), **Rules** (`/rules`) and a 404 page.
 - **Header**, sticky: Back (not on Home), the room code with copy and Kutsu (a sheet with a QR
-  code and a share link) in an online room, and the menu: Tilastot, Ennätykset, Säännöt, Kieli,
+  code and a share link) in an online room, and the menu: Tilastot, Ennätykset, Säännöt, Tietosuoja, Kieli,
   Teema (eight themes), Asenna sovellus, and Päivitä sovellus when a new version is waiting.
 
 One score card is open at a time and saves only on ✓ or Enter; a tap outside drops the typed

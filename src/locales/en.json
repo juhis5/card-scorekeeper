@@ -33,7 +33,8 @@
       "home": "Home",
       "language": "Language",
       "settings": "Settings",
-      "thisGame": "This game"
+      "thisGame": "This game",
+      "privacy": "Privacy"
     },
     "install": {
       "label": "Install the app",
@@ -475,6 +476,36 @@
       "J": "jack",
       "Q": "queen",
       "K": "king"
+    }
+  },
+  "privacy": {
+    "heading": "Privacy",
+    "lede": "What Rommi handles and where. There's no account, email address or phone number.",
+    "sections": {
+      "device": {
+        "title": "On this device",
+        "body": "Your name, a game in progress, results waiting to upload, and your theme and language are kept in this device's browser. Clearing the browser's data removes them."
+      },
+      "online": {
+        "title": "Online games",
+        "body": "In an online game the room code, the players' names and their scores are stored in Google's Firebase in Finland (europe-north1). A room can be joined with its code for six hours after it opens."
+      },
+      "identity": {
+        "title": "Identity",
+        "body": "Each device gets an anonymous id. Your stats and games are tied to it, not to your name or who you are."
+      },
+      "public": {
+        "title": "Highscores are public",
+        "body": "The names and scores of players in a finished online game appear on the Highscores page for everyone using the app, and can't be removed. Use a nickname if you prefer."
+      },
+      "photo": {
+        "title": "Counting cards from a photo",
+        "body": "If you count your points from a photo, the photo is sent to Google's Gemini service to recognise the cards. The app doesn't keep the photo."
+      },
+      "errors": {
+        "title": "Error reports",
+        "body": "When something goes wrong, a report goes to Sentry in the EU. It can include a recording of the moment before the error, with all text masked. Names and room codes are left out."
+      }
     }
   }
 }

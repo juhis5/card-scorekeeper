@@ -1,8 +1,9 @@
 /**
- * Errors, tracing and replays of sessions with an error to Sentry, only in builds that set a DSN (the Vercel ones).
- * Loaded after the app starts, so neither the first paint nor an offline host waits for it. Room
- * codes are cut from every report, click breadcrumbs (whose labels carry player names) are off,
- * and replays mask all text.
+ * Errors, tracing and replays of sessions with an error to Sentry, only in builds that set a DSN
+ * (the Vercel ones). Loaded after the app starts, so neither the first paint nor an offline host
+ * waits for it. Room codes are cut from every payload: events, streamed spans, replay recordings
+ * and replay events. Component props (player names, uids) and click breadcrumbs (whose labels
+ * carry names) are off, and replays mask all text.
  */
 import type { App } from 'vue'
 import type { Router } from 'vue-router'
@@ -35,6 +36,8 @@ export async function startErrorReporting(app: App, router: Router): Promise<voi
   Sentry.init({
     app,
     dsn,
+    // Vue's error handler would attach the failing component's props: players' names and uids.
+    attachProps: false,
     environment: import.meta.env.VITE_DEPLOY_ENV,
     release: import.meta.env.VITE_RELEASE || undefined,
     dataCollection: {
@@ -48,15 +51,22 @@ export async function startErrorReporting(app: App, router: Router): Promise<voi
       ...defaults.filter((integration) => integration.name !== 'Breadcrumbs'),
       Sentry.breadcrumbsIntegration({ dom: false }),
       Sentry.browserTracingIntegration({ router }),
-      Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }),
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+        beforeAddRecordingEvent: (event) => scrubReport(event),
+      }),
     ],
     tracesSampleRate: 1,
     // Replays only of sessions that hit an error: the last minute is kept in memory and sent then.
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 1,
     beforeSend: (event) => scrubReport(event),
-    beforeSendTransaction: (event) => scrubReport(event),
+    // Sentry 11 streams spans, so beforeSendTransaction never sees them: spans carry the route.
+    beforeSendSpan: (span) => scrubReport(span),
     beforeBreadcrumb: (breadcrumb) => scrubReport(breadcrumb),
   })
+  // Replay events skip beforeSend; a global processor also sees them and their URL list.
+  Sentry.addEventProcessor((event) => scrubReport(event))
   sentry = Sentry
 }

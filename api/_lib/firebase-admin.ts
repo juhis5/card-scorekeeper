@@ -24,9 +24,14 @@ function readServiceAccount(): ServiceAccountKey {
   if (!raw) {
     throw new Error('FIREBASE_SERVICE_ACCOUNT is not set')
   }
-  // Never logged: a parse failure throws a SyntaxError without the credential in it. A cast, not
-  // a shape guard: the operator sets this env var, it isn't user input.
-  cachedServiceAccount = JSON.parse(raw) as ServiceAccountKey
+  // A cast, not a shape guard: the operator sets this env var, it isn't user input. A parse error
+  // is replaced, not wrapped: V8's message quotes the input around the bad token, and this one
+  // holds the private key, which must never reach the logs.
+  try {
+    cachedServiceAccount = JSON.parse(raw) as ServiceAccountKey
+  } catch {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON')
+  }
   return cachedServiceAccount
 }
 
