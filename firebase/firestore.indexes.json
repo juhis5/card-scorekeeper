@@ -1,4 +1,33 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "player_totals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "qualified",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "winRate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "player_totals",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "qualified",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "averageScore",
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

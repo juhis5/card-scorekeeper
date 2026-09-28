@@ -1638,6 +1638,154 @@ describe('ending a game early: the host abandons it', () => {
   })
 })
 
+describe('player_totals: the running totals behind the global player lists', () => {
+  const FIRST_GAME = GAME_ID
+  const SECOND_GAME = 'c4a1d3b5-6e7f-4a81-9b02-3c4d5e6f7a81'
+
+  function entryOf(gameId: string, finalScore: number) {
+    return {
+      displayName: 'Alice',
+      finalScore,
+      worstRound: 20,
+      finishedAt: '2026-01-01T00:00:00.000Z',
+    }
+  }
+
+  function totals(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      displayName: 'Alice',
+      gamesPlayed: 1,
+      wins: 1,
+      scoreSum: 42,
+      winRate: 1,
+      averageScore: 42,
+      qualified: false,
+      lastEntry: `${FIRST_GAME}_${ALICE_UID}`,
+      ...overrides,
+    }
+  }
+
+  async function seedGame(gameId: string, row: Partial<Record<string, unknown>> = {}) {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `game_result/${gameId}`), gameResultFixture({ gameId }))
+      await setDoc(
+        doc(db(), `game_player/${gameId}_${ALICE_UID}`),
+        gamePlayerFixture(gameId, ALICE_UID, row),
+      )
+    })
+  }
+
+  /** Publishes a game's highscore entry and Alice's new totals in one write, as the app does. */
+  function publish(
+    gameId: string,
+    fields: Record<string, unknown>,
+    { as = ALICE_UID, withEntry = true, finalScore = 42 } = {},
+  ) {
+    const db = testEnv.authenticatedContext(as).firestore()
+    const batch = writeBatch(db as unknown as Firestore)
+    if (withEntry)
+      batch.set(doc(db, `leaderboard/${gameId}_${ALICE_UID}`), entryOf(gameId, finalScore))
+    batch.set(doc(db, `player_totals/${ALICE_UID}`), fields)
+    return batch.commit()
+  }
+
+  it("starts a player's totals from their first game, published with its entry", async () => {
+    await seedGame(FIRST_GAME)
+
+    await assertSucceeds(publish(FIRST_GAME, totals()))
+  })
+
+  it('adds exactly the next game: one more game, its win or not, its score', async () => {
+    await seedGame(FIRST_GAME)
+    await seedGame(SECOND_GAME, { placement: 2, finalScore: 58 })
+    await seed(async (db) => {
+      await setDoc(doc(db(), `leaderboard/${FIRST_GAME}_${ALICE_UID}`), entryOf(FIRST_GAME, 42))
+      await setDoc(doc(db(), `player_totals/${ALICE_UID}`), totals())
+    })
+    const next = totals({
+      gamesPlayed: 2,
+      wins: 1,
+      scoreSum: 100,
+      winRate: 0.5,
+      averageScore: 50,
+      lastEntry: `${SECOND_GAME}_${ALICE_UID}`,
+    })
+
+    await assertSucceeds(publish(SECOND_GAME, next, { finalScore: 58 }))
+  })
+
+  it('matches the app on a fraction that does not come out even, like a third', async () => {
+    await seedGame(FIRST_GAME)
+    await seed(async (db) => {
+      await setDoc(
+        doc(db(), `player_totals/${ALICE_UID}`),
+        totals({
+          gamesPlayed: 2,
+          wins: 0,
+          scoreSum: 100,
+          winRate: 0,
+          averageScore: 50,
+          lastEntry: 'older_game',
+        }),
+      )
+    })
+    const next = totals({
+      gamesPlayed: 3,
+      wins: 1,
+      scoreSum: 142,
+      winRate: 1 / 3,
+      averageScore: 142 / 3,
+    })
+
+    await assertSucceeds(publish(FIRST_GAME, next))
+  })
+
+  it('denies totals that do not add up to the row', async () => {
+    await seedGame(FIRST_GAME)
+
+    await assertFails(publish(FIRST_GAME, totals({ wins: 0, winRate: 0 })))
+    await assertFails(publish(FIRST_GAME, totals({ scoreSum: 10, averageScore: 10 })))
+    await assertFails(publish(FIRST_GAME, totals({ winRate: 0.5 })))
+    await assertFails(publish(FIRST_GAME, totals({ gamesPlayed: 5, qualified: true })))
+    await assertFails(publish(FIRST_GAME, totals({ displayName: 'Mallory' })))
+  })
+
+  it('counts a game only once: only in the write that publishes its entry', async () => {
+    await seedGame(FIRST_GAME)
+    await assertFails(publish(FIRST_GAME, totals(), { withEntry: false }))
+
+    await seed(async (db) => {
+      await setDoc(doc(db(), `leaderboard/${FIRST_GAME}_${ALICE_UID}`), entryOf(FIRST_GAME, 42))
+    })
+    const db = testEnv.authenticatedContext(ALICE_UID).firestore()
+    await assertFails(setDoc(doc(db, `player_totals/${ALICE_UID}`), totals()))
+  })
+
+  it("denies someone who wasn't in the game, or totals under another player's id", async () => {
+    await seedGame(FIRST_GAME)
+    await assertFails(publish(FIRST_GAME, totals(), { as: 'mallory-uid' }))
+
+    const db = testEnv.authenticatedContext(ALICE_UID).firestore()
+    const batch = writeBatch(db as unknown as Firestore)
+    batch.set(doc(db, `leaderboard/${FIRST_GAME}_${ALICE_UID}`), entryOf(FIRST_GAME, 42))
+    batch.set(doc(db, `player_totals/someone-else`), totals())
+    await assertFails(batch.commit())
+  })
+
+  it('lets anyone signed in read a top 10, never more, and nobody delete', async () => {
+    await seed(async (db) => setDoc(doc(db(), `player_totals/${ALICE_UID}`), totals()))
+    const stranger = testEnv.authenticatedContext('stranger-uid').firestore()
+    const board = collection(stranger, 'player_totals')
+
+    await assertSucceeds(getDocs(query(board, orderBy('wins', 'desc'), limit(10))))
+    await assertSucceeds(
+      getDocs(query(board, where('qualified', '==', true), orderBy('winRate', 'desc'), limit(10))),
+    )
+    await assertFails(getDocs(query(board, orderBy('wins', 'desc'), limit(11))))
+    await assertFails(deleteDoc(doc(stranger, `player_totals/${ALICE_UID}`)))
+  })
+})
+
 describe('roundScores tied to the room', () => {
   beforeEach(async () => {
     await seed(async (db) => {

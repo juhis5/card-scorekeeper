@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { bestAndWorstRound, headToHead, playerStats } from './stats'
+import {
+  bestAndWorstRound,
+  headToHead,
+  nextPlayerTotals,
+  playerStats,
+  QUALIFYING_GAMES,
+} from './stats'
 import type { GamePlayer } from './types'
 
 const HOST = 'device-host'
@@ -215,5 +221,55 @@ describe('bestAndWorstRound', () => {
 
   it('throws for an empty list of round points', () => {
     expect(() => bestAndWorstRound([])).toThrow(RangeError)
+  })
+})
+
+describe('nextPlayerTotals', () => {
+  const row = (placement: number, finalScore: number): GamePlayer => ({
+    gameId: 'g',
+    deviceUuid: 'uid',
+    displayName: 'Juho',
+    finalScore,
+    placement,
+    bestRound: 0,
+    worstRound: 40,
+  })
+
+  it("starts a player's totals from their first game", () => {
+    expect(nextPlayerTotals(null, row(1, 60), 'g_uid')).toEqual({
+      displayName: 'Juho',
+      gamesPlayed: 1,
+      wins: 1,
+      scoreSum: 60,
+      winRate: 1,
+      averageScore: 60,
+      qualified: false,
+      lastEntry: 'g_uid',
+    })
+  })
+
+  it('adds a game: a shared first place counts as a win, like your own stats', () => {
+    const first = nextPlayerTotals(null, row(1, 60), 'g1_uid')
+    const second = nextPlayerTotals(first, { ...row(2, 90), displayName: 'Juho K' }, 'g2_uid')
+
+    expect(second).toMatchObject({
+      displayName: 'Juho K',
+      gamesPlayed: 2,
+      wins: 1,
+      scoreSum: 150,
+      winRate: 0.5,
+      averageScore: 75,
+      lastEntry: 'g2_uid',
+    })
+  })
+
+  it(`qualifies for the rate and average lists at ${QUALIFYING_GAMES} games`, () => {
+    let totals = null
+    for (let game = 1; game < QUALIFYING_GAMES; game += 1) {
+      totals = nextPlayerTotals(totals, row(3, 100), `g${game}_uid`)
+    }
+    expect(totals?.qualified).toBe(false)
+
+    expect(nextPlayerTotals(totals, row(3, 100), 'last_uid').qualified).toBe(true)
   })
 })

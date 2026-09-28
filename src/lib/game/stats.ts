@@ -103,3 +103,42 @@ export function bestAndWorstRound(points: readonly number[]): {
   }
   return { bestRound: Math.min(...points), worstRound: Math.max(...points) }
 }
+
+/** Games a player needs before the win-rate and average lists rank them. */
+export const QUALIFYING_GAMES = 5
+
+/** A player's running totals across every game, for the global player lists (fifth round).
+ * `firebase/firestore.rules` recomputes the same fields; change both together. */
+export interface PlayerTotals {
+  /** From their latest game. */
+  displayName: string
+  gamesPlayed: number
+  wins: number
+  scoreSum: number
+  winRate: number
+  averageScore: number
+  qualified: boolean
+  /** The leaderboard entry this update counted: each game's row counts once. */
+  lastEntry: string
+}
+
+/** A win is placing first, ties included, as in `playerStats`. */
+export function nextPlayerTotals(
+  previous: PlayerTotals | null,
+  row: GamePlayer,
+  entryId: string,
+): PlayerTotals {
+  const gamesPlayed = (previous?.gamesPlayed ?? 0) + 1
+  const wins = (previous?.wins ?? 0) + (row.placement === 1 ? 1 : 0)
+  const scoreSum = (previous?.scoreSum ?? 0) + row.finalScore
+  return {
+    displayName: row.displayName,
+    gamesPlayed,
+    wins,
+    scoreSum,
+    winRate: wins / gamesPlayed,
+    averageScore: scoreSum / gamesPlayed,
+    qualified: gamesPlayed >= QUALIFYING_GAMES,
+    lastEntry: entryId,
+  }
+}

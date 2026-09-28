@@ -1,16 +1,43 @@
 <script setup lang="ts">
 /**
- * Single job: the Stats screen's global highscores. It has its own loading and error states, so a
- * failure never hides this device's stats above it.
+ * Single job: the Stats screen's global highscores, in two tabs: player lists and game records.
+ * It has its own loading and error states, so a failure never hides this device's stats above it.
  */
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import HighscoreList from '@/components/stats/HighscoreList.vue'
+import HighscoreList, { type HighscoreValueKind } from '@/components/stats/HighscoreList.vue'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { QUALIFYING_GAMES } from '@/lib/game/stats'
 import { useHighscoresStore, type HighscoreListName } from '@/stores/highscores'
 
-const LISTS: HighscoreListName[] = ['bestGames', 'worstGames', 'biggestRounds']
+interface ListView {
+  name: HighscoreListName
+  kind: HighscoreValueKind
+  /** The key of the value column's heading. */
+  header: string
+}
+
+const GROUPS: { id: 'players' | 'games'; lists: ListView[] }[] = [
+  {
+    id: 'players',
+    lists: [
+      { name: 'mostWins', kind: 'count', header: 'wins' },
+      { name: 'bestWinRate', kind: 'percent', header: 'winRate' },
+      { name: 'bestAverage', kind: 'average', header: 'average' },
+      { name: 'mostGames', kind: 'count', header: 'games' },
+    ],
+  },
+  {
+    id: 'games',
+    lists: [
+      { name: 'bestGames', kind: 'count', header: 'points' },
+      { name: 'worstGames', kind: 'count', header: 'points' },
+      { name: 'biggestRounds', kind: 'count', header: 'points' },
+    ],
+  },
+]
 
 const { t } = useI18n()
 const highscores = useHighscoresStore()
@@ -38,15 +65,31 @@ onMounted(() => {
         {{ t('stats.error.retry') }}
       </Button>
     </div>
-    <template v-else>
-      <HighscoreList
-        v-for="list in LISTS"
-        :id="`highscores-${list}`"
-        :key="list"
-        :title="t(`stats.highscores.lists.${list}.title`)"
-        :description="t(`stats.highscores.lists.${list}.description`)"
-        :entries="lists[list]"
-      />
-    </template>
+    <Tabs v-else default-value="players" class="gap-4">
+      <TabsList class="grid h-11 w-full grid-cols-2">
+        <TabsTrigger v-for="group in GROUPS" :key="group.id" :value="group.id" class="h-9">
+          {{ t(`stats.highscores.tabs.${group.id}`) }}
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent
+        v-for="group in GROUPS"
+        :key="group.id"
+        :value="group.id"
+        class="flex flex-col gap-4"
+      >
+        <HighscoreList
+          v-for="list in group.lists"
+          :id="`highscores-${list.name}`"
+          :key="list.name"
+          :title="t(`stats.highscores.lists.${list.name}.title`)"
+          :description="
+            t(`stats.highscores.lists.${list.name}.description`, { min: QUALIFYING_GAMES })
+          "
+          :value-header="t(`stats.highscores.columns.${list.header}`)"
+          :value-kind="list.kind"
+          :entries="lists[list.name]"
+        />
+      </TabsContent>
+    </Tabs>
   </section>
 </template>

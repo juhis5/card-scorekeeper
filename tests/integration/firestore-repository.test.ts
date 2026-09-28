@@ -187,6 +187,16 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
       query(collection(stranger.db, 'leaderboard'), orderBy('finalScore'), limit(10)),
     )
     expect(board.size).toBeGreaterThan(0)
+    const totals = await getDoc(doc(stranger.db, `player_totals/${aliceUid}`))
+    expect(totals.data()).toMatchObject({
+      displayName: 'Alice',
+      gamesPlayed: 1,
+      wins: 1,
+      scoreSum: 50,
+      winRate: 1,
+      averageScore: 50,
+      qualified: false,
+    })
 
     hostRepo.leave()
     joinerRepo.leave()
