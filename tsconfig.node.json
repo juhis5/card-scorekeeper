@@ -4,7 +4,6 @@
   "include": [
     "vite.config.*",
     "vitest.config.*",
-    "cypress.config.*",
     "tests/e2e/playwright.config.ts",
     "eslint.config.*"
   ],

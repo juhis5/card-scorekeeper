@@ -127,7 +127,7 @@ async function handleSubmit(): Promise<void> {
         :aria-describedby="isNameInvalid ? 'host-name-error' : undefined"
       />
       <p v-if="isNameInvalid" id="host-name-error" class="text-destructive text-sm">
-        {{ t('home.errors.hostNameRequired') }}
+        {{ t('home.errors.nameRequired') }}
       </p>
     </div>
     <label

@@ -39,7 +39,7 @@ describe('InstallAppRow', () => {
     expect(prompt).toHaveBeenCalledTimes(1)
   })
 
-  it("shows Chrome on an iPhone where its Share button is, then Add to Home Screen (the tester's case)", async () => {
+  it('shows Chrome on an iPhone where its Share button is, then Add to Home Screen', async () => {
     useInstallStore().listen(fakeWindow(IPHONE_CHROME))
     render(InstallAppRow, { global: { plugins: [i18n] } })
 

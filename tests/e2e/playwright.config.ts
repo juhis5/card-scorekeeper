@@ -10,8 +10,8 @@ export default defineConfig({
   // Room for two slow sync assertions in one test (see expect.timeout).
   timeout: 60 * 1000,
   expect: {
-    // Raised from 5 s for cross-client sync, which is slow on WebKit's long-polling (see the
-    // webkit project).
+    // Raised from 5 s for cross-client sync on a loaded CI runner: a cold Firestore read has
+    // taken 2.7 s, and a slow connectivity probe waits up to 8 s before a game starts.
     timeout: 30000,
   },
   forbidOnly: !!process.env.CI,

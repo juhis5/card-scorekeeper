@@ -469,7 +469,7 @@ describe('RoomView with no active game', () => {
   })
 })
 
-describe('RoomView resume after reload (slice 5 offline robustness)', () => {
+describe('RoomView resume after reload', () => {
   // resume() uses the real localStorage, which a reload keeps, so these tests seed it directly.
 
   it('resumes a persisted local game on mount instead of showing the empty state', async () => {
@@ -1235,7 +1235,7 @@ describe('RoomView players the host adds', () => {
   })
 })
 
-describe('RoomView reconnecting indicator (slice 5 offline robustness)', () => {
+describe('RoomView reconnecting indicator', () => {
   const ROOM_CODE = '7K4RQ'
 
   /** Restores navigator.onLine so a stub never leaks into other tests. */

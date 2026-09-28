@@ -397,7 +397,7 @@ describe('ownerUid spoofing is rejected on create', () => {
   })
 })
 
-describe('room create/update authorization (bonus coverage)', () => {
+describe('room create/update authorization', () => {
   it('lets an authenticated user create a room naming themselves as host', async () => {
     const host = testEnv.authenticatedContext(HOST_UID).firestore()
 
@@ -445,7 +445,7 @@ describe('room create/update authorization (bonus coverage)', () => {
 
 // Only totalScore may change: a rewritten deviceUuid could steal another device's stats, and a
 // rename would dodge the unique-name records.
-describe('players field-level write restrictions (bonus coverage)', () => {
+describe('players field-level write restrictions', () => {
   beforeEach(async () => {
     await seed(async (db) => {
       await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture())
@@ -845,14 +845,6 @@ describe('players update validation', () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
     return updateDoc(doc(alice, `room/${ROOM_CODE}/players/${ALICE_UID}`), fields)
   }
-
-  it('denies renaming to a non-string', async () => {
-    await assertFails(updateAlice({ name: 123 }))
-  })
-
-  it('denies renaming past the length limit', async () => {
-    await assertFails(updateAlice({ name: 'x'.repeat(MAX_PLAYER_NAME_LENGTH + 1) }))
-  })
 
   it('denies a negative totalScore', async () => {
     await assertFails(updateAlice({ totalScore: -5 }))
@@ -1856,7 +1848,7 @@ describe('roundScores tied to the room', () => {
 })
 
 // Tested on the no-room path; the room-backed path has the same bounds.
-describe('game_player value bounds (bonus coverage)', () => {
+describe('game_player value bounds', () => {
   beforeEach(async () => {
     await seed(async (db) => setDoc(doc(db(), `game_result/${GAME_ID}`), gameResultFixture()))
   })
@@ -1932,7 +1924,7 @@ describe('game_player value bounds (bonus coverage)', () => {
   })
 })
 
-describe('game_result field sanity (bonus coverage)', () => {
+describe('game_result field sanity', () => {
   it('denies a totalRounds that is not the fixed 5-round game', async () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 

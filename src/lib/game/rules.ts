@@ -8,6 +8,7 @@ import type {
   Player,
   RoundScore,
   Standing,
+  Suit,
 } from './types.js'
 
 export const LOW_NUMBER_CARD_VALUE = 5
@@ -15,6 +16,13 @@ export const TEN_VALUE = 10
 export const FACE_CARD_VALUE = 10
 export const ACE_VALUE = 15
 export const JOKER_VALUE = 25
+
+export const SUIT_SYMBOLS: Readonly<Record<Suit, string>> = {
+  clubs: '♣',
+  diamonds: '♦',
+  hearts: '♥',
+  spades: '♠',
+}
 
 /** Points a leftover card counts against its holder. */
 export function cardValue(card: Card): number {
