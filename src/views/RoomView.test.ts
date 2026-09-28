@@ -939,6 +939,23 @@ describe('RoomView after a reload of an online room', () => {
     expect(screen.getByRole('button', { name: 'Next round' })).toBeTruthy()
   })
 
+  it('opens the online room its address names even while a local game is open (Peli kesken)', async () => {
+    const room = await roomCreatedBeforeReload()
+    room.seat = { playerId: 'host-uid', isHost: true }
+    resumeRepository.mockResolvedValue(room)
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    await useGameStore().start(makeRepository(), {
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Local host',
+    })
+
+    await renderAt(pinia)
+
+    expect(useGameStore().roomCode).toBe(ROOM_CODE)
+    expect(screen.queryByText('Local host')).toBeNull()
+  })
+
   it('offers to join again when this device has no seat in the room', async () => {
     const room = await roomCreatedBeforeReload()
     room.seat = null

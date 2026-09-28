@@ -105,7 +105,8 @@
       "reconnecting": "Yhteyttä muodostetaan uudelleen… pisteesi ovat tallessa ja synkronoituvat automaattisesti."
     },
     "offline": {
-      "banner": "Pelaat paikallista peliä tällä laitteella. Muut eivät voi liittyä, eikä korttien kuvaus ole käytössä."
+      "banner": "Pelaat paikallista peliä tällä laitteella. Muut eivät voi liittyä, eikä korttien kuvaus ole käytössä.",
+      "badge": "Paikallinen peli: mitä tämä tarkoittaa"
     },
     "table": {
       "player": "Pelaaja",
@@ -297,7 +298,9 @@
       "opponent": "Vastustaja",
       "recordHeader": "V–H–T",
       "recordCompact": "{wins} V – {losses} H – {ties} T",
-      "empty": "Ei vielä yhteisiä pelejä muiden pelaajien kanssa."
+      "empty": "Ei vielä yhteisiä pelejä muiden pelaajien kanssa.",
+      "legendLabel": "Mitä V–H–T tarkoittaa",
+      "legend": "V = voitot, H = häviöt, T = tasapelit: tuloksesi tätä pelaajaa vastaan peleissä, joissa olitte molemmat."
     },
     "highscores": {
       "heading": "Ennätykset",

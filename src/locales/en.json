@@ -105,7 +105,8 @@
       "reconnecting": "Reconnecting… your scores are safe and will sync automatically."
     },
     "offline": {
-      "banner": "Playing a local game on this device. Others can't join, and photo count is off."
+      "banner": "Playing a local game on this device. Others can't join, and photo count is off.",
+      "badge": "Local game: what this means"
     },
     "table": {
       "player": "Player",
@@ -297,7 +298,9 @@
       "opponent": "Opponent",
       "recordHeader": "W–L–T",
       "recordCompact": "{wins} W – {losses} L – {ties} T",
-      "empty": "No shared games yet with other players."
+      "empty": "No shared games yet with other players.",
+      "legendLabel": "What W–L–T means",
+      "legend": "W = wins, L = losses, T = ties: your record against this player, over the games you both played."
     },
     "highscores": {
       "heading": "Highscores",
