@@ -452,6 +452,36 @@ describe('LocalGameRepository persistence', () => {
   })
 })
 
+describe('LocalGameRepository.finishGame on a damaged save', () => {
+  it('stays unfinished when the host row cannot be built, so nothing is marked done without its result', async () => {
+    const storage = makeMemoryStorage()
+    const first = makeRepository({ storage })
+    await first.createGame(HOST_CONFIG)
+    for (let round = 1; round < ALL_ROUNDS.length; round += 1) await first.advanceRound()
+    const saved = JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}')
+    storage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, hostPlayerId: 'nobody' }))
+    const damaged = makeRepository({ storage })
+
+    await expect(damaged.finishGame()).rejects.toThrow()
+
+    expect(JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}').state.status).not.toBe('finished')
+  })
+})
+
+describe('LocalGameRepository when storage refuses to be read', () => {
+  it('starts with no game instead of throwing', () => {
+    const blocked: KeyValueStorage = {
+      getItem: () => {
+        throw new Error('SecurityError')
+      },
+      setItem: () => undefined,
+    }
+
+    expect(() => makeRepository({ storage: blocked })).not.toThrow()
+    expect(hasPersistedGame(blocked)).toBe(false)
+  })
+})
+
 describe('LocalGameRepository.getResumeInfo / hasPersistedGame', () => {
   it('reports no persisted game before createGame has ever been called', () => {
     const storage = makeMemoryStorage()

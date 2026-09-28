@@ -57,9 +57,10 @@ export function readPendingResults(storage: KeyValueStorage): PendingResult[] {
 }
 
 function readResults(storage: KeyValueStorage, key: string): PendingResult[] {
-  const raw = storage.getItem(key)
-  if (!raw) return []
   try {
+    // Blocked storage throws on read, too: that means nothing queued, not a crash.
+    const raw = storage.getItem(key)
+    if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     return Array.isArray(parsed) ? parsed.filter(isPendingResult) : []
   } catch {

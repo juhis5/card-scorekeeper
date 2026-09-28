@@ -388,3 +388,8 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     denied in pnpm-workspace.yaml; its binary comes from the per-platform package.
   - The CSP allows `https://*.ingest.de.sentry.io`. The Sentry MCP server is set up locally for
     reading issues.
+- 2026-09-28 — Failures leave things as they were (found while trimming comments): starting a
+  game that can't be created keeps the current one; a join whose seat lookup fails after the seat
+  was taken keeps the current game on screen (a retry finds the seat); blocked storage that throws
+  on read means "nothing saved", not a crash; and a local finish builds the host's stats row
+  before marking the game finished, so a damaged save can't end up finished with nothing to sync.

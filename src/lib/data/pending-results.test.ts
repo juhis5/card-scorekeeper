@@ -219,3 +219,24 @@ describe('flushPendingResults', () => {
     expect(readPendingResults(storage)).toEqual([])
   })
 })
+
+describe('pending results when storage refuses to be read', () => {
+  it('reads nothing and queues without throwing, like a blocked storage in a private window', () => {
+    const blocked: KeyValueStorage = {
+      getItem: () => {
+        throw new Error('SecurityError')
+      },
+      setItem: () => {
+        throw new Error('SecurityError')
+      },
+    }
+
+    expect(readPendingResults(blocked)).toEqual([])
+    expect(() =>
+      appendPendingResult(blocked, {
+        result: { gameId: 'g', finishedAt: '2026-01-01T00:00:00.000Z', totalRounds: 5 },
+        players: [],
+      }),
+    ).not.toThrow()
+  })
+})

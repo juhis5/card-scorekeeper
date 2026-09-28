@@ -116,10 +116,11 @@ export const useGameStore = defineStore('game', () => {
   }
 
   /** Starts a new game as its host. */
+  /** A game that can't be created changes nothing: the current one stays. */
   async function start(repo: GameRepository, config: GameConfig): Promise<void> {
+    const created = await repo.createGame(config)
     leave()
-    repository = repo
-    hostCreatedGame(repo, await repo.createGame(config))
+    hostCreatedGame(repo, created)
   }
 
   /**
@@ -164,15 +165,16 @@ export const useGameStore = defineStore('game', () => {
     player: AddPlayerInput,
   ): Promise<PlayerId> {
     const playerId = await repo.addPlayer(player)
+    // Before anything changes here: a lookup that fails leaves the current game on screen, and a
+    // retry finds the seat already taken. The host rejoining their own room is still its host.
+    const seat = isResumable(repo) ? await repo.findSeat() : null
     leave()
     repository = repo
     gameId.value = code
     roomCode.value = code
-    isHost.value = false
+    isHost.value = seat?.isHost ?? false
     myPlayerId.value = playerId
     rememberRoom(code)
-    // The host rejoining their own room by code is still its host.
-    if (isResumable(repo)) isHost.value = (await repo.findSeat())?.isHost ?? false
     followRoom(repo)
     return playerId
   }

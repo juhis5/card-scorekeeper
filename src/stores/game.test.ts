@@ -822,6 +822,33 @@ describe('useGameStore.join from a finished game', () => {
     expect(game.status).toBe('finished')
   })
 
+  it('keeps showing the finished game when the seat lookup fails after the seat was taken', async () => {
+    const { game, finished } = await finishedGame()
+    const next = new FakeResumableRepository()
+    next.findSeat = () => Promise.reject(new Error('offline'))
+
+    const error = await game
+      .join(next, 'FGHJK', { name: 'Juho', deviceUuid: 'device-a' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(Error)
+    expect(finished.leaveCalls).toBe(0)
+    expect(game.roomCode).toBe('ABCDE')
+    expect(lastRoom()).not.toBe('FGHJK')
+  })
+
+  it('keeps the current game when a new one cannot be created', async () => {
+    const { game, finished } = await finishedGame()
+    const next = new FakeGameRepository()
+    next.createGame = () => Promise.reject(new Error('unreachable'))
+
+    await game.start(next, HOST_CONFIG).catch(() => undefined)
+
+    expect(finished.leaveCalls).toBe(0)
+    expect(game.roomCode).toBe('ABCDE')
+    expect(game.status).toBe('finished')
+  })
+
   it('leaves the finished room once seated in the next one', async () => {
     const { game, finished } = await finishedGame()
 
