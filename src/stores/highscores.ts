@@ -1,5 +1,6 @@
 /**
- * Global top-10 lists, read from the public `leaderboard` entries finished games publish. Loaded
+ * Global top-10 lists: game records from the public `leaderboard` entries, and player lists from
+ * each player's running totals (`player_totals`), both published when a game finishes. Loaded
  * apart from this device's stats, so a failure in one never hides the other.
  */
 import { defineStore } from 'pinia'
@@ -14,48 +15,85 @@ export interface HighscoreEntry {
   /** Shared by tied entries: 1, 1, 3. */
   rank: number
   displayName: string
-  points: number
-  finishedAt: string
-  /** This device's own entry: its id ends with this device's uid. */
+  value: number
+  /** Game records: when the game finished. */
+  finishedAt?: string
+  /** Player lists: how many games the total covers. */
+  gamesPlayed?: number
+  /** This device's own entry or totals. */
   isMine: boolean
 }
 
-export type HighscoreListName = 'bestGames' | 'worstGames' | 'biggestRounds'
+export type HighscoreListName =
+  | 'bestGames'
+  | 'worstGames'
+  | 'biggestRounds'
+  | 'mostWins'
+  | 'bestWinRate'
+  | 'bestAverage'
+  | 'mostGames'
 export type HighscoresStatus = 'loading' | 'loaded' | 'error'
 
-interface LeaderboardEntryData {
-  displayName: string
-  finalScore: number
-  worstRound: number
-  finishedAt: string
+interface ListQuery {
+  collection: 'leaderboard' | 'player_totals'
+  field: string
+  direction: 'asc' | 'desc'
+  /** Win rate and average rank only players with enough games. */
+  qualifiedOnly?: boolean
 }
 
-type RankedField = 'finalScore' | 'worstRound'
+const LISTS: Record<HighscoreListName, ListQuery> = {
+  bestGames: { collection: 'leaderboard', field: 'finalScore', direction: 'asc' },
+  worstGames: { collection: 'leaderboard', field: 'finalScore', direction: 'desc' },
+  biggestRounds: { collection: 'leaderboard', field: 'worstRound', direction: 'desc' },
+  mostWins: { collection: 'player_totals', field: 'wins', direction: 'desc' },
+  bestWinRate: {
+    collection: 'player_totals',
+    field: 'winRate',
+    direction: 'desc',
+    qualifiedOnly: true,
+  },
+  bestAverage: {
+    collection: 'player_totals',
+    field: 'averageScore',
+    direction: 'asc',
+    qualifiedOnly: true,
+  },
+  mostGames: { collection: 'player_totals', field: 'gamesPlayed', direction: 'desc' },
+}
 
-function toEntries(
-  docs: { id: string; data: () => unknown }[],
-  field: RankedField,
-  uid: string,
-): HighscoreEntry[] {
-  const rows = docs.map((doc) => ({ id: doc.id, data: doc.data() as LeaderboardEntryData }))
+type Document = { id: string; data: () => Record<string, unknown> }
+
+function toEntries(docs: Document[], list: ListQuery, uid: string): HighscoreEntry[] {
+  const rows = docs.map((doc) => ({ id: doc.id, data: doc.data() }))
   return rows.map(({ id, data }) => ({
     id,
-    // The list is sorted, so the first entry with these points holds the shared rank.
-    rank: rows.findIndex((row) => row.data[field] === data[field]) + 1,
-    displayName: data.displayName,
-    points: data[field],
-    finishedAt: data.finishedAt,
-    isMine: id.endsWith(`_${uid}`),
+    // The list is sorted, so the first entry with this value holds the shared rank.
+    rank: rows.findIndex((row) => row.data[list.field] === data[list.field]) + 1,
+    displayName: String(data.displayName),
+    value: Number(data[list.field]),
+    ...(typeof data.finishedAt === 'string' && { finishedAt: data.finishedAt }),
+    ...(typeof data.gamesPlayed === 'number' && { gamesPlayed: data.gamesPlayed }),
+    // A leaderboard entry is `{game}_{player}`; a totals doc is the player's own id.
+    isMine: list.collection === 'player_totals' ? id === uid : id.endsWith(`_${uid}`),
   }))
+}
+
+function emptyLists(): Record<HighscoreListName, HighscoreEntry[]> {
+  return {
+    bestGames: [],
+    worstGames: [],
+    biggestRounds: [],
+    mostWins: [],
+    bestWinRate: [],
+    bestAverage: [],
+    mostGames: [],
+  }
 }
 
 export const useHighscoresStore = defineStore('highscores', () => {
   const status = ref<HighscoresStatus>('loading')
-  const lists = ref<Record<HighscoreListName, HighscoreEntry[]>>({
-    bestGames: [],
-    worstGames: [],
-    biggestRounds: [],
-  })
+  const lists = ref(emptyLists())
 
   /** Never throws: offline, a broken config or a refused read all land on `error`. */
   async function load(): Promise<void> {
@@ -63,7 +101,7 @@ export const useHighscoresStore = defineStore('highscores', () => {
     try {
       const [
         { getDb, getFirebaseAuth, ensureSignedIn, checkBackendReachable },
-        { collection, getDocs, limit, orderBy, query },
+        { collection, getDocs, limit, orderBy, query, where },
       ] = await Promise.all([import('@/lib/data/firebase'), import('firebase/firestore')])
       const db = getDb()
       const reachable = await probeBackendReachable({
@@ -74,18 +112,21 @@ export const useHighscoresStore = defineStore('highscores', () => {
         return
       }
       const uid = await ensureSignedIn()
-      const top = async (field: RankedField, direction: 'asc' | 'desc') => {
+      const top = async ([name, list]: [HighscoreListName, ListQuery]) => {
         const snapshot = await getDocs(
-          query(collection(db, 'leaderboard'), orderBy(field, direction), limit(HIGHSCORE_LIMIT)),
+          query(
+            collection(db, list.collection),
+            ...(list.qualifiedOnly ? [where('qualified', '==', true)] : []),
+            orderBy(list.field, list.direction),
+            limit(HIGHSCORE_LIMIT),
+          ),
         )
-        return toEntries(snapshot.docs, field, uid)
+        return [name, toEntries(snapshot.docs as Document[], list, uid)] as const
       }
-      const [bestGames, worstGames, biggestRounds] = await Promise.all([
-        top('finalScore', 'asc'),
-        top('finalScore', 'desc'),
-        top('worstRound', 'desc'),
-      ])
-      lists.value = { bestGames, worstGames, biggestRounds }
+      const loaded = await Promise.all(
+        (Object.entries(LISTS) as [HighscoreListName, ListQuery][]).map(top),
+      )
+      lists.value = { ...emptyLists(), ...Object.fromEntries(loaded) }
       status.value = 'loaded'
     } catch {
       status.value = 'error'

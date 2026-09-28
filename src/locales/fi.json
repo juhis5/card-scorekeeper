@@ -332,7 +332,6 @@
       "empty": "Ei vielä pelejä.",
       "rank": "#",
       "player": "Pelaaja",
-      "points": "Pisteet",
       "you": "sinä",
       "lists": {
         "bestGames": {
@@ -346,8 +345,36 @@
         "biggestRounds": {
           "title": "Suurin kierros",
           "description": "Eniten pisteitä yhdellä kierroksella"
+        },
+        "mostWins": {
+          "title": "Eniten voittoja",
+          "description": "Voitetut pelit; jaettu ykkössija lasketaan"
+        },
+        "bestWinRate": {
+          "title": "Paras voittoprosentti",
+          "description": "Vähintään {min} peliä pelanneista"
+        },
+        "bestAverage": {
+          "title": "Paras keskiarvo",
+          "description": "Pienin keskimääräinen loppupistemäärä, vähintään {min} peliä"
+        },
+        "mostGames": {
+          "title": "Eniten pelejä",
+          "description": "Loppuun pelatut pelit"
         }
-      }
+      },
+      "tabs": {
+        "players": "Pelaajat",
+        "games": "Pelit"
+      },
+      "columns": {
+        "points": "Pisteet",
+        "wins": "Voitot",
+        "winRate": "Voitto-%",
+        "average": "Keskiarvo",
+        "games": "Pelit"
+      },
+      "games": "{count} peli | {count} peliä"
     }
   },
   "invite": {

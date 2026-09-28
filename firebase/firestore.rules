@@ -424,6 +424,56 @@ service cloud.firestore {
     // time. An entry must copy its game_player row (and the game's finishedAt) exactly and come
     // from one of that game's players, so the stats-row rules above also decide what reaches the
     // board. Append-only.
+    // The global player lists: one running total per player, which anyone signed in may read, ten
+    // at a time. A write must count exactly one game's stats row (the one `lastEntry` names), in
+    // the same write that publishes that row's leaderboard entry. An entry can only be created
+    // once, so each game counts once, and only one of that game's players can count it. The
+    // derived fields must match what `nextPlayerTotals` in src/lib/game/stats.ts computes (float()
+    // because dividing two ints here truncates).
+    match /player_totals/{playerId} {
+      function countedRow() {
+        return get(/databases/$(database)/documents/game_player/$(request.resource.data.lastEntry)).data;
+      }
+
+      function countsOneNewGame() {
+        let entryId = request.resource.data.lastEntry;
+        return entryId is string
+          && countedRow().deviceUuid == playerId
+          && request.auth.uid in countedRow().participantUids
+          && !exists(/databases/$(database)/documents/leaderboard/$(entryId))
+          && existsAfter(/databases/$(database)/documents/leaderboard/$(entryId))
+          && request.resource.data.displayName == countedRow().displayName;
+      }
+
+      function addsUp(before) {
+        let totals = request.resource.data;
+        let row = countedRow();
+        return totals.gamesPlayed == before.gamesPlayed + 1
+          && totals.wins == before.wins + (row.placement == 1 ? 1 : 0)
+          && totals.scoreSum == before.scoreSum + row.finalScore
+          && totals.winRate == float(totals.wins) / totals.gamesPlayed
+          && totals.averageScore == float(totals.scoreSum) / totals.gamesPlayed
+          && totals.qualified == (totals.gamesPlayed >= 5);
+      }
+
+      function hasTotalsShape() {
+        let keys = ['displayName', 'gamesPlayed', 'wins', 'scoreSum', 'winRate', 'averageScore', 'qualified', 'lastEntry'];
+        return request.resource.data.keys().hasOnly(keys) && request.resource.data.keys().hasAll(keys);
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && request.query.limit <= 10;
+      allow create: if isSignedIn()
+        && hasTotalsShape()
+        && countsOneNewGame()
+        && addsUp({ 'gamesPlayed': 0, 'wins': 0, 'scoreSum': 0 });
+      allow update: if isSignedIn()
+        && hasTotalsShape()
+        && countsOneNewGame()
+        && addsUp(resource.data);
+      allow delete: if false;
+    }
+
     match /leaderboard/{entryId} {
       function matchesItsStatsRow() {
         let row = get(/databases/$(database)/documents/game_player/$(entryId)).data;

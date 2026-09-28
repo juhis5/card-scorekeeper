@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Single job: one highscore list as a table. This device's own entries say "you" in words, not
- * only by color.
+ * only by color. Game records show the date; player lists show how many games a total covers.
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -16,19 +16,38 @@ import {
 } from '@/components/ui/table'
 import type { HighscoreEntry } from '@/stores/highscores'
 
-const { id, title, description, entries } = defineProps<{
+export type HighscoreValueKind = 'count' | 'percent' | 'average'
+
+const {
+  id,
+  title,
+  description,
+  valueHeader,
+  valueKind = 'count',
+  entries,
+} = defineProps<{
   id: string
   title: string
   description: string
+  valueHeader: string
+  valueKind?: HighscoreValueKind
   entries: HighscoreEntry[]
 }>()
 
-const { t, n, locale } = useI18n()
+const { t, locale } = useI18n()
 
 const dateFormat = computed(
   () =>
     new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'numeric', year: 'numeric' }),
 )
+const valueFormat = computed(
+  () =>
+    new Intl.NumberFormat(locale.value, {
+      style: valueKind === 'percent' ? 'percent' : 'decimal',
+      maximumFractionDigits: valueKind === 'average' ? 1 : 0,
+    }),
+)
+const countFormat = computed(() => new Intl.NumberFormat(locale.value))
 </script>
 
 <template>
@@ -40,7 +59,7 @@ const dateFormat = computed(
         <TableRow>
           <TableHead scope="col" class="w-8">{{ t('stats.highscores.rank') }}</TableHead>
           <TableHead scope="col">{{ t('stats.highscores.player') }}</TableHead>
-          <TableHead scope="col" class="text-right">{{ t('stats.highscores.points') }}</TableHead>
+          <TableHead scope="col" class="text-right">{{ valueHeader }}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -48,17 +67,30 @@ const dateFormat = computed(
           {{ t('stats.highscores.empty') }}
         </TableEmpty>
         <TableRow v-for="entry in entries" :key="entry.id" :class="{ 'bg-muted': entry.isMine }">
-          <TableCell class="text-muted-foreground tabular-nums">{{ n(entry.rank) }}</TableCell>
+          <TableCell class="text-muted-foreground tabular-nums">
+            {{ countFormat.format(entry.rank) }}
+          </TableCell>
           <TableCell class="whitespace-normal">
             <span class="font-medium">{{ entry.displayName }}</span>
             <span v-if="entry.isMine" class="text-primary text-sm">
               · {{ t('stats.highscores.you') }}
             </span>
-            <span class="text-muted-foreground block text-xs">
+            <span v-if="entry.finishedAt" class="text-muted-foreground block text-xs">
               {{ dateFormat.format(new Date(entry.finishedAt)) }}
             </span>
+            <span v-else-if="entry.gamesPlayed" class="text-muted-foreground block text-xs">
+              {{
+                t(
+                  'stats.highscores.games',
+                  { count: countFormat.format(entry.gamesPlayed) },
+                  entry.gamesPlayed,
+                )
+              }}
+            </span>
           </TableCell>
-          <TableCell class="text-right font-semibold tabular-nums">{{ n(entry.points) }}</TableCell>
+          <TableCell class="text-right font-semibold tabular-nums">
+            {{ valueFormat.format(entry.value) }}
+          </TableCell>
         </TableRow>
       </TableBody>
     </Table>

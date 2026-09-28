@@ -5,10 +5,23 @@ const setDocMock = vi.fn().mockResolvedValue(undefined)
 const getDocMock = vi.fn()
 const docMock = vi.fn((db: unknown, path: string) => ({ db, path }))
 
+/** A transaction whose reads use getDocMock and whose writes are recorded like setDoc's. */
+const transactionSetMock = vi.fn()
+const runTransactionMock = vi.fn(
+  async (_db: unknown, update: (transaction: unknown) => Promise<void>) => {
+    await update({
+      get: (ref: unknown) => getDocMock(ref),
+      set: (ref: unknown, data: unknown) => transactionSetMock(ref, data),
+    })
+  },
+)
+
 vi.mock('firebase/firestore', () => ({
   doc: (db: unknown, path: string) => docMock(db, path),
   getDoc: (ref: unknown) => getDocMock(ref),
   setDoc: (ref: unknown, data: unknown) => setDocMock(ref, data),
+  runTransaction: (db: unknown, update: (transaction: unknown) => Promise<void>) =>
+    runTransactionMock(db, update),
 }))
 
 const { writeGameResult } = await import('./firestore-stats')
@@ -102,25 +115,45 @@ describe('writeGameResult', () => {
     expect(Math.min(...playerIndices)).toBeGreaterThan(resultIndex)
   })
 
-  it("publishes each player's highscore entry after their stats row, repeating it", async () => {
+  it("publishes each player's highscore entry with their new totals, after their stats row", async () => {
     await writeGameResult(DB, RESULT, PLAYERS)
 
-    const paths = setDocMock.mock.calls.map((call) => pathOf(call[0]))
-    expect(paths.indexOf('leaderboard/g1_device-a')).toBeGreaterThan(
-      paths.indexOf('game_player/g1_device-a'),
-    )
-    expect(setDocMock).toHaveBeenCalledWith(
-      { db: DB, path: 'leaderboard/g1_device-b' },
+    const written = transactionSetMock.mock.calls.map(([ref, data]) => [pathOf(ref), data])
+    expect(written).toContainEqual([
+      'leaderboard/g1_device-b',
       { displayName: 'Bob', finalScore: 20, worstRound: 8, finishedAt: '2026-01-01T00:00:00.000Z' },
-    )
+    ])
+    expect(written).toContainEqual([
+      'player_totals/device-b',
+      expect.objectContaining({ gamesPlayed: 1, wins: 0, scoreSum: 20, lastEntry: 'g1_device-b' }),
+    ])
+    expect(runTransactionMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("adds to a player's existing totals, and counts a game already published only once", async () => {
+    getDocMock.mockImplementation((ref: unknown) => {
+      const path = pathOf(ref)
+      if (path === 'player_totals/device-a') {
+        return Promise.resolve({
+          exists: () => true,
+          data: () => ({ gamesPlayed: 4, wins: 2, scoreSum: 200 }),
+        })
+      }
+      return Promise.resolve({ exists: () => path === 'leaderboard/g1_device-b' })
+    })
+
+    await writeGameResult(DB, RESULT, PLAYERS)
+
+    const written = transactionSetMock.mock.calls.map(([ref, data]) => [pathOf(ref), data])
+    expect(written).toContainEqual([
+      'player_totals/device-a',
+      expect.objectContaining({ gamesPlayed: 5, wins: 3, scoreSum: 210, qualified: true }),
+    ])
+    expect(written.map(([path]) => path)).not.toContain('player_totals/device-b')
   })
 
   it('still finishes when the highscores refuse an entry', async () => {
-    setDocMock.mockImplementation((ref: unknown) =>
-      pathOf(ref).startsWith('leaderboard/')
-        ? Promise.reject(new Error('permission-denied'))
-        : Promise.resolve(undefined),
-    )
+    runTransactionMock.mockRejectedValueOnce(new Error('permission-denied'))
 
     await expect(writeGameResult(DB, RESULT, PLAYERS)).resolves.toBeUndefined()
   })

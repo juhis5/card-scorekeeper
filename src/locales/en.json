@@ -332,7 +332,6 @@
       "empty": "No games yet.",
       "rank": "#",
       "player": "Player",
-      "points": "Points",
       "you": "you",
       "lists": {
         "bestGames": {
@@ -346,8 +345,36 @@
         "biggestRounds": {
           "title": "Biggest round",
           "description": "Most points in one round"
+        },
+        "mostWins": {
+          "title": "Most wins",
+          "description": "Games won; a shared first place counts"
+        },
+        "bestWinRate": {
+          "title": "Best win rate",
+          "description": "Among players with at least {min} games"
+        },
+        "bestAverage": {
+          "title": "Best average",
+          "description": "Lowest average final score, at least {min} games"
+        },
+        "mostGames": {
+          "title": "Most games played",
+          "description": "Finished games"
         }
-      }
+      },
+      "tabs": {
+        "players": "Players",
+        "games": "Games"
+      },
+      "columns": {
+        "points": "Points",
+        "wins": "Wins",
+        "winRate": "Win %",
+        "average": "Average",
+        "games": "Games"
+      },
+      "games": "{count} game | {count} games"
     }
   },
   "invite": {

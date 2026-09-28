@@ -417,3 +417,22 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     just forgets it; without a connection it's only forgotten here, which the confirm says.
   - The store's `leave()` now clears `gameId` and `roomCode` too, so an ended game doesn't linger
     as "in progress".
+- 2026-09-28 — Global player lists (fifth round; the owner chose most wins, best win rate, best
+  average and most games):
+  - Reading every game for "most wins" would grow with every game. Instead each player (auth uid
+    or guest id) has a running total, `player_totals/{playerId}`: games, wins, score sum, and the
+    derived win rate, average and `qualified` (at least 5 games, `QUALIFYING_GAMES`). Each list
+    is then one query of 10 reads, like the game records.
+  - The totals change in the same transaction that publishes a game's leaderboard entry. The rules
+    accept a write only if it counts exactly the stats row its `lastEntry` names (one more game,
+    a win if that row placed first, its score), in the write that creates that row's entry, by
+    one of that game's players. An entry can only be created once, so each game counts once. The
+    derived fields must equal what `nextPlayerTotals` computes; the rules use `float()` because
+    dividing two ints there truncates (a test pins a third). The transaction retries if two games
+    finish with the same player at once.
+  - Win rate and average rank only qualified players, which needs two composite indexes
+    (`firebase/firestore.indexes.json`), deployed with the rules.
+  - Tilastot's records split into tabs: Pelaajat (the four player lists, each with its game count)
+    and Pelit (best game, hall of shame, biggest round).
+  - Totals start with this release; at the release they're built once from the production games,
+    together with the highscore entries.
