@@ -2,12 +2,17 @@
  * writer is injected (see reconnect-flush.ts), so nothing here imports Firebase. */
 import type { GamePlayer, GameResult } from '../game/types'
 import type { KeyValueStorage } from './key-value-storage'
+import { reportHandledError } from '../platform/error-reporting'
 import { isPermanentWriteError } from './write-errors'
 
 export const PENDING_RESULTS_STORAGE_KEY = 'card-scorekeeper:pending-results'
 /** Results Firestore rejected for good (e.g. a value its rules refuse). Kept, not deleted, so the
  * record isn't lost, but never retried: one of these must not block every later game's upload. */
 export const FAILED_RESULTS_STORAGE_KEY = 'card-scorekeeper:pending-results-failed'
+
+/** Highscore entries of finished online games that failed to publish for a passing reason
+ * (offline, a contended transaction). Retried with the queue; each entry is written once. */
+export const PENDING_HIGHSCORES_STORAGE_KEY = 'card-scorekeeper:pending-highscores'
 
 /** One finished game's records, always written as a unit. */
 export interface PendingResult {
@@ -138,6 +143,7 @@ export async function flushPendingResults(
       await writer.write(entry)
     } catch (error) {
       if (!isPermanentWriteError(error)) break
+      reportHandledError(error, 'pending-result-refused')
       moveToFailedResults(storage, entry)
       failed += 1
       continue
@@ -147,4 +153,36 @@ export async function flushPendingResults(
   }
 
   return { flushed, failed, remaining: readPendingResults(storage).length }
+}
+
+export function readPendingHighscores(storage: KeyValueStorage): PendingResult[] {
+  return readResults(storage, PENDING_HIGHSCORES_STORAGE_KEY)
+}
+
+/** Adds a game's unpublished entries, merged with any already waiting for that game. */
+export function appendPendingHighscores(storage: KeyValueStorage, entry: PendingResult): void {
+  const others = readPendingHighscores(storage).filter(
+    (waiting) => waiting.result.gameId !== entry.result.gameId,
+  )
+  writeResults(storage, PENDING_HIGHSCORES_STORAGE_KEY, [...others, entry])
+}
+
+export interface HighscorePublisher {
+  /** Resolves to the players whose entries still failed for a passing reason. */
+  publish(entry: PendingResult): Promise<GamePlayer[]>
+}
+
+/** Retries every waiting game. What still fails stays queued; the rest is done. */
+export async function flushPendingHighscores(
+  storage: KeyValueStorage,
+  publisher: HighscorePublisher,
+): Promise<void> {
+  for (const entry of readPendingHighscores(storage)) {
+    const stillFailing = await publisher.publish(entry)
+    const others = readPendingHighscores(storage).filter(
+      (waiting) => waiting.result.gameId !== entry.result.gameId,
+    )
+    const remaining = stillFailing.length > 0 ? [{ ...entry, players: stillFailing }] : []
+    writeResults(storage, PENDING_HIGHSCORES_STORAGE_KEY, [...others, ...remaining])
+  }
 }

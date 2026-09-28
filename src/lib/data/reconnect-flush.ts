@@ -1,8 +1,14 @@
 /** Uploads finished local games queued offline. The logic is in pending-results.ts; this wires
  * the real writer. Firebase loads lazily so an offline host never downloads it. */
+import { reportHandledError } from '../platform/error-reporting'
 import { withTimeout } from '../platform/timeout'
 import { browserLocalStorage } from './key-value-storage'
-import { flushPendingResults, readPendingResults } from './pending-results'
+import {
+  flushPendingHighscores,
+  flushPendingResults,
+  readPendingHighscores,
+  readPendingResults,
+} from './pending-results'
 
 /** An offline Firestore write waits forever; past this the upload stops and tries again later. */
 export const UPLOAD_WRITE_TIMEOUT_MS = 15_000
@@ -30,8 +36,27 @@ export async function uploadPendingResults(): Promise<number> {
       },
     })
     return flushed
-  } catch {
+  } catch (error) {
     // Stays queued for the next try.
+    reportHandledError(error, 'upload-pending-results')
     return 0
+  }
+}
+
+/** Retries highscore entries of online games that failed to publish. Never throws. */
+export async function uploadPendingHighscores(): Promise<void> {
+  try {
+    if (readPendingHighscores(browserLocalStorage()).length === 0) return
+    const [{ getDb, ensureSignedIn }, { publishHighscores }] = await Promise.all([
+      import('./firebase'),
+      import('./firestore-stats'),
+    ])
+    await ensureSignedIn()
+    const db = getDb()
+    await flushPendingHighscores(browserLocalStorage(), {
+      publish: (entry) => publishHighscores(db, entry.result, entry.players),
+    })
+  } catch (error) {
+    reportHandledError(error, 'upload-pending-highscores')
   }
 }

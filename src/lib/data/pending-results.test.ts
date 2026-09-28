@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  appendPendingHighscores,
   appendPendingResult,
   discardFailedResults,
   FAILED_RESULTS_STORAGE_KEY,
+  flushPendingHighscores,
   flushPendingResults,
   PENDING_RESULTS_STORAGE_KEY,
   readFailedResults,
+  readPendingHighscores,
   readPendingResults,
   retryFailedResults,
 } from './pending-results'
@@ -269,6 +272,31 @@ describe('failed results', () => {
 
     expect(readFailedResults(storage)).toEqual([])
     expect(readPendingResults(storage)).toHaveLength(1)
+  })
+})
+
+describe('pending highscores', () => {
+  it("merges a game's unpublished entries instead of queueing it twice", () => {
+    const storage = makeMemoryStorage()
+    appendPendingHighscores(storage, pendingResult('g1', 'a'))
+    appendPendingHighscores(storage, pendingResult('g1', 'b'))
+
+    expect(readPendingHighscores(storage)).toHaveLength(1)
+    expect(readPendingHighscores(storage)[0]?.players[0]?.deviceUuid).toBe('b')
+  })
+
+  it('keeps only what still fails after a retry', async () => {
+    const storage = makeMemoryStorage()
+    appendPendingHighscores(storage, pendingResult('done'))
+    appendPendingHighscores(storage, pendingResult('still-failing'))
+
+    await flushPendingHighscores(storage, {
+      publish: async (entry) => (entry.result.gameId === 'still-failing' ? entry.players : []),
+    })
+
+    expect(readPendingHighscores(storage).map((entry) => entry.result.gameId)).toEqual([
+      'still-failing',
+    ])
   })
 })
 

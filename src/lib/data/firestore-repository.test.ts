@@ -7,8 +7,8 @@ vi.mock('./firebase', () => ({
   ensureSignedIn: (...args: unknown[]) => ensureSignedInMock(...args),
 }))
 
-const writeGameResultMock = vi.fn().mockResolvedValue(undefined)
-const publishHighscoresMock = vi.fn().mockResolvedValue(undefined)
+const writeGameResultMock = vi.fn((...args: unknown[]) => Promise.resolve(args[1]))
+const publishHighscoresMock = vi.fn().mockResolvedValue([])
 vi.mock('./firestore-stats', () => ({
   writeGameResult: (...args: unknown[]) => writeGameResultMock(...args),
   publishHighscores: (...args: unknown[]) => publishHighscoresMock(...args),
@@ -72,8 +72,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   ensureSignedInMock.mockResolvedValue(HOST_UID)
   updateDocMock.mockResolvedValue(undefined)
-  writeGameResultMock.mockResolvedValue(undefined)
-  publishHighscoresMock.mockResolvedValue(undefined)
+  writeGameResultMock.mockImplementation((...args: unknown[]) => Promise.resolve(args[1]))
+  publishHighscoresMock.mockResolvedValue([])
   collectionMock.mockImplementation((_db: unknown, path: string) => ({ path }))
   docMock.mockImplementation((_db: unknown, path: string) => ({ path }))
   batchCommitMock.mockResolvedValue(undefined)
@@ -752,6 +752,41 @@ describe('FirestoreGameRepository.finishGame — order', () => {
     const [roomUpdateOrder] = updateDocMock.mock.invocationCallOrder
     const [publishOrder] = publishHighscoresMock.mock.invocationCallOrder
     expect(roomUpdateOrder).toBeLessThan(publishOrder ?? 0)
+  })
+
+  it('publishes a retried Finish whose room is already finished, without writing the room again', async () => {
+    installFinishedRoom()
+    getDocMock.mockResolvedValue(snapshot({ status: 'finished', currentRound: 5 }))
+
+    await makeRepo().finishGame()
+
+    expect(updateDocMock).not.toHaveBeenCalled()
+    expect(publishHighscoresMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('queues the entries that failed to publish, to retry once back online', async () => {
+    installFinishedRoom()
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+    }
+    publishHighscoresMock.mockImplementation((_db: unknown, _result: unknown, players: unknown[]) =>
+      Promise.resolve(players.slice(0, 1)),
+    )
+    const repo = new FirestoreGameRepository({
+      db: {} as never,
+      auth: {} as never,
+      roomCode: ROOM_CODE,
+      storage,
+    })
+
+    await repo.finishGame()
+
+    const queued = JSON.parse(values.get('card-scorekeeper:pending-highscores') ?? '[]')
+    expect(queued).toHaveLength(1)
+    expect(queued[0].result.gameId).toBe(ROOM_CODE)
+    expect(queued[0].players).toHaveLength(1)
   })
 
   it('leaves the room unfinished when the stats write fails, so Finish can be retried', async () => {

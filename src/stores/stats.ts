@@ -8,6 +8,7 @@ import { probeBackendReachable } from '@/lib/platform/connectivity'
 import { headToHead, playerStats } from '@/lib/game/stats'
 import type { HeadToHeadRecord, PlayerStats } from '@/lib/game/stats'
 import type { GamePlayer, GameResult } from '@/lib/game/types'
+import { reportHandledError } from '@/lib/platform/error-reporting'
 
 /** Firestore's `in` operator compares against at most 30 values per query. */
 const IN_QUERY_CHUNK_SIZE = 30
@@ -141,7 +142,8 @@ export const useStatsStore = defineStore('stats', () => {
       stats.value = playerStats(uid, allRows)
       opponents.value = buildOpponentRecords(uid, allRows, finishedAtByGameId)
       status.value = 'loaded'
-    } catch {
+    } catch (error) {
+      reportHandledError(error, 'load-stats')
       status.value = 'error'
     }
   }

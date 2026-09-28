@@ -13,9 +13,11 @@ import type { PendingResult } from '@/lib/data/pending-results'
 import { useResultQueueStore } from '@/stores/result-queue'
 
 const uploadPendingResultsMock = vi.fn()
+const uploadPendingHighscoresMock = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/lib/data/reconnect-flush', () => ({
   uploadPendingResults: () => uploadPendingResultsMock(),
+  uploadPendingHighscores: () => uploadPendingHighscoresMock(),
 }))
 
 function queuedGame(gameId: string): PendingResult {

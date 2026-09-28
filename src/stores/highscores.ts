@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { probeBackendReachable } from '@/lib/platform/connectivity'
+import { reportHandledError } from '@/lib/platform/error-reporting'
 
 /** Also the most firestore.rules lets one query read. */
 export const HIGHSCORE_LIMIT = 10
@@ -134,7 +135,8 @@ export const useHighscoresStore = defineStore('highscores', () => {
       )
       lists.value = { ...emptyLists(), ...Object.fromEntries(loaded) }
       status.value = 'loaded'
-    } catch {
+    } catch (error) {
+      reportHandledError(error, 'load-highscores')
       status.value = 'error'
     }
   }

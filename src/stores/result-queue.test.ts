@@ -3,15 +3,18 @@ import { createPinia, setActivePinia } from 'pinia'
 import {
   appendPendingResult,
   FAILED_RESULTS_STORAGE_KEY,
+  PENDING_HIGHSCORES_STORAGE_KEY,
   readPendingResults,
 } from '@/lib/data/pending-results'
 import type { PendingResult } from '@/lib/data/pending-results'
 import { useResultQueueStore } from './result-queue'
 
 const uploadPendingResultsMock = vi.fn()
+const uploadPendingHighscoresMock = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/lib/data/reconnect-flush', () => ({
   uploadPendingResults: () => uploadPendingResultsMock(),
+  uploadPendingHighscores: () => uploadPendingHighscoresMock(),
 }))
 
 function queuedGame(gameId: string): PendingResult {
@@ -34,6 +37,7 @@ beforeEach(() => {
   localStorage.clear()
   vi.restoreAllMocks()
   uploadPendingResultsMock.mockReset().mockResolvedValue(0)
+  uploadPendingHighscoresMock.mockReset().mockResolvedValue(undefined)
   setOnline(true)
 })
 
@@ -70,12 +74,22 @@ describe('useResultQueueStore', () => {
     await useResultQueueStore().upload()
 
     expect(uploadPendingResultsMock).not.toHaveBeenCalled()
+    expect(uploadPendingHighscoresMock).not.toHaveBeenCalled()
+  })
+
+  it('retries unpublished highscores even with no game waiting', async () => {
+    localStorage.setItem(PENDING_HIGHSCORES_STORAGE_KEY, JSON.stringify([queuedGame('g1')]))
+
+    await useResultQueueStore().upload()
+
+    expect(uploadPendingHighscoresMock).toHaveBeenCalledTimes(1)
   })
 
   it('skips the upload when nothing is waiting', async () => {
     await useResultQueueStore().upload()
 
     expect(uploadPendingResultsMock).not.toHaveBeenCalled()
+    expect(uploadPendingHighscoresMock).not.toHaveBeenCalled()
   })
 
   it('runs one upload at a time, so two triggers never write a game twice', async () => {
