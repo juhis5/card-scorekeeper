@@ -20,7 +20,7 @@ describe('installGuideFor', () => {
     expect(installGuideFor({ userAgent: IPHONE_SAFARI, maxTouchPoints: 5 })).toBe('ios-safari')
   })
 
-  it("tells Chrome on an iPhone to use the Share button in its address bar (the tester's case)", () => {
+  it('tells Chrome on an iPhone to use the Share button in its address bar', () => {
     expect(installGuideFor({ userAgent: IPHONE_CHROME, maxTouchPoints: 5 })).toBe('ios-chrome')
   })
 

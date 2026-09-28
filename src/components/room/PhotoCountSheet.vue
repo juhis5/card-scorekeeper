@@ -23,7 +23,7 @@ import {
   type PhotoCountCard,
   type PhotoCountFailureReason,
 } from '@/composables/usePhotoCount'
-import { isValidRoundScore, MAX_ROUND_SCORE } from '@/lib/game/rules'
+import { isValidRoundScore, MAX_ROUND_SCORE, SUIT_SYMBOLS } from '@/lib/game/rules'
 
 const { id, roomCode } = defineProps<{
   /** Base id for the form controls, unique per card. */
@@ -85,16 +85,12 @@ const isTotalValid = computed(() => total.value !== null && isValidRoundScore(to
 const isTotalInvalid = computed(() => total.value !== null && !isValidRoundScore(total.value))
 const totalErrorId = computed(() => `${id}-total-error`)
 
-const SUIT_SYMBOLS: Record<string, string> = {
-  clubs: '♣',
-  diamonds: '♦',
-  hearts: '♥',
-  spades: '♠',
-}
+/** The model's suit is an unchecked string, so look it up as one. */
+const symbolBySuit: Readonly<Record<string, string>> = SUIT_SYMBOLS
 
 function cardSymbol(card: PhotoCountCard): string {
   if (card.suit === null) return t('room.photoCount.jokerShort')
-  return `${card.rank}${SUIT_SYMBOLS[card.suit] ?? card.suit}`
+  return `${card.rank}${symbolBySuit[card.suit] ?? card.suit}`
 }
 
 function rankName(rank: string): string {

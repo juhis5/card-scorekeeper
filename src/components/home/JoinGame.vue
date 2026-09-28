@@ -50,7 +50,7 @@ const isNameMissing = computed(() => attemptedSubmit.value && trimmedName.value 
 const nameTaken = ref<'player' | 'guest' | null>(null)
 const isNameInvalid = computed(() => isNameMissing.value || nameTaken.value !== null)
 const nameError = computed(() => {
-  if (isNameMissing.value) return t('home.errors.hostNameRequired')
+  if (isNameMissing.value) return t('home.errors.nameRequired')
   return nameTaken.value === 'guest'
     ? t('home.join.errors.nameTakenByGuest')
     : t('home.join.errors.nameTaken')

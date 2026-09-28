@@ -6,13 +6,12 @@
  */
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { SUIT_SYMBOLS } from '@/lib/game/rules'
 import type { Card } from '@/lib/game/types'
 
 const { card } = defineProps<{ card: Card }>()
 
 const { t } = useI18n()
-
-const SUIT_SYMBOLS = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' } as const
 
 const isRed = computed(() => card.suit === 'hearts' || card.suit === 'diamonds')
 const spokenName = computed(() =>

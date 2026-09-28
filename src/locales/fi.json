@@ -91,7 +91,7 @@
       }
     },
     "errors": {
-      "hostNameRequired": "Anna nimesi jatkaaksesi.",
+      "nameRequired": "Anna nimesi jatkaaksesi.",
       "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen."
     },
     "continue": {

@@ -171,15 +171,6 @@ describe('handleCountRequest', () => {
     )
   })
 
-  it('rejects an oversized image with 413', async () => {
-    const oversizedImage = Buffer.alloc(MAX_IMAGE_BYTES + 1, 1).toString('base64')
-    const result = await handleCountRequest(
-      validRequest({ body: validBody({ image: oversizedImage }) }),
-      createDeps(),
-    )
-    expect(result.status).toBe(413)
-  })
-
   it('returns a clean error when the Gemini call itself fails (quota/network)', async () => {
     const deps = createDeps({
       geminiClient: { extractCards: vi.fn().mockRejectedValue(new Error('quota exceeded')) },

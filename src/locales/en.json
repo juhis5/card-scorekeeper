@@ -91,7 +91,7 @@
       }
     },
     "errors": {
-      "hostNameRequired": "Enter your name to continue.",
+      "nameRequired": "Enter your name to continue.",
       "startFailed": "Couldn't start the game. Try again."
     },
     "continue": {

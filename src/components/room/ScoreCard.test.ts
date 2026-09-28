@@ -405,10 +405,11 @@ describe('ScoreCard, discarding and saving a draft', () => {
 })
 
 describe('ScoreCard photo-count affordance', () => {
-  it('is hidden by default (offline / not this device own row)', () => {
+  it('is hidden by default (offline / not this device own row)', async () => {
     renderCard()
 
-    // Collapsed, so this holds whatever the gate says; the cases below expand the card.
+    await expandCard()
+    expect(scoreInput()).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Snap cards' })).toBeNull()
   })
 
