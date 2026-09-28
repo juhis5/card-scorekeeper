@@ -172,6 +172,7 @@ service cloud.firestore {
             && playerUid == request.auth.uid
             && request.resource.data.ownerUid == request.auth.uid
             && roomNotExpired(code)
+            && roomData(code).status in ['waiting', 'playing']
             && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
             && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
             && isCleanPlayerName(request.resource.data.name)
@@ -365,6 +366,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['gameId', 'finishedAt', 'totalRounds', 'participantUids'])
         && request.resource.data.gameId == gameId
         && request.resource.data.finishedAt is string
+        && request.resource.data.finishedAt.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z')
         && request.resource.data.totalRounds is int
         && request.resource.data.totalRounds == 5
         && request.resource.data.participantUids is list
@@ -423,7 +425,9 @@ service cloud.firestore {
     // Global highscores: one public entry per stats row, readable by anyone signed in, ten at a
     // time. An entry must copy its game_player row (and the game's finishedAt) exactly and come
     // from one of that game's players, so the stats-row rules above also decide what reaches the
-    // board. Append-only.
+    // board. Only an online game counts, once its room is finished and with at least two players
+    // (guests included): a local game is three self-written docs anyone could script, so it counts
+    // in its player's own stats only. Append-only.
     // The global player lists: one running total per player, which anyone signed in may read, ten
     // at a time. A write must count exactly one game's stats row (the one `lastEntry` names), in
     // the same write that publishes that row's leaderboard entry. An entry can only be created
@@ -479,6 +483,9 @@ service cloud.firestore {
         let row = get(/databases/$(database)/documents/game_player/$(entryId)).data;
         let result = get(/databases/$(database)/documents/game_result/$(row.gameId)).data;
         return request.auth.uid in row.participantUids
+          && roomExists(row.gameId)
+          && roomData(row.gameId).status == 'finished'
+          && row.participantUids.size() >= 2
           && request.resource.data.displayName == row.displayName
           && request.resource.data.finalScore == row.finalScore
           && request.resource.data.worstRound == row.worstRound

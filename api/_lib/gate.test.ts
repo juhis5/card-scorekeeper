@@ -62,6 +62,11 @@ describe('evaluateRoomGate', () => {
     expect(evaluateRoomGate(room, nowMs)).toEqual({ ok: false, reason: 'finished' })
   })
 
+  it('rejects a room the host ended early', () => {
+    const room: RoomSnapshot = { ...activeRoom, status: 'abandoned' }
+    expect(evaluateRoomGate(room, nowMs)).toEqual({ ok: false, reason: 'finished' })
+  })
+
   it('rejects an expired room', () => {
     const room: RoomSnapshot = { ...activeRoom, expiresAtMs: nowMs - 1 }
     expect(evaluateRoomGate(room, nowMs)).toEqual({ ok: false, reason: 'expired' })

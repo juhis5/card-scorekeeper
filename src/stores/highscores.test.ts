@@ -165,6 +165,25 @@ describe('useHighscoresStore, player lists', () => {
     expect(highscores.lists.bestAverage[0]?.gamesPlayed).toBe(6)
   })
 
+  it('leaves out an unreadable date instead of letting it break the list', async () => {
+    const original = COLLECTIONS.leaderboard?.[2]?.finishedAt
+    const forged = COLLECTIONS.leaderboard?.[2]
+    if (!forged) throw new Error('expected a third leaderboard entry')
+    forged.finishedAt = 'x'
+    try {
+      installBoard()
+      const store = useHighscoresStore()
+
+      await store.load()
+
+      const mummo = store.lists.bestGames.find((entry) => entry.displayName === 'Mummo')
+      expect(mummo).toBeDefined()
+      expect(mummo?.finishedAt).toBeUndefined()
+    } finally {
+      forged.finishedAt = original
+    }
+  })
+
   it('reads every list ten at a time at most', async () => {
     installBoard()
 

@@ -149,6 +149,11 @@ export function canFinishGame(
   return currentRound === TOTAL_ROUNDS && canCloseRound(playerIds, roundScores, currentRound)
 }
 
+/** Finished or ended early: nobody joins, scores or photographs cards in it any more. */
+export function isGameOver(status: GameStatus): boolean {
+  return status === 'finished' || status === 'abandoned'
+}
+
 /** Rounds whose scores are settled: those before the current one, or all of them once the game
  * is finished. The scoreboard marks a leader only after the first one. */
 export function completedRounds(currentRound: ContractRoundNumber, status: GameStatus): number {

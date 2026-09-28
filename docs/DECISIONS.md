@@ -349,8 +349,8 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     (and the game's `finishedAt`) exactly, written by one of that game's players. So who may write
     a stats row decides what reaches the board. A host could still enter made-up scores in their
     own game; accepted when choosing a global board.
-  - Names on the board are public to app users. The entry id carries the game code and the
-    player's anonymous uid.
+  - Names on the board are public to anyone holding the public web config (anonymous sign-in).
+    The entry id carries the game code and the player's anonymous uid (see 2026-09-28 below).
   - An entry is an extra: if it can't be written, the game still finishes and the entry is left
     out, not retried.
   - At the next release, the production games played since the wipe get their entries copied in
@@ -505,3 +505,20 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   held Enter or an IME confirmation doesn't save. A photo retake clears the previous result and
   only the newest read counts, so a hidden old total can't be confirmed. A timed-out end game says
   it ends once the phone is back online (the write stays queued), not that it failed.
+- 2026-09-28 — Ended rooms stay closed; the public lists count online games only (second audit,
+  PR 3).
+  - A seat can be created only while the room is waiting or playing. Before, a stranger could sit
+    down in a finished room (shown as the winner on every phone still on it, then carried into the
+    next game by Play again) or in an abandoned one. Late joiners during play are unaffected.
+  - Owner's decision: the leaderboard and player_totals accept an entry only for a finished online
+    room with at least two participants (guests count: a guest is a real person without a phone).
+    A local game is three self-written docs any script could forge; it now feeds Tilastot only.
+    Highscores are published after the room is marked finished, so the rule can check it.
+  - Accepted, for now: someone scripting two anonymous accounts through a real room can still
+    forge an entry, and an entry id still carries its room code, so a finished room's code (and its
+    `nextRoomCode`) is public. The next room is joinable like any room whose code is known; the
+    host sees newcomers and can remove them. App Check is the fix for both and is still open.
+  - `finishedAt` must be an ISO timestamp (`YYYY-MM-DDTHH:MM:SS.sssZ`); the Ennätykset list also
+    skips an unreadable date instead of failing to render.
+  - `isGameOver(status)` in rules.ts is the one "room is over" check (store, repository, JoinView,
+    and the photo gate, which now also refuses an abandoned room).

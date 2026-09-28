@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import {
   completedRounds as completedRoundsFor,
   contractForRound,
+  isGameOver,
   runningTotal,
   standings as standingsFor,
   winners as winnersFor,
@@ -58,8 +59,7 @@ export const useGameStore = defineStore('game', () => {
       (next) => {
         state.value = next
         // Nothing left to continue: Home stops offering this room.
-        const isOver = next.status === 'finished' || next.status === 'abandoned'
-        if (isOver && roomCode.value) forgetRoom(roomCode.value)
+        if (isGameOver(next.status) && roomCode.value) forgetRoom(roomCode.value)
       },
       (error) => {
         connectionError.value = isPermissionDenied(error) ? 'removed' : 'lost'

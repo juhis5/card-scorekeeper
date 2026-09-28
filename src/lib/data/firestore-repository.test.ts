@@ -8,8 +8,10 @@ vi.mock('./firebase', () => ({
 }))
 
 const writeGameResultMock = vi.fn().mockResolvedValue(undefined)
+const publishHighscoresMock = vi.fn().mockResolvedValue(undefined)
 vi.mock('./firestore-stats', () => ({
   writeGameResult: (...args: unknown[]) => writeGameResultMock(...args),
+  publishHighscores: (...args: unknown[]) => publishHighscoresMock(...args),
 }))
 
 const collectionMock = vi.fn((_db: unknown, path: string) => ({ path }))
@@ -71,6 +73,7 @@ beforeEach(() => {
   ensureSignedInMock.mockResolvedValue(HOST_UID)
   updateDocMock.mockResolvedValue(undefined)
   writeGameResultMock.mockResolvedValue(undefined)
+  publishHighscoresMock.mockResolvedValue(undefined)
   collectionMock.mockImplementation((_db: unknown, path: string) => ({ path }))
   docMock.mockImplementation((_db: unknown, path: string) => ({ path }))
   batchCommitMock.mockResolvedValue(undefined)
@@ -739,6 +742,16 @@ describe('FirestoreGameRepository.finishGame — order', () => {
     const [statsWriteOrder] = writeGameResultMock.mock.invocationCallOrder
     const [roomUpdateOrder] = updateDocMock.mock.invocationCallOrder
     expect(statsWriteOrder).toBeLessThan(roomUpdateOrder ?? 0)
+  })
+
+  it('publishes the highscores only after the room is finished, as the rules require', async () => {
+    installFinishedRoom()
+
+    await makeRepo().finishGame()
+
+    const [roomUpdateOrder] = updateDocMock.mock.invocationCallOrder
+    const [publishOrder] = publishHighscoresMock.mock.invocationCallOrder
+    expect(roomUpdateOrder).toBeLessThan(publishOrder ?? 0)
   })
 
   it('leaves the room unfinished when the stats write fails, so Finish can be retried', async () => {

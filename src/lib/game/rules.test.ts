@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   canCloseRound,
   canFinishGame,
+  isGameOver,
   roundsWithoutWinner,
   roundsWithSeveralZeros,
   ACE_VALUE,
@@ -417,6 +418,15 @@ describe('canFinishGame', () => {
 
   it('never finishes with a seated player who has no scores (a seat that just arrived)', () => {
     expect(canFinishGame(['alice', 'bob', 'carol'], fullGame, 5)).toBe(false)
+  })
+})
+
+describe('isGameOver', () => {
+  it('is over once finished or ended early, not while waiting or playing', () => {
+    expect(isGameOver('finished')).toBe(true)
+    expect(isGameOver('abandoned')).toBe(true)
+    expect(isGameOver('waiting')).toBe(false)
+    expect(isGameOver('playing')).toBe(false)
   })
 })
 

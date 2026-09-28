@@ -24,7 +24,7 @@ vi.mock('firebase/firestore', () => ({
     runTransactionMock(db, update),
 }))
 
-const { writeGameResult } = await import('./firestore-stats')
+const { publishHighscores, writeGameResult } = await import('./firestore-stats')
 
 const DB = {} as never
 
@@ -115,47 +115,10 @@ describe('writeGameResult', () => {
     expect(Math.min(...playerIndices)).toBeGreaterThan(resultIndex)
   })
 
-  it("publishes each player's highscore entry with their new totals, after their stats row", async () => {
+  it('writes no highscore entries: those wait until the room is finished, and local games never get one', async () => {
     await writeGameResult(DB, RESULT, PLAYERS)
 
-    const written = transactionSetMock.mock.calls.map(([ref, data]) => [pathOf(ref), data])
-    expect(written).toContainEqual([
-      'leaderboard/g1_device-b',
-      { displayName: 'Bob', finalScore: 20, worstRound: 8, finishedAt: '2026-01-01T00:00:00.000Z' },
-    ])
-    expect(written).toContainEqual([
-      'player_totals/device-b',
-      expect.objectContaining({ gamesPlayed: 1, wins: 0, scoreSum: 20, lastEntry: 'g1_device-b' }),
-    ])
-    expect(runTransactionMock).toHaveBeenCalledTimes(2)
-  })
-
-  it("adds to a player's existing totals, and counts a game already published only once", async () => {
-    getDocMock.mockImplementation((ref: unknown) => {
-      const path = pathOf(ref)
-      if (path === 'player_totals/device-a') {
-        return Promise.resolve({
-          exists: () => true,
-          data: () => ({ gamesPlayed: 4, wins: 2, scoreSum: 200 }),
-        })
-      }
-      return Promise.resolve({ exists: () => path === 'leaderboard/g1_device-b' })
-    })
-
-    await writeGameResult(DB, RESULT, PLAYERS)
-
-    const written = transactionSetMock.mock.calls.map(([ref, data]) => [pathOf(ref), data])
-    expect(written).toContainEqual([
-      'player_totals/device-a',
-      expect.objectContaining({ gamesPlayed: 5, wins: 3, scoreSum: 210, qualified: true }),
-    ])
-    expect(written.map(([path]) => path)).not.toContain('player_totals/device-b')
-  })
-
-  it('still finishes when the highscores refuse an entry', async () => {
-    runTransactionMock.mockRejectedValueOnce(new Error('permission-denied'))
-
-    await expect(writeGameResult(DB, RESULT, PLAYERS)).resolves.toBeUndefined()
+    expect(runTransactionMock).not.toHaveBeenCalled()
   })
 
   it('writes nothing beyond the game_result doc when there are no players', async () => {
@@ -198,5 +161,50 @@ describe('writeGameResult', () => {
     await writeGameResult(DB, RESULT, PLAYERS)
 
     expect(setDocMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('publishHighscores', () => {
+  it("publishes each player's highscore entry with their new totals", async () => {
+    await publishHighscores(DB, RESULT, PLAYERS)
+
+    const written = transactionSetMock.mock.calls.map(([ref, data]) => [pathOf(ref), data])
+    expect(written).toContainEqual([
+      'leaderboard/g1_device-b',
+      { displayName: 'Bob', finalScore: 20, worstRound: 8, finishedAt: '2026-01-01T00:00:00.000Z' },
+    ])
+    expect(written).toContainEqual([
+      'player_totals/device-b',
+      expect.objectContaining({ gamesPlayed: 1, wins: 0, scoreSum: 20, lastEntry: 'g1_device-b' }),
+    ])
+    expect(runTransactionMock).toHaveBeenCalledTimes(2)
+  })
+
+  it("adds to a player's existing totals, and counts a game already published only once", async () => {
+    getDocMock.mockImplementation((ref: unknown) => {
+      const path = pathOf(ref)
+      if (path === 'player_totals/device-a') {
+        return Promise.resolve({
+          exists: () => true,
+          data: () => ({ gamesPlayed: 4, wins: 2, scoreSum: 200 }),
+        })
+      }
+      return Promise.resolve({ exists: () => path === 'leaderboard/g1_device-b' })
+    })
+
+    await publishHighscores(DB, RESULT, PLAYERS)
+
+    const written = transactionSetMock.mock.calls.map(([ref, data]) => [pathOf(ref), data])
+    expect(written).toContainEqual([
+      'player_totals/device-a',
+      expect.objectContaining({ gamesPlayed: 5, wins: 3, scoreSum: 210, qualified: true }),
+    ])
+    expect(written.map(([path]) => path)).not.toContain('player_totals/device-b')
+  })
+
+  it('never fails when the highscores refuse an entry', async () => {
+    runTransactionMock.mockRejectedValueOnce(new Error('permission-denied'))
+
+    await expect(publishHighscores(DB, RESULT, PLAYERS)).resolves.toBeUndefined()
   })
 })

@@ -13,6 +13,7 @@ import { Card } from '@/components/ui/card'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import type { RoomAvailability } from '@/lib/data/repository'
 import { isValidRoomCode, normalizeRoomCode } from '@/lib/game/room-code'
+import { isGameOver } from '@/lib/game/rules'
 import { useGameStore } from '@/stores/game'
 
 type JoinPageState = 'checking' | 'invalid' | RoomAvailability
@@ -48,7 +49,7 @@ async function goToRoom(): Promise<void> {
 
 /** Seated here already → the room. Otherwise whether the room can still be joined. */
 async function checkRoom(): Promise<void> {
-  if (activeRoomCode.value === code.value && status.value !== 'finished') return goToRoom()
+  if (activeRoomCode.value === code.value && !isGameOver(status.value)) return goToRoom()
   const repository = await resumeRepository(code.value)
   if (!repository) {
     state.value = 'open'
