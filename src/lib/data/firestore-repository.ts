@@ -18,6 +18,8 @@ import {
 import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
 import { publishHighscores, writeGameResult } from './firestore-stats'
+import { browserLocalStorage, type KeyValueStorage } from './key-value-storage'
+import { appendPendingHighscores } from './pending-results'
 import { cleanPlayerName, NameTakenError, playerNameKey } from '../game/player-names'
 import {
   generateRoomCode as defaultGenerateRoomCode,
@@ -122,6 +124,8 @@ export interface FirestoreGameRepositoryDeps {
   writeTimeoutMs?: number
   /** A lowercase UUID for a guest seat's id. */
   newGuestId?: () => string
+  /** Where highscore entries that failed to publish wait for a retry. */
+  storage?: KeyValueStorage
 }
 
 /** Offline writes wait forever, so the writes the user waits on get a bound and the caller can
@@ -135,6 +139,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
   private readonly generateRoomCode: () => string
   private readonly writeTimeoutMs: number
   private readonly newGuestId: () => string
+  private readonly storage: KeyValueStorage
   private roomCode: string | null
   /** Set by createNextGame: the finished room this one's players come from. */
   private previousRoomCode: string | null = null
@@ -147,6 +152,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     this.generateRoomCode = deps.generateRoomCode ?? (() => defaultGenerateRoomCode())
     this.writeTimeoutMs = deps.writeTimeoutMs ?? DEFAULT_WRITE_TIMEOUT_MS
     this.newGuestId = deps.newGuestId ?? (() => crypto.randomUUID())
+    this.storage = deps.storage ?? browserLocalStorage()
     this.roomCode = deps.roomCode ?? null
   }
 
@@ -549,11 +555,17 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
 
     // Stats first: players may open Stats the moment the room is finished, and a finished room
     // refuses every write, so a failed stats write leaves Finish retryable.
-    await writeGameResult(this.db, result, gamePlayers)
-    await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
-    await publishHighscores(this.db, result, gamePlayers)
+    // A retry reuses what the first attempt stored: the rules match entries against it.
+    const stored = await writeGameResult(this.db, result, gamePlayers)
+    if (room.status !== 'finished') {
+      await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
+    }
+    const unpublished = await publishHighscores(this.db, stored, gamePlayers)
+    if (unpublished.length > 0) {
+      appendPendingHighscores(this.storage, { result: stored, players: unpublished })
+    }
 
-    return result
+    return stored
   }
 
   /** Bounded, so a host with no connection hears it didn't go through. */

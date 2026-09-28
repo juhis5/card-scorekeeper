@@ -522,3 +522,14 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     skips an unreadable date instead of failing to render.
   - `isGameOver(status)` in rules.ts is the one "room is over" check (store, repository, JoinView,
     and the photo gate, which now also refuses an abandoned room).
+- 2026-09-28 — Highscores that arrive, failures that leave a trace (second audit, PR 4).
+  - A retried online Finish reuses the stored `game_result` (its `finishedAt`), which the rules
+    match entries against; before, every entry of a retried Finish was refused silently. A retry
+    whose room is already finished skips that write and still publishes.
+  - An entry that fails for a passing reason (offline, a contended transaction) is kept in
+    `card-scorekeeper:pending-highscores` and retried with the result queue (launch, back online,
+    Tilastot). Refused ones are dropped; each entry is written once, so a retry can't count twice.
+  - `reportHandledError` sends recovered errors to Sentry as warnings (no-op without a DSN):
+    highscore publishes, Tilastot and Ennätykset loads, the reconnect flushes, refused queued
+    results, and the online-setup fallbacks. A broken prod backend no longer degrades silently.
+  - `tests/e2e/highscores.spec.ts`: a finished online game shows on Ennätykset.

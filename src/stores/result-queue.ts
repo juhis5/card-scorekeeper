@@ -9,10 +9,11 @@ import { browserLocalStorage } from '@/lib/data/key-value-storage'
 import {
   discardFailedResults,
   readFailedResults,
+  readPendingHighscores,
   readPendingResults,
   retryFailedResults,
 } from '@/lib/data/pending-results'
-import { uploadPendingResults } from '@/lib/data/reconnect-flush'
+import { uploadPendingHighscores, uploadPendingResults } from '@/lib/data/reconnect-flush'
 
 export const useResultQueueStore = defineStore('result-queue', () => {
   const waitingCount = ref(0)
@@ -27,17 +28,21 @@ export const useResultQueueStore = defineStore('result-queue', () => {
     failedCount.value = readFailedResults(storage).length
   }
 
-  /** Never throws. Resolves to how many games went up; a second call joins the one in flight. */
+  /** Never throws. Resolves to how many games went up; a second call joins the one in flight.
+   * Also retries online games' highscore entries that failed to publish. */
   function upload(): Promise<number> {
     if (inFlight) return inFlight
     refresh()
-    if (waitingCount.value === 0 || !navigator.onLine) return Promise.resolve(0)
+    const hasHighscores = readPendingHighscores(browserLocalStorage()).length > 0
+    if ((waitingCount.value === 0 && !hasHighscores) || !navigator.onLine) return Promise.resolve(0)
     isUploading.value = true
-    inFlight = uploadPendingResults().finally(() => {
-      inFlight = null
-      isUploading.value = false
-      refresh()
-    })
+    inFlight = Promise.all([uploadPendingResults(), uploadPendingHighscores()])
+      .then(([flushed]) => flushed)
+      .finally(() => {
+        inFlight = null
+        isUploading.value = false
+        refresh()
+      })
     return inFlight
   }
 

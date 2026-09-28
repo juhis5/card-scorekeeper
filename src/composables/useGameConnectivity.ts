@@ -8,6 +8,7 @@ import { createHostRepository, createJoinRepository } from '@/lib/data/game-mode
 import type { HostGameMode, JoinGameMode } from '@/lib/data/game-mode'
 import { LocalGameRepository } from '@/lib/data/local-repository'
 import type { ResumableGameRepository } from '@/lib/data/repository'
+import { reportHandledError } from '@/lib/platform/error-reporting'
 
 async function loadFirebase() {
   const [{ getFirebaseAuth, getDb, checkBackendReachable }, { FirestoreGameRepository }] =
@@ -38,8 +39,9 @@ export function useGameConnectivity() {
         createOnlineRepository: () => new FirestoreGameRepository({ db, auth }),
         createLocalRepository: () => new LocalGameRepository(),
       })
-    } catch {
+    } catch (error) {
       // Firebase didn't load: degrade like an unreachable backend, never fail "Start game".
+      reportHandledError(error, 'host-online-setup')
       return localRepository()
     }
   }
@@ -52,7 +54,8 @@ export function useGameConnectivity() {
         probeBackendReachable: () => probeBackendReachable({ checkBackend }),
         createOnlineRepository: () => new FirestoreGameRepository({ db, auth, roomCode }),
       })
-    } catch {
+    } catch (error) {
+      reportHandledError(error, 'join-online-setup')
       return { kind: 'unreachable' }
     }
   }
@@ -65,7 +68,8 @@ export function useGameConnectivity() {
         probeBackendReachable: () => probeBackendReachable({ checkBackend }),
         createOnlineRepository: () => new FirestoreGameRepository({ db, auth }),
       })
-    } catch {
+    } catch (error) {
+      reportHandledError(error, 'next-room-setup')
       return { kind: 'unreachable' }
     }
   }
@@ -75,7 +79,8 @@ export function useGameConnectivity() {
     try {
       const { auth, db, FirestoreGameRepository } = await loadFirebase()
       return new FirestoreGameRepository({ db, auth, roomCode })
-    } catch {
+    } catch (error) {
+      reportHandledError(error, 'resume-setup')
       return null
     }
   }

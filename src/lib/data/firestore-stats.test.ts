@@ -16,6 +16,11 @@ const runTransactionMock = vi.fn(
   },
 )
 
+const reportHandledErrorMock = vi.fn()
+vi.mock('../platform/error-reporting', () => ({
+  reportHandledError: (...args: unknown[]) => reportHandledErrorMock(...args),
+}))
+
 vi.mock('firebase/firestore', () => ({
   doc: (db: unknown, path: string) => docMock(db, path),
   getDoc: (ref: unknown) => getDocMock(ref),
@@ -129,7 +134,10 @@ describe('writeGameResult', () => {
 
   it('skips re-creating the game_result doc when it already exists (idempotent retry)', async () => {
     getDocMock.mockImplementation((ref: unknown) =>
-      Promise.resolve({ exists: () => pathOf(ref) === 'game_result/g1' }),
+      Promise.resolve({
+        exists: () => pathOf(ref) === 'game_result/g1',
+        data: () => ({ finishedAt: RESULT.finishedAt, totalRounds: 5 }),
+      }),
     )
 
     await writeGameResult(DB, RESULT, PLAYERS)
@@ -156,11 +164,31 @@ describe('writeGameResult', () => {
   })
 
   it('writes nothing at all when every doc already exists (a fully-succeeded retry is a no-op)', async () => {
-    getDocMock.mockResolvedValue({ exists: () => true })
+    getDocMock.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ finishedAt: RESULT.finishedAt, totalRounds: 5 }),
+    })
 
     await writeGameResult(DB, RESULT, PLAYERS)
 
     expect(setDocMock).not.toHaveBeenCalled()
+  })
+
+  it("keeps the first attempt's finishedAt on a retry, which the rules match entries against", async () => {
+    getDocMock.mockImplementation((ref: unknown) =>
+      Promise.resolve({
+        exists: () => pathOf(ref) === 'game_result/g1',
+        data: () => ({ finishedAt: '2025-12-31T23:00:00.000Z', totalRounds: 5 }),
+      }),
+    )
+
+    const stored = await writeGameResult(
+      DB,
+      { ...RESULT, finishedAt: '2026-01-01T00:05:00.000Z' },
+      PLAYERS,
+    )
+
+    expect(stored).toEqual({ gameId: 'g1', finishedAt: '2025-12-31T23:00:00.000Z', totalRounds: 5 })
   })
 })
 
@@ -202,9 +230,22 @@ describe('publishHighscores', () => {
     expect(written.map(([path]) => path)).not.toContain('player_totals/device-b')
   })
 
-  it('never fails when the highscores refuse an entry', async () => {
-    runTransactionMock.mockRejectedValueOnce(new Error('permission-denied'))
+  it('never fails when the rules refuse an entry, and has nothing to retry', async () => {
+    runTransactionMock.mockRejectedValueOnce(
+      Object.assign(new Error('no'), { code: 'permission-denied' }),
+    )
 
-    await expect(publishHighscores(DB, RESULT, PLAYERS)).resolves.toBeUndefined()
+    await expect(publishHighscores(DB, RESULT, PLAYERS)).resolves.toEqual([])
+    expect(reportHandledErrorMock).toHaveBeenCalledWith(expect.any(Error), 'publish-highscores')
+  })
+
+  it('returns the players whose entry failed for a passing reason, to retry later', async () => {
+    runTransactionMock.mockRejectedValueOnce(
+      Object.assign(new Error('offline'), { code: 'unavailable' }),
+    )
+
+    const failed = await publishHighscores(DB, RESULT, PLAYERS)
+
+    expect(failed).toHaveLength(1)
   })
 })

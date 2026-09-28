@@ -3,11 +3,13 @@ import type { App } from 'vue'
 import type { Router } from 'vue-router'
 
 const init = vi.fn()
+const captureException = vi.fn()
 const breadcrumbsIntegration = vi.fn((options: unknown) => ({ name: 'Breadcrumbs', options }))
 const browserTracingIntegration = vi.fn((options: unknown) => ({ name: 'BrowserTracing', options }))
 const replayIntegration = vi.fn((options: unknown) => ({ name: 'Replay', options }))
 vi.mock('@sentry/vue', () => ({
   init,
+  captureException,
   breadcrumbsIntegration,
   browserTracingIntegration,
   replayIntegration,
@@ -96,6 +98,38 @@ describe('startErrorReporting', () => {
     expect(breadcrumbsIntegration).toHaveBeenCalledWith({ dom: false })
     expect(options.beforeSend({ request: { url: '/room/7K4RQ' } })).toEqual({
       request: { url: '/room/:code' },
+    })
+  })
+})
+
+describe('reportHandledError', () => {
+  /** A fresh module each time: whether Sentry has started is module state. */
+  async function freshModule() {
+    vi.resetModules()
+    return import('./error-reporting')
+  }
+
+  it('sends nothing without a DSN, as in local and CI builds', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', '')
+    const reporting = await freshModule()
+    await reporting.startErrorReporting({} as App, {} as Router)
+
+    reporting.reportHandledError(new Error('refused'), 'publish-highscores')
+
+    expect(captureException).not.toHaveBeenCalled()
+  })
+
+  it('sends a recovered error as a warning tagged with where it happened', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://key@o1.ingest.de.sentry.io/2')
+    const reporting = await freshModule()
+    await reporting.startErrorReporting({} as App, {} as Router)
+    const error = new Error('refused')
+
+    reporting.reportHandledError(error, 'publish-highscores')
+
+    expect(captureException).toHaveBeenCalledWith(error, {
+      level: 'warning',
+      tags: { handled: 'true', context: 'publish-highscores' },
     })
   })
 })

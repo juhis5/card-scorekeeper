@@ -9,6 +9,16 @@ import type { Router } from 'vue-router'
 
 const ROOM_PATH = /\b(room|join)\/[2-9A-HJ-NP-Z]{5}\b/g
 
+type SentryModule = typeof import('@sentry/vue')
+/** Set once Sentry has started; handled errors from before that aren't sent. */
+let sentry: SentryModule | null = null
+
+/** An error the app recovers from (a fallback, a skipped extra), so it still leaves a trace. A
+ * no-op in builds without a DSN, and scrubbed like every other report. */
+export function reportHandledError(error: unknown, context: string): void {
+  sentry?.captureException(error, { level: 'warning', tags: { handled: 'true', context } })
+}
+
 export function scrubRoomCodes(text: string): string {
   return text.replace(ROOM_PATH, '$1/:code')
 }
@@ -48,4 +58,5 @@ export async function startErrorReporting(app: App, router: Router): Promise<voi
     beforeSendTransaction: (event) => scrubReport(event),
     beforeBreadcrumb: (breadcrumb) => scrubReport(breadcrumb),
   })
+  sentry = Sentry
 }
