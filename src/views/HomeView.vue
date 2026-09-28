@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import GameSetup from '@/components/home/GameSetup.vue'
 import LeaveGameButton from '@/components/home/LeaveGameButton.vue'
+import SegmentedToggle from '@/components/shared/SegmentedToggle.vue'
 import JoinGame from '@/components/home/JoinGame.vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -77,27 +78,11 @@ const canContinueLocalGame = computed(
     </section>
     <!-- One card: join or start a game, sharing one name field. -->
     <Card class="gap-4 px-4">
-      <div
-        role="group"
-        :aria-label="t('home.play.label')"
-        class="bg-muted grid grid-cols-2 gap-1 rounded-lg p-1"
-      >
-        <button
-          v-for="option in PLAY_MODES"
-          :key="option"
-          type="button"
-          class="focus-visible:ring-ring h-11 rounded-md text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
-          :class="
-            mode === option
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          "
-          :aria-pressed="mode === option"
-          @click="mode = option"
-        >
-          {{ t(`home.play.${option}`) }}
-        </button>
-      </div>
+      <SegmentedToggle
+        v-model="mode"
+        :label="t('home.play.label')"
+        :options="PLAY_MODES.map((option) => ({ value: option, label: t(`home.play.${option}`) }))"
+      />
       <JoinGame v-if="mode === 'join'" v-model:name="playerName" />
       <GameSetup v-else v-model:name="playerName" />
     </Card>

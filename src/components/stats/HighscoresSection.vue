@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * Single job: the Stats screen's global highscores, in two tabs: player lists and game records.
+ * Single job: the Stats screen's global highscores, player lists or game records at a time.
  * It has its own loading and error states, so a failure never hides this device's stats above it.
  */
-import { onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import HighscoreList, { type HighscoreValueKind } from '@/components/stats/HighscoreList.vue'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import SegmentedToggle from '@/components/shared/SegmentedToggle.vue'
 import { QUALIFYING_GAMES } from '@/lib/game/stats'
 import { useHighscoresStore, type HighscoreListName } from '@/stores/highscores'
 
@@ -41,6 +41,13 @@ const GROUPS: { id: 'players' | 'games'; lists: ListView[] }[] = [
 
 const { t } = useI18n()
 const highscores = useHighscoresStore()
+const shownGroup = ref<(typeof GROUPS)[number]['id']>('players')
+const groupOptions = computed(() =>
+  GROUPS.map((group) => ({ value: group.id, label: t(`stats.highscores.tabs.${group.id}`) })),
+)
+const shownLists = computed(
+  () => GROUPS.find((group) => group.id === shownGroup.value)?.lists ?? [],
+)
 const { status, lists } = storeToRefs(highscores)
 
 onMounted(() => {
@@ -65,31 +72,24 @@ onMounted(() => {
         {{ t('stats.error.retry') }}
       </Button>
     </div>
-    <Tabs v-else default-value="players" class="gap-4">
-      <TabsList class="grid h-11 w-full grid-cols-2">
-        <TabsTrigger v-for="group in GROUPS" :key="group.id" :value="group.id" class="h-9">
-          {{ t(`stats.highscores.tabs.${group.id}`) }}
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent
-        v-for="group in GROUPS"
-        :key="group.id"
-        :value="group.id"
-        class="flex flex-col gap-4"
-      >
-        <HighscoreList
-          v-for="list in group.lists"
-          :id="`highscores-${list.name}`"
-          :key="list.name"
-          :title="t(`stats.highscores.lists.${list.name}.title`)"
-          :description="
-            t(`stats.highscores.lists.${list.name}.description`, { min: QUALIFYING_GAMES })
-          "
-          :value-header="t(`stats.highscores.columns.${list.header}`)"
-          :value-kind="list.kind"
-          :entries="lists[list.name]"
-        />
-      </TabsContent>
-    </Tabs>
+    <template v-else>
+      <SegmentedToggle
+        v-model="shownGroup"
+        :label="t('stats.highscores.heading')"
+        :options="groupOptions"
+      />
+      <HighscoreList
+        v-for="list in shownLists"
+        :id="`highscores-${list.name}`"
+        :key="list.name"
+        :title="t(`stats.highscores.lists.${list.name}.title`)"
+        :description="
+          t(`stats.highscores.lists.${list.name}.description`, { min: QUALIFYING_GAMES })
+        "
+        :value-header="t(`stats.highscores.columns.${list.header}`)"
+        :value-kind="list.kind"
+        :entries="lists[list.name]"
+      />
+    </template>
   </section>
 </template>

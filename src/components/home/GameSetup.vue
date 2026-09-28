@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Single job: Home's "Uusi peli" form. Starts an online room when the backend is reachable, else a
- * local game; "This phone only" skips the check. Other players are added in the room, so it asks
+ * local game; "This device only" skips the check. Other players are added in the room, so it asks
  * only for the name, which Home shares with "Liity".
  */
 import { computed, nextTick, ref, useTemplateRef } from 'vue'

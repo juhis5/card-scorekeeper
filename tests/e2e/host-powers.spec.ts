@@ -33,14 +33,14 @@ test.describe('late joiners and host powers', () => {
       await startHostedGame(hostPage, 'Host')
       await expectOnlineRoom(hostPage)
       const roomCode = await readRoomCode(hostPage)
-      await enterRoundScore(hostPage, 'Host', 1, 20)
+      await enterRoundScore(hostPage, 'Host', 1, 0)
       await hostPage.getByRole('button', { name: 'Next round' }).click()
       await expect(hostPage.getByRole('heading', { name: 'Round 2 scores' })).toBeVisible()
 
       await joinHostedGame(joinerPage, roomCode, 'Alice')
       await expect(joinerPage.getByRole('heading', { name: 'Missed rounds' })).toBeVisible()
 
-      await enterRoundScore(hostPage, 'Host', 2, 10)
+      await enterRoundScore(hostPage, 'Host', 2, 0)
       await enterOwnRoundScore(joinerPage, 2, 5)
       await expect(scoreboardRow(hostPage, 'Alice')).toContainText('Entered')
       await expect(hostPage.getByRole('button', { name: 'Next round' })).toBeDisabled()

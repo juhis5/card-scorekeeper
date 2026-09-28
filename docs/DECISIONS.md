@@ -451,3 +451,23 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     choice keeps working). Only a device with no stored choice moves to Kapteeni. The manifest
     and `theme-color` are brown-black to match; the contrast test covers both new palettes and
     the brand colour in every theme.
+- 2026-09-29 — Sixth round of notes:
+  - A completed round needs exactly one 0 (`roundsWithoutWinner` joins `roundsWithSeveralZeros`):
+    someone always goes out. Next and Finish stay disabled, with a line naming the round, until
+    it's fixed. A round still being scored isn't judged.
+  - "Vain tällä laitteella", not "puhelimella": the switch works the same on a computer.
+  - The points field steps by 5 (`step="5"`), so the desktop spinner arrows and the arrow keys
+    move in valid amounts. iOS shows no spinner either way.
+  - An online player sees "Odotetaan, että isäntä siirtyy seuraavalle kierrokselle" only once
+    their own points for the round (and any missed rounds) are in.
+  - Tilastot's Pelaajat | Pelit toggle looked broken: shadcn's tab styles key on `data-active`,
+    but Reka marks the chosen tab with `data-state`, so the selected tab never looked selected.
+    Both it and Home's Liity | Uusi peli now use one `SegmentedToggle` (pressed buttons in a
+    labelled group); the shadcn tabs are gone.
+  - A scanned invite QR opens the installed app on Android (a Chrome-installed app catches links
+    in its scope from outside the browser; `handle_links: 'preferred'` and `launch_handler`
+    make it explicit and reuse the open window). iOS can't: home-screen apps can't catch links.
+  - Keeping the open card above the keyboard stays as it is. There's no cross-browser standard:
+    Android gets `interactive-widget=resizes-content`, the VirtualKeyboard API is Chromium-only,
+    and on an iPhone the keyboard covers the page without resizing it, so the last card can only
+    rise above it if there's page below. Following `visualViewport` fought the player's scrolling.

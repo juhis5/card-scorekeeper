@@ -49,6 +49,7 @@ const rawValue = computed<string | number>({
         inputmode="numeric"
         enterkeyhint="done"
         min="0"
+        step="5"
         class="h-11 min-w-0 flex-1 text-base"
         :placeholder="placeholder"
         :aria-invalid="isInvalid"

@@ -70,7 +70,7 @@ test.describe('score entry on a card', () => {
     await page.getByRole('spinbutton').fill('20')
     await page.getByRole('button', { name: 'Save and next' }).click()
     await expect(page.getByLabel("Maiju's round 1 score")).toBeFocused()
-    await page.getByRole('spinbutton').fill('10')
+    await page.getByRole('spinbutton').fill('0')
     await page.getByRole('button', { name: 'Save and next' }).click()
 
     await expect(page.getByRole('dialog')).toHaveCount(0)

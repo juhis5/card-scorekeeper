@@ -74,8 +74,8 @@
       "replaceStart": "Aloita uusi peli",
       "replaceKeep": "Jatka peliä",
       "hint": "Muut lisäät pelissä, tai he liittyvät huonekoodilla.",
-      "thisPhoneOnly": "Vain tällä puhelimella",
-      "thisPhoneOnlyHint": "Kaikkien pisteet syötetään tällä puhelimella, eikä kukaan liity. Toimii ilman yhteyttä."
+      "thisPhoneOnly": "Vain tällä laitteella",
+      "thisPhoneOnlyHint": "Kaikkien pisteet syötetään tällä laitteella, eikä kukaan liity. Toimii ilman yhteyttä."
     },
     "join": {
       "roomCodeLabel": "Huonekoodi",
@@ -193,7 +193,8 @@
     "next": {
       "button": "Seuraava kierros",
       "waiting": "Odotetaan vielä pisteitä: {names}.",
-      "severalZeros": "Vain yksi pelaaja voi saada kierroksella 0 pistettä. Tarkista kierros {rounds}."
+      "severalZeros": "Vain yksi pelaaja voi saada kierroksella 0 pistettä. Tarkista kierros {rounds}.",
+      "noWinner": "Kierroksella {rounds} ei ole voittajaa: pelistä ulos mennyt saa 0 pistettä."
     },
     "finish": {
       "button": "Päätä peli"

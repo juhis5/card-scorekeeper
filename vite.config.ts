@@ -36,6 +36,10 @@ export default defineConfig({
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
+        // A scanned invite link opens the installed app (Android) and reuses its open window.
+        // iOS has no way for a home-screen app to catch links: they open in the browser.
+        handle_links: 'preferred',
+        launch_handler: { client_mode: 'navigate-existing' },
         icons: [
           { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },

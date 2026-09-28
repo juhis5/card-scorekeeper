@@ -260,7 +260,7 @@ describe('RoomView score entry', () => {
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
     await renderRoom()
-    await enterScore('Host', 1, 20)
+    await enterScore('Host', 1, 0)
     await enterScore('Alice', 1, 10)
 
     const aliceRow = () =>
@@ -285,7 +285,7 @@ describe('RoomView score entry', () => {
 
     expect(screen.queryByText('Leader')).toBeNull()
     await enterScore('Host', 1, 20)
-    await enterScore('Alice', 1, 10)
+    await enterScore('Alice', 1, 0)
     expect(screen.queryByText('Leader')).toBeNull()
 
     await advanceOrFinish(1)
@@ -381,13 +381,13 @@ describe('RoomView moving to the next round', () => {
     await startWithAlice()
     const { container } = await renderRoom()
     await enterScore('Host', 1, 20)
-    await enterScore('Alice', 1, 10)
+    await enterScore('Alice', 1, 0)
 
     await advanceOrFinish(1)
     await flushPromises()
 
     const message = liveRegion(container)
-    expect(message).toContain('Round 1 results: Alice leads with 10 points.')
+    expect(message).toContain('Round 1 results: Alice leads with 0 points.')
     expect(message).toContain("You're in place 2.")
     expect(message).toContain('Round 2 of 5')
   })
@@ -400,7 +400,7 @@ describe('RoomView moving to the next round', () => {
     })
     const aliceId = await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
     await seed.setRoundScore({ playerId: created.hostPlayerId, round: 1, points: 20 })
-    await seed.setRoundScore({ playerId: aliceId, round: 1, points: 10 })
+    await seed.setRoundScore({ playerId: aliceId, round: 1, points: 0 })
     await seed.advanceRound()
     seed.leave()
 
@@ -577,7 +577,7 @@ describe('RoomView finishing the game', () => {
 
     for (let round = 1; round <= 5; round++) {
       await enterScore('Host', round, 50)
-      await enterScore('Alice', round, 5)
+      await enterScore('Alice', round, 0)
       await advanceOrFinish(round)
     }
 
@@ -592,10 +592,19 @@ describe('RoomView finishing the game', () => {
 
     await renderRoom()
 
-    for (let round = 1; round <= 5; round++) {
-      await enterScore('Host', round, 50)
-      await enterScore('Alice', round, 10)
-      await enterScore('Bob', round, 10)
+    // Alice and Bob take turns going out, and the host goes out last: 30 points each.
+    const pointsByRound = [
+      { host: 50, alice: 0, bob: 10 },
+      { host: 50, alice: 10, bob: 0 },
+      { host: 50, alice: 0, bob: 10 },
+      { host: 50, alice: 10, bob: 0 },
+      { host: 0, alice: 10, bob: 10 },
+    ]
+    for (const [index, points] of pointsByRound.entries()) {
+      const round = index + 1
+      await enterScore('Host', round, points.host)
+      await enterScore('Alice', round, points.alice)
+      await enterScore('Bob', round, points.bob)
       await advanceOrFinish(round)
     }
 
@@ -615,7 +624,7 @@ describe('RoomView finishing the game', () => {
 
     for (let round = 1; round <= 5; round++) {
       await enterScore('Host', round, 50)
-      await enterScore('Alice', round, 5)
+      await enterScore('Alice', round, 0)
       await enterScore('Bob', round, 10)
       await advanceOrFinish(round)
     }
@@ -668,7 +677,7 @@ describe('RoomView when a save fails', () => {
   it('says the next round did not start and stays on the current round', async () => {
     const repository = await startFailingGame()
     await enterScore('Host', 1, 20)
-    await enterScore('Alice', 1, 10)
+    await enterScore('Alice', 1, 0)
     repository.failure = new Error('offline')
 
     await advanceOrFinish(1)
@@ -683,11 +692,11 @@ describe('RoomView when a save fails', () => {
     const repository = await startFailingGame()
     for (let round = 1; round <= 4; round++) {
       await enterScore('Host', round, 20)
-      await enterScore('Alice', round, 10)
+      await enterScore('Alice', round, 0)
       await advanceOrFinish(round)
     }
     await enterScore('Host', 5, 20)
-    await enterScore('Alice', 5, 10)
+    await enterScore('Alice', 5, 0)
     repository.failure = new Error('offline')
 
     await advanceOrFinish(5)
@@ -781,7 +790,7 @@ describe('RoomView online mode', () => {
     expect(screen.queryByRole('button', { name: /host/i })).toBeNull()
   })
 
-  it('shows Next round for the host but not for a joiner, who sees a waiting message instead', async () => {
+  it('shows Next round for the host but not for a joiner, who waits for the host once their points are in', async () => {
     const { hostPinia, joinerPinia } = await setUpOnlineRoom()
 
     setActivePinia(hostPinia)
@@ -792,6 +801,12 @@ describe('RoomView online mode', () => {
     setActivePinia(joinerPinia)
     await renderAs(joinerPinia)
     expect(screen.queryByRole('button', { name: 'Next round' })).toBeNull()
+    expect(screen.queryByText('Waiting for the host to move to the next round.')).toBeNull()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Enter your points' }))
+    await fireEvent.update(screen.getByLabelText('Your round 1 points'), '0')
+    await fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await flushPromises()
     expect(screen.getByText('Waiting for the host to move to the next round.')).toBeTruthy()
   })
 
@@ -799,14 +814,14 @@ describe('RoomView online mode', () => {
     const { hostPinia, joinerGame, aliceId } = await setUpOnlineRoom()
 
     // Alice enters her own score from her own device/store.
-    await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 5 })
+    await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 0 })
 
     setActivePinia(hostPinia)
     await renderAs(hostPinia)
     await enterScore('Host', 1, 50)
 
-    const nextButton = screen.getByRole('button', { name: 'Next round' }) as HTMLButtonElement
-    expect(nextButton.disabled).toBe(false)
+    const nextButton = screen.getByRole('button', { name: 'Next round' })
+    expect(nextButton.getAttribute('aria-disabled')).toBe('false')
   })
 
   it("lets the host enter another player's score", async () => {
@@ -1103,7 +1118,7 @@ describe('RoomView late joiners', () => {
 
   it('keeps Next disabled until the late joiner has filled in every missed round', async () => {
     const { hostPinia, hostGame, joinerGame, aliceId } = await setUpLateJoin()
-    await hostGame.setRoundScore({ playerId: 'host-uid', round: 2, points: 10 })
+    await hostGame.setRoundScore({ playerId: 'host-uid', round: 2, points: 0 })
     await joinerGame.setRoundScore({ playerId: aliceId, round: 2, points: 5 })
     setActivePinia(hostPinia)
     await renderAs(hostPinia)
@@ -1111,7 +1126,7 @@ describe('RoomView late joiners', () => {
 
     expect(nextButton().getAttribute('aria-disabled')).toBe('true')
 
-    await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 15 })
+    await joinerGame.setRoundScore({ playerId: aliceId, round: 1, points: 0 })
     await flushPromises()
     expect(nextButton().getAttribute('aria-disabled')).toBe('false')
   })
@@ -1137,7 +1152,7 @@ describe("RoomView entering everyone's points at once", () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Enter all' }))
     await flushPromises()
     expect(screen.getByRole('dialog', { name: 'Enter points · 1/2' })).toBeTruthy()
-    for (const points of ['10', '5']) {
+    for (const points of ['10', '0']) {
       await fireEvent.update(screen.getByRole('spinbutton'), points)
       await fireEvent.click(screen.getByRole('button', { name: 'Save and next' }))
       await flushPromises()
@@ -1174,7 +1189,7 @@ describe('RoomView players the host adds', () => {
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
     await renderRoom()
     await enterScore('Host', 1, 20)
-    await enterScore('Alice', 1, 10)
+    await enterScore('Alice', 1, 0)
     await advanceOrFinish(1)
 
     await fireEvent.click(screen.getByRole('button', { name: 'Add player' }))

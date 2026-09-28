@@ -11,7 +11,7 @@ test.describe('play again, local game', () => {
 
     for (let round = 1; round <= 5; round++) {
       await enterRoundScore(page, 'Host', round, 20)
-      await enterRoundScore(page, 'Alice', round, 10)
+      await enterRoundScore(page, 'Alice', round, 0)
       await page.getByRole('button', { name: round < 5 ? 'Next round' : 'Finish game' }).click()
     }
     await expect(page.getByText('Alice wins!')).toBeVisible()

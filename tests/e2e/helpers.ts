@@ -105,8 +105,8 @@ export interface OnlinePlayers {
   joinerName: string
 }
 
-/** Both players score (the host scores 20, the joiner 10), the host moves on once both are in,
- * the board reveals the round's totals and the joiner follows. */
+/** Both players score (the host 20, the joiner goes out with 0), the host moves on once both are
+ * in, the board reveals the round's totals and the joiner follows. */
 export async function playOnlineRound(
   hostPage: Page,
   joinerPage: Page,
@@ -114,12 +114,13 @@ export async function playOnlineRound(
   { hostName, joinerName }: OnlinePlayers,
 ): Promise<void> {
   await enterRoundScore(hostPage, hostName, round, 20)
-  await enterOwnRoundScore(joinerPage, round, 10)
+  await enterOwnRoundScore(joinerPage, round, 0)
   const isLastRound = round === TOTAL_ROUNDS
   const button = hostPage.getByRole('button', { name: isLastRound ? 'Finish game' : 'Next round' })
   await expect(button).toBeEnabled()
   await button.click()
-  await expect(scoreboardRow(hostPage, joinerName)).toContainText(String(round * 10))
+  await expect(scoreboardRow(hostPage, hostName)).toContainText(String(round * 20))
+  await expect(scoreboardRow(hostPage, joinerName)).not.toContainText('Entered')
   if (!isLastRound) await expect(roundHeading(joinerPage, round + 1)).toBeVisible()
 }
 
