@@ -24,7 +24,14 @@ import {
   isValidRoomCode,
   ROOM_TTL_MS,
 } from '../game/room-code'
-import { CONTRACTS, TOTAL_ROUNDS, placements as placementsFor, runningTotal } from '../game/rules'
+import {
+  CONTRACTS,
+  GameIncompleteError,
+  TOTAL_ROUNDS,
+  canFinishGame,
+  placements as placementsFor,
+  runningTotal,
+} from '../game/rules'
 import { bestAndWorstRound } from '../game/stats'
 import { withTimeout } from '../platform/timeout'
 import { isPermissionDenied } from './write-errors'
@@ -482,15 +489,16 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     await batch.commit()
   }
 
-  async advanceRound(): Promise<void> {
+  /** No read first, and bounded: a repeat writes the same round, so retrying a timed-out advance
+   * is safe (the timed-out write still lands later). */
+  async advanceRound(fromRound: ContractRoundNumber): Promise<void> {
     await ensureSignedIn(this.auth)
-    const roomCode = this.requireRoomCode()
-    const roomRef = doc(this.db, `room/${roomCode}`)
-    const snapshot = await getDoc(roomRef)
-    const data = snapshot.data() as RoomDocData | undefined
-    if (!data) throw new Error(`advanceRound: room ${roomCode} not found`)
-    const nextRound = Math.min(data.currentRound + 1, TOTAL_ROUNDS) as ContractRoundNumber
-    await updateDoc(roomRef, { status: 'playing', currentRound: nextRound })
+    const roomRef = doc(this.db, `room/${this.requireRoomCode()}`)
+    const nextRound = Math.min(fromRound + 1, TOTAL_ROUNDS) as ContractRoundNumber
+    await withTimeout(
+      updateDoc(roomRef, { status: 'playing', currentRound: nextRound }),
+      this.writeTimeoutMs,
+    )
   }
 
   async finishGame(): Promise<GameResult> {
@@ -500,6 +508,12 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     const players = playersSnapshot.docs.map(toPlayer)
     const roundScoresSnapshot = await getDocs(collection(this.db, `room/${roomCode}/roundScores`))
     const roundScores = roundScoresSnapshot.docs.map(toRoundScore)
+    const room = (await getDoc(doc(this.db, `room/${roomCode}`))).data() as RoomDocData | undefined
+    // Checked again here, on fresh data: the stats rows written next can never be corrected.
+    const playerIds = players.map((player) => player.id)
+    if (!room || !canFinishGame(playerIds, roundScores, room.currentRound)) {
+      throw new GameIncompleteError()
+    }
 
     // From roundScores, not the player-writable totalScore: a permanent stats row must be exact.
     const rankedPlayers = players.map((player) => ({
@@ -517,9 +531,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       const points = roundScores
         .filter((score) => score.playerId === player.id)
         .map((score) => score.points)
-      // No rounds shouldn't happen past the Finish gate, but mustn't throw.
-      const { bestRound, worstRound } =
-        points.length > 0 ? bestAndWorstRound(points) : { bestRound: 0, worstRound: 0 }
+      const { bestRound, worstRound } = bestAndWorstRound(points)
       return {
         gameId: roomCode,
         // The auth uid that keys the player doc, never the localStorage device_uuid: the rules

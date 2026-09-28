@@ -100,21 +100,53 @@ export function roundsWithSeveralZeros(
   )
 }
 
-/** Rounds so far that every seated player has scored, but nobody with 0. Someone always goes out,
- * so such a round has a typo in it too; a round still being scored isn't judged yet. */
+/** The round being closed, when every seated player has scored it but nobody with 0. Someone
+ * always goes out, so it has a typo in it. Earlier rounds passed this when they closed: removing
+ * the player who went out in one must not lock the game. */
 export function roundsWithoutWinner(
   playerIds: string[],
   roundScores: RoundScore[],
   throughRound: ContractRoundNumber,
 ): ContractRoundNumber[] {
   const seated = new Set(playerIds)
-  return CONTRACTS.map((contract) => contract.round).filter((round) => {
-    if (round > throughRound || seated.size === 0) return false
-    const scores = roundScores.filter(
-      (score) => score.round === round && seated.has(score.playerId),
-    )
-    return scores.length === seated.size && scores.every((score) => score.points !== 0)
-  })
+  if (seated.size === 0) return []
+  const scores = roundScores.filter(
+    (score) => score.round === throughRound && seated.has(score.playerId),
+  )
+  const hasNoWinner = scores.length === seated.size && scores.every((score) => score.points !== 0)
+  return hasNoWinner ? [throughRound] : []
+}
+
+/** Next's gate: every round so far scored by everyone seated, with exactly one 0 in this one. */
+export function canCloseRound(
+  playerIds: string[],
+  roundScores: RoundScore[],
+  round: ContractRoundNumber,
+): boolean {
+  return (
+    playerIds.length > 0 &&
+    isEveryRoundScored(playerIds, roundScores, round) &&
+    roundsWithSeveralZeros(playerIds, roundScores, round).length === 0 &&
+    roundsWithoutWinner(playerIds, roundScores, round).length === 0
+  )
+}
+
+/** Finish on a game that isn't complete: nothing permanent may be written. */
+export class GameIncompleteError extends Error {
+  constructor() {
+    super('The game is not complete: the last round is not reached or not fully scored')
+    this.name = 'GameIncompleteError'
+  }
+}
+
+/** Finish's gate: the last round, and it can close. The repositories check it again on fresh
+ * data before writing permanent stats. */
+export function canFinishGame(
+  playerIds: string[],
+  roundScores: RoundScore[],
+  currentRound: ContractRoundNumber,
+): boolean {
+  return currentRound === TOTAL_ROUNDS && canCloseRound(playerIds, roundScores, currentRound)
 }
 
 /** Rounds whose scores are settled: those before the current one, or all of them once the game

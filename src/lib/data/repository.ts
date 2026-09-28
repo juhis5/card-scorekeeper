@@ -50,7 +50,11 @@ export interface GameRepository {
   setRoundScore(input: SetRoundScoreInput): Promise<void>
   /** Host only: removes a seat and its scores. Rejects for the host's own seat. */
   removePlayer(playerId: PlayerId): Promise<void>
-  advanceRound(): Promise<void>
+  /** Host only: moves the room from `fromRound` to the next. A repeat writes the same round, so a
+   * double tap or a retry never skips one. */
+  advanceRound(fromRound: ContractRoundNumber): Promise<void>
+  /** Host only: records the game. Rejects with GameIncompleteError, writing nothing, unless the
+   * last round is fully scored with exactly one 0 (checked on fresh data). */
   finishGame(): Promise<GameResult>
   /** Host only: ends the game early for everyone. Nothing about it is recorded. */
   abandonGame(): Promise<void>

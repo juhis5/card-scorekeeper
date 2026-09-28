@@ -136,8 +136,8 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     const rounds: ContractRoundNumber[] = [1, 2, 3, 4, 5]
     for (const round of rounds) {
       await hostRepo.setRoundScore({ playerId: created.hostPlayerId, round, points: 50 })
-      await joinerRepo.setRoundScore({ playerId: aliceUid, round, points: 10 })
-      if (round < 5) await hostRepo.advanceRound()
+      await joinerRepo.setRoundScore({ playerId: aliceUid, round, points: 0 })
+      if (round < 5) await hostRepo.advanceRound(round)
     }
 
     const result = await hostRepo.finishGame()
@@ -167,10 +167,10 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     const alicePlayerDoc = await getDoc(doc(host.db, `game_player/${roomCode}_${aliceUid}`))
     expect(alicePlayerDoc.data()).toMatchObject({
       deviceUuid: aliceUid,
-      finalScore: 50,
+      finalScore: 0,
       placement: 1,
-      bestRound: 10,
-      worstRound: 10,
+      bestRound: 0,
+      worstRound: 0,
     })
 
     // The highscores are public: someone who never played here reads them too.
@@ -179,8 +179,8 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     const entry = await getDoc(doc(stranger.db, `leaderboard/${roomCode}_${aliceUid}`))
     expect(entry.data()).toEqual({
       displayName: 'Alice',
-      finalScore: 50,
-      worstRound: 10,
+      finalScore: 0,
+      worstRound: 0,
       finishedAt: result.finishedAt,
     })
     const board = await getDocs(
@@ -192,9 +192,9 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
       displayName: 'Alice',
       gamesPlayed: 1,
       wins: 1,
-      scoreSum: 50,
+      scoreSum: 0,
       winRate: 1,
-      averageScore: 50,
+      averageScore: 0,
       qualified: false,
     })
 
@@ -298,9 +298,9 @@ describe('FirestoreGameRepository, end-to-end against the emulator', () => {
     const rounds: ContractRoundNumber[] = [1, 2, 3, 4, 5]
     for (const round of rounds) {
       await hostRepo.setRoundScore({ playerId: created.hostPlayerId, round, points: 50 })
-      await hostRepo.setRoundScore({ playerId: aliceUid, round, points: 10 })
+      await hostRepo.setRoundScore({ playerId: aliceUid, round, points: 0 })
       await hostRepo.setRoundScore({ playerId: guestId, round, points: 20 })
-      if (round < 5) await hostRepo.advanceRound()
+      if (round < 5) await hostRepo.advanceRound(round)
     }
     await hostRepo.finishGame()
     const aliceSeesHerSeat = waitForState(aliceRepo, (state) => state.hasSeatInNextRoom === true)

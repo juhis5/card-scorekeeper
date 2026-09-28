@@ -148,7 +148,8 @@
       "nextRound": "Seuraavaa kierrosta ei voitu aloittaa. Yritä uudelleen.",
       "finish": "Peliä ei voitu päättää. Yritä uudelleen.",
       "closed": "Tähän huoneeseen ei voi enää tallentaa. Se on ehkä vanhentunut.",
-      "remove": "Pelaajaa {name} ei voitu poistaa. Yritä uudelleen."
+      "remove": "Pelaajaa {name} ei voitu poistaa. Yritä uudelleen.",
+      "offline": "Ei yhteyttä, joten tämä ei mennyt vielä perille. Yritä uudelleen, kun yhteys palaa."
     },
     "photoCount": {
       "trigger": "Kuvaa kortit",

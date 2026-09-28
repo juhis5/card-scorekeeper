@@ -45,6 +45,7 @@ vi.mock('firebase/firestore', () => ({
 
 const { FirestoreGameRepository } = await import('./firestore-repository')
 const { NameTakenError } = await import('../game/player-names')
+const { GameIncompleteError } = await import('../game/rules')
 
 const ROOM_CODE = 'ABCDE'
 const HOST_UID = 'host-uid'
@@ -716,12 +717,13 @@ describe('FirestoreGameRepository.finishGame — order', () => {
         return Promise.resolve({
           docs: [1, 2, 3, 4, 5].flatMap((round) => [
             roundScoreDoc(HOST_UID, round, 20),
-            roundScoreDoc(ALICE_UID, round, 10),
+            roundScoreDoc(ALICE_UID, round, 0),
           ]),
         })
       }
       throw new Error(`unexpected getDocs path: ${ref.path}`)
     })
+    getDocMock.mockResolvedValue(snapshot({ status: 'playing', currentRound: 5 }))
   }
 
   function makeRepo() {
@@ -752,6 +754,64 @@ describe('FirestoreGameRepository.finishGame — order', () => {
   })
 })
 
+describe('FirestoreGameRepository.finishGame — gate', () => {
+  function repo() {
+    return new FirestoreGameRepository({ db: {} as never, auth: {} as never, roomCode: ROOM_CODE })
+  }
+
+  function installScores(roundsScored: number, currentRound: number): void {
+    getDocsMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path === `room/${ROOM_CODE}/players`
+          ? { docs: [playerDoc(HOST_UID, 'Host', 'd'), playerDoc(ALICE_UID, 'Alice', 'd')] }
+          : {
+              docs: [1, 2, 3, 4, 5]
+                .slice(0, roundsScored)
+                .flatMap((round) => [
+                  roundScoreDoc(HOST_UID, round, 20),
+                  roundScoreDoc(ALICE_UID, round, 0),
+                ]),
+            },
+      ),
+    )
+    getDocMock.mockResolvedValue(snapshot({ status: 'playing', currentRound }))
+  }
+
+  it('writes no stats when finished before the last round', async () => {
+    installScores(3, 3)
+
+    await expect(repo().finishGame()).rejects.toBeInstanceOf(GameIncompleteError)
+    expect(writeGameResultMock).not.toHaveBeenCalled()
+    expect(updateDocMock).not.toHaveBeenCalled()
+  })
+
+  it('writes no stats while a seated player has no score for the last round', async () => {
+    installScores(4, 5)
+
+    await expect(repo().finishGame()).rejects.toBeInstanceOf(GameIncompleteError)
+    expect(writeGameResultMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('FirestoreGameRepository.advanceRound', () => {
+  it('writes the round after the one it was asked to move from, with no read, so a repeat is a no-op', async () => {
+    const repo = new FirestoreGameRepository({
+      db: {} as never,
+      auth: {} as never,
+      roomCode: ROOM_CODE,
+    })
+
+    await repo.advanceRound(2)
+    await repo.advanceRound(2)
+
+    expect(getDocMock).not.toHaveBeenCalled()
+    expect(updateDocMock.mock.calls).toEqual([
+      [{ path: `room/${ROOM_CODE}` }, { status: 'playing', currentRound: 3 }],
+      [{ path: `room/${ROOM_CODE}` }, { status: 'playing', currentRound: 3 }],
+    ])
+  })
+})
+
 describe('FirestoreGameRepository.finishGame — stats-building', () => {
   it("writes game_player rows keyed by each participant's own auth uid, not their localStorage device_uuid", async () => {
     getDocsMock.mockImplementation((ref: { path: string }) => {
@@ -770,12 +830,16 @@ describe('FirestoreGameRepository.finishGame — stats-building', () => {
           docs: [
             ...[1, 2, 3, 4, 5].map((round) => roundScoreDoc(HOST_UID, round, 50)),
             ...aliceRounds.map((points, index) => roundScoreDoc(ALICE_UID, index + 1, points)),
-            ...[1, 2, 3, 4, 5].map((round) => roundScoreDoc(BOB_UID, round, 20)),
+            // Bob goes out whenever Alice doesn't: exactly one 0 a round.
+            ...aliceRounds.map((points, index) =>
+              roundScoreDoc(BOB_UID, index + 1, points === 0 ? 20 : 0),
+            ),
           ],
         })
       }
       throw new Error(`unexpected getDocs path: ${ref.path}`)
     })
+    getDocMock.mockResolvedValue(snapshot({ status: 'playing', currentRound: 5 }))
 
     const repo = new FirestoreGameRepository({
       db: {} as never,
@@ -807,19 +871,19 @@ describe('FirestoreGameRepository.finishGame — stats-building', () => {
     expect(writtenPlayers.map((p) => p.deviceUuid)).not.toContain('device-bob-local')
 
     const byUid = new Map(writtenPlayers.map((p) => [p.deviceUuid, p]))
-    // alice's total (90) is lowest -> placement 1; bob (100) -> 2; host (250) -> 3.
+    // bob's total (20) is lowest -> placement 1; alice (90) -> 2; host (250) -> 3.
     expect(byUid.get(ALICE_UID)).toMatchObject({
       displayName: 'Alice',
       finalScore: 90,
-      placement: 1,
+      placement: 2,
       bestRound: 0,
       worstRound: 40,
     })
     expect(byUid.get(BOB_UID)).toMatchObject({
       displayName: 'Bob',
-      finalScore: 100,
-      placement: 2,
-      bestRound: 20,
+      finalScore: 20,
+      placement: 1,
+      bestRound: 0,
       worstRound: 20,
     })
     expect(byUid.get(HOST_UID)).toMatchObject({

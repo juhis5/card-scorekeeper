@@ -7,6 +7,7 @@ import {
 } from './local-repository'
 import type { KeyValueStorage } from './local-repository'
 import { NameTakenError } from '../game/player-names'
+import { GameIncompleteError } from '../game/rules'
 import { readPendingResults } from './pending-results'
 import type { ContractRoundNumber, GameState } from '../game/types'
 
@@ -114,7 +115,7 @@ describe('LocalGameRepository.addGuest', () => {
   it('adds a player the host scores for, at any point in the game', async () => {
     const repository = makeRepository()
     await repository.createGame(HOST_CONFIG)
-    await repository.advanceRound()
+    await repository.advanceRound(1)
 
     const playerId = await repository.addGuest({ name: ' Mummo ' })
 
@@ -264,8 +265,8 @@ describe('LocalGameRepository.advanceRound', () => {
     await repository.createGame(HOST_CONFIG)
 
     const rounds: number[] = []
-    for (let step = 0; step < 4; step += 1) {
-      await repository.advanceRound()
+    for (const fromRound of [1, 2, 3, 4] as const) {
+      await repository.advanceRound(fromRound)
       const emissions = recordEmissions(repository)
       rounds.push(emissions[0]?.currentRound ?? -1)
     }
@@ -277,12 +278,20 @@ describe('LocalGameRepository.advanceRound', () => {
     const repository = makeRepository()
     await repository.createGame(HOST_CONFIG)
 
-    for (let step = 0; step < 6; step += 1) {
-      await repository.advanceRound()
-    }
+    for (const fromRound of [1, 2, 3, 4, 5, 5] as const) await repository.advanceRound(fromRound)
 
     const emissions = recordEmissions(repository)
     expect(emissions[0]?.currentRound).toBe(5)
+  })
+
+  it('does nothing on a repeat, so a double tap never skips a round', async () => {
+    const repository = makeRepository()
+    await repository.createGame(HOST_CONFIG)
+
+    await repository.advanceRound(1)
+    await repository.advanceRound(1)
+
+    expect(recordEmissions(repository)[0]?.currentRound).toBe(2)
   })
 })
 
@@ -298,9 +307,9 @@ describe('LocalGameRepository.finishGame', () => {
 
     for (const round of ALL_ROUNDS) {
       await repository.setRoundScore({ playerId: host.id, round, points: 50 })
-      await repository.setRoundScore({ playerId: alice, round, points: 10 })
+      await repository.setRoundScore({ playerId: alice, round, points: 0 })
       await repository.setRoundScore({ playerId: bob, round, points: 20 })
-      if (round < 5) await repository.advanceRound()
+      if (round < 5) await repository.advanceRound(round)
     }
 
     return { repository, host, alice, bob, gameId: created.gameId, storage }
@@ -332,6 +341,22 @@ describe('LocalGameRepository.finishGame', () => {
     expect(emissions[0]?.status).toBe('finished')
   })
 
+  it('writes nothing for a last round with no 0 in it', async () => {
+    const storage = makeMemoryStorage()
+    const repository = makeRepository({ storage })
+    await repository.createGame(HOST_CONFIG)
+    const host = recordEmissions(repository)[0]?.players[0]
+    if (!host) throw new Error('expected the host to be seated after createGame')
+    for (const round of ALL_ROUNDS) {
+      await repository.setRoundScore({ playerId: host.id, round, points: round === 5 ? 15 : 0 })
+      if (round < 5) await repository.advanceRound(round)
+    }
+
+    await expect(repository.finishGame()).rejects.toBeInstanceOf(GameIncompleteError)
+    expect(readPendingResults(storage)).toEqual([])
+    expect(recordEmissions(repository)[0]?.status).not.toBe('finished')
+  })
+
   it('throws when called before the final round is reached', async () => {
     const storage = makeMemoryStorage()
     const repository = makeRepository({ storage })
@@ -360,7 +385,7 @@ describe('LocalGameRepository.finishGame', () => {
 
     await repository.finishGame()
 
-    // host scored 50/round (worst of the 3: alice 10/round wins, bob 20/round is 2nd).
+    // host scored 50/round (worst of the 3: alice 0/round wins, bob 20/round is 2nd).
     const hostPlayer = readPendingResults(storage)[0]?.players[0]
     expect(hostPlayer?.deviceUuid).toBe('device-host')
     expect(hostPlayer?.placement).toBe(3)
@@ -376,9 +401,11 @@ describe('LocalGameRepository.finishGame', () => {
 
     const hostPoints = [10, 40, 0, 25, 15]
     for (const [index, round] of ALL_ROUNDS.entries()) {
-      await repository.setRoundScore({ playerId: host.id, round, points: hostPoints[index] ?? 0 })
-      await repository.setRoundScore({ playerId: alice, round, points: 5 })
-      if (round < 5) await repository.advanceRound()
+      const hostRound = hostPoints[index] ?? 0
+      await repository.setRoundScore({ playerId: host.id, round, points: hostRound })
+      // Exactly one 0 a round: Alice goes out whenever the host doesn't.
+      await repository.setRoundScore({ playerId: alice, round, points: hostRound === 0 ? 5 : 0 })
+      if (round < 5) await repository.advanceRound(round)
     }
 
     await repository.finishGame()
@@ -471,8 +498,12 @@ describe('LocalGameRepository.finishGame on a damaged save', () => {
   it('stays unfinished when the host row cannot be built, so nothing is marked done without its result', async () => {
     const storage = makeMemoryStorage()
     const first = makeRepository({ storage })
-    await first.createGame(HOST_CONFIG)
-    for (let round = 1; round < ALL_ROUNDS.length; round += 1) await first.advanceRound()
+    const created = await first.createGame(HOST_CONFIG)
+    // A complete game, so only the damaged host id can stop the finish.
+    for (const round of ALL_ROUNDS) {
+      await first.setRoundScore({ playerId: created.hostPlayerId, round, points: 0 })
+      if (round < 5) await first.advanceRound(round)
+    }
     const saved = JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}')
     storage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, hostPlayerId: 'nobody' }))
     const damaged = makeRepository({ storage })
@@ -542,8 +573,8 @@ describe('hasUnfinishedPersistedGame', () => {
     const repository = makeRepository({ storage })
     const created = await repository.createGame(HOST_CONFIG)
     for (const round of [1, 2, 3, 4, 5] as const) {
-      await repository.setRoundScore({ playerId: created.hostPlayerId, round, points: 10 })
-      if (round < 5) await repository.advanceRound()
+      await repository.setRoundScore({ playerId: created.hostPlayerId, round, points: 0 })
+      if (round < 5) await repository.advanceRound(round)
     }
 
     await repository.finishGame()

@@ -1,7 +1,9 @@
 /** Offline, single-device game, saved to localStorage so a reload resumes it. With no network,
  * `finishGame` queues the stats for the reconnect flush. */
 import {
+  GameIncompleteError,
   TOTAL_ROUNDS,
+  canFinishGame,
   contractForRound,
   placements as placementsFor,
   runningTotal,
@@ -11,7 +13,14 @@ import { appendPendingResult } from './pending-results'
 import { cleanPlayerName, isNameTaken, NameTakenError } from '../game/player-names'
 import { browserLocalStorage } from './key-value-storage'
 import type { KeyValueStorage } from './key-value-storage'
-import type { GamePlayer, GameResult, GameState, Player, RoundScore } from '../game/types'
+import type {
+  ContractRoundNumber,
+  GamePlayer,
+  GameResult,
+  GameState,
+  Player,
+  RoundScore,
+} from '../game/types'
 import type {
   AddGuestInput,
   AddPlayerInput,
@@ -232,8 +241,10 @@ export class LocalGameRepository implements GameRepository {
     this.persistAndNotify()
   }
 
-  async advanceRound(): Promise<void> {
-    const nextRoundNumber = Math.min(this.game.state.currentRound + 1, TOTAL_ROUNDS)
+  async advanceRound(fromRound: ContractRoundNumber): Promise<void> {
+    // A repeat (a double tap) finds the round already moved on and does nothing.
+    if (this.game.state.currentRound !== fromRound) return
+    const nextRoundNumber = Math.min(fromRound + 1, TOTAL_ROUNDS)
     const nextRound = contractForRound(nextRoundNumber).round
     this.game = {
       ...this.game,
@@ -243,12 +254,9 @@ export class LocalGameRepository implements GameRepository {
   }
 
   async finishGame(): Promise<GameResult> {
-    // Only guards "too early". The UI's Finish gate makes sure every score is in.
-    if (this.game.state.currentRound !== TOTAL_ROUNDS) {
-      throw new Error(
-        `finishGame called at round ${this.game.state.currentRound}, before the final round ${TOTAL_ROUNDS}`,
-      )
-    }
+    const { players, roundScores, currentRound } = this.game.state
+    const playerIds = players.map((player) => player.id)
+    if (!canFinishGame(playerIds, roundScores, currentRound)) throw new GameIncompleteError()
     // The host's row first: if it can't be built, the game stays unfinished rather than finishing
     // with no result to sync.
     const hostRow = this.buildHostGamePlayer()

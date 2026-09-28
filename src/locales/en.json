@@ -148,7 +148,8 @@
       "nextRound": "Couldn't start the next round. Try again.",
       "finish": "Couldn't finish the game. Try again.",
       "closed": "This room isn't accepting changes anymore. It may have expired.",
-      "remove": "Couldn't remove {name}. Try again."
+      "remove": "Couldn't remove {name}. Try again.",
+      "offline": "No connection, so this didn't go through yet. Try again once you're back online."
     },
     "photoCount": {
       "trigger": "Snap cards",
