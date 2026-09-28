@@ -12,6 +12,7 @@ import {
   roundHeading,
   scoreboardRow,
   startHostedGame,
+  winnerBanner,
 } from './helpers'
 
 const PLAYERS = { hostName: 'Host', joinerName: 'Alice' }
@@ -47,8 +48,8 @@ test.describe('a full online game', () => {
       await playOnlineRound(hostPage, joinerPage, 4, PLAYERS)
       await playOnlineRound(hostPage, joinerPage, 5, PLAYERS)
 
-      await expect(hostPage.getByText('Alice wins!')).toBeVisible()
-      await expect(joinerPage.getByText('Alice wins!')).toBeVisible()
+      await expect(winnerBanner(hostPage, 'Alice wins!')).toBeVisible()
+      await expect(winnerBanner(joinerPage, 'Alice wins!')).toBeVisible()
 
       await openFromMenu(hostPage, 'Stats')
       const gamesPlayed = hostPage

@@ -589,12 +589,12 @@ describe('RoomView score entry order', () => {
 })
 
 describe('RoomView finishing the game', () => {
-  it('declares the correct winner after 5 rounds', async () => {
+  it('declares the correct winner after 5 rounds, announces it and keeps focus on the page', async () => {
     const game = useGameStore()
     await game.start(makeRepository(), { hostDeviceUuid: 'device-host', hostDisplayName: 'Host' })
     await game.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
 
-    await renderRoom()
+    const { container } = await renderRoom()
 
     for (let round = 1; round <= 5; round++) {
       await enterScore('Host', round, 50)
@@ -602,7 +602,10 @@ describe('RoomView finishing the game', () => {
       await advanceOrFinish(round)
     }
 
-    expect(screen.getByText('Alice wins!')).toBeTruthy()
+    // The banner shows it; the room's persistent live region says it.
+    expect(screen.getAllByText('Alice wins!')).toHaveLength(2)
+    expect(container.querySelector('[aria-live="polite"]')?.textContent).toBe('Alice wins!')
+    expect(document.activeElement?.id).toBe('main-heading')
   })
 
   it('shows co-winners when the game ends in a tie', async () => {
@@ -629,7 +632,7 @@ describe('RoomView finishing the game', () => {
       await advanceOrFinish(round)
     }
 
-    expect(screen.getByText('Alice and Bob tie for the win!')).toBeTruthy()
+    expect(screen.getAllByText('Alice and Bob tie for the win!')).toHaveLength(2)
   })
 
   it('starts the next local game at once with the same players in the same order', async () => {
@@ -678,6 +681,17 @@ describe('RoomView Next while a save is still going through', () => {
     await enterScore('Alice', 1, 0)
     return repository
   }
+
+  it('moves focus to the new round heading after Next, not to the page body', async () => {
+    const repository = await startSlowGame()
+    repository.releaseSaves()
+    await flushPromises()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Next round' }))
+    await flushPromises()
+
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Round 2 scores' }))
+  })
 
   it('advances once however many times Next is tapped before the save settles', async () => {
     const repository = await startSlowGame()
@@ -1079,6 +1093,28 @@ describe('RoomView after a reload of an online room', () => {
     expect(screen.getByText('Join room 7K4RQ')).toBeTruthy()
   })
 
+  it('says there is no connection, not "not seated", when the seat lookup fails offline', async () => {
+    const room = await roomCreatedBeforeReload()
+    room.seat = { playerId: 'host-uid', isHost: true }
+    const findSeat = vi
+      .spyOn(room, 'findSeat')
+      .mockRejectedValueOnce(Object.assign(new Error('client is offline'), { code: 'unavailable' }))
+    resumeRepository.mockResolvedValue(room)
+    const reloaded = createPinia()
+    setActivePinia(reloaded)
+
+    await renderAt(reloaded)
+
+    expect(screen.getByRole('heading', { name: 'No connection' })).toBeTruthy()
+    expect(screen.queryByText('Join room 7K4RQ')).toBeNull()
+
+    window.dispatchEvent(new Event('online'))
+    await flushPromises()
+
+    expect(findSeat).toHaveBeenCalledTimes(2)
+    expect(screen.getByRole('heading', { name: 'Round 1 scores' })).toBeTruthy()
+  })
+
   it('shows that the room is opening while its seat is looked up', async () => {
     resumeRepository.mockReturnValue(new Promise(() => undefined))
     const reloaded = createPinia()
@@ -1233,6 +1269,8 @@ describe("RoomView entering everyone's points at once", () => {
 
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Enter all' })).toBeNull()
+    // Its button is gone with nobody left, so focus lands on the round heading, not <body>.
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Round 1 scores' }))
     expect(screen.getByRole('button', { name: 'Next round' }).getAttribute('aria-disabled')).toBe(
       'false',
     )

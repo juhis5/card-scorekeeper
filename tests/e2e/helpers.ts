@@ -129,3 +129,9 @@ export async function openFromMenu(page: Page, pageName: string): Promise<void> 
   await page.getByRole('button', { name: 'Menu' }).click()
   await page.getByRole('dialog').getByRole('link', { name: pageName }).click()
 }
+
+/** The winner banner itself: the same words are also in the room's (screen-reader only) live
+ * region, so a plain text match finds two. */
+export function winnerBanner(page: Page, text: string | RegExp) {
+  return page.locator('p', { hasText: text })
+}

@@ -6,15 +6,16 @@
 import { expect, test } from '@playwright/test'
 import {
   addPlayerInRoom,
-  expectOnlineRoom,
   enterOwnRoundScore,
   enterRoundScore,
+  expectOnlineRoom,
   joinHostedGame,
   playOnlineRound,
   readRoomCode,
   roundHeading,
   scoreboardRow,
   startHostedGame,
+  winnerBanner,
 } from './helpers'
 
 const PLAYERS = { hostName: 'Host', joinerName: 'Alice' }
@@ -48,7 +49,7 @@ test.describe('play again', () => {
         await enterRoundScore(hostPage, GUEST_NAME, round, GUEST_POINTS)
         await playOnlineRound(hostPage, joinerPage, round, PLAYERS)
       }
-      await expect(joinerPage.getByText('Alice wins!')).toBeVisible()
+      await expect(winnerBanner(joinerPage, 'Alice wins!')).toBeVisible()
 
       await hostPage.getByRole('button', { name: 'Play again' }).click()
       await expect(roundHeading(hostPage, 1)).toBeVisible()

@@ -5,16 +5,17 @@
  */
 import { expect, test, type Page } from '@playwright/test'
 import {
-  expectOnlineRoom,
+  addPlayerInRoom,
   enterOwnRoundScore,
   enterRoundScore,
-  addPlayerInRoom,
-  startHostedGame,
+  expectOnlineRoom,
   joinHostedGame,
   openFromMenu,
   readRoomCode,
   roundHeading,
   scoreboardRow,
+  startHostedGame,
+  winnerBanner,
 } from './helpers'
 
 /** Waits for the filled-in card to go: its section closing moves the cards below it. */
@@ -77,8 +78,8 @@ test.describe('players without a phone', () => {
         await moveOn(hostPage, joinerPage, round)
       }
 
-      await expect(hostPage.getByText('Mummo wins!')).toBeVisible()
-      await expect(joinerPage.getByText('Mummo wins!')).toBeVisible()
+      await expect(winnerBanner(hostPage, 'Mummo wins!')).toBeVisible()
+      await expect(winnerBanner(joinerPage, 'Mummo wins!')).toBeVisible()
       await expect(scoreboardRow(joinerPage, 'Ripa')).toContainText('150')
 
       await openFromMenu(hostPage, 'Stats')

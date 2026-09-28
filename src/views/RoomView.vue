@@ -6,6 +6,7 @@
  */
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useEventListener } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { ListChecks, WifiOff } from '@lucide/vue'
@@ -17,6 +18,7 @@ import RemovePlayerControl from '@/components/room/RemovePlayerControl.vue'
 import ScoreCard from '@/components/room/ScoreCard.vue'
 import ScoreBoard from '@/components/room/ScoreBoard.vue'
 import WinnerBanner from '@/components/room/WinnerBanner.vue'
+import { winnerMessage } from '@/components/room/winner-message'
 import { Button } from '@/components/ui/button'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
@@ -31,13 +33,14 @@ import {
   roundsWithSeveralZeros,
   TOTAL_ROUNDS,
 } from '@/lib/game/rules'
-import { isPermissionDenied } from '@/lib/data/write-errors'
+import { isPermissionDenied, isUnavailable } from '@/lib/data/write-errors'
 import { TimeoutError, withTimeout } from '@/lib/platform/timeout'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/data/repository'
 import type { ContractRoundNumber, Player, Standing } from '@/lib/game/types'
 
-const { t, n, locale } = useI18n()
+const i18n = useI18n()
+const { t, n, locale } = i18n
 provideOpenCard()
 const route = useRoute()
 const game = useGameStore()
@@ -241,7 +244,7 @@ function revealMessage(round: number): string {
 }
 
 // Announce each reveal once, but not on opening or resuming a room: the board already shows it.
-// WinnerBanner announces the finish.
+// The last reveal is the finish: its announcement is the winner.
 let revealBaseline: { gameId: string | null; completed: number } | null = null
 watch(
   [gameId, completedRounds, hasActiveGame],
@@ -255,7 +258,10 @@ watch(
       revealBaseline.gameId === id &&
       completed > revealBaseline.completed
     revealBaseline = { gameId: id, completed }
-    if (isNewReveal && status.value !== 'finished') void announce(revealMessage(completed))
+    if (!isNewReveal) return
+    void announce(
+      status.value === 'finished' ? winnerMessage(i18n, winners.value) : revealMessage(completed),
+    )
   },
   { immediate: true },
 )
@@ -355,6 +361,13 @@ async function isReadyToAdvance(): Promise<boolean> {
   return canAdvance.value
 }
 
+/** Back to the "Enter all" button, or to the round heading once nobody is left to enter. */
+async function restoreFocusAfterEnterAll(): Promise<void> {
+  await nextTick()
+  const opener = document.querySelector<HTMLElement>('[data-enter-all]')
+  ;(opener ?? scoreEntryHeading.value)?.focus()
+}
+
 /** Busy before the first await, so taps made while a save settles can't advance twice. */
 async function handleNextRound(): Promise<void> {
   if (isAdvancing.value) return
@@ -363,6 +376,9 @@ async function handleNextRound(): Promise<void> {
     if (!(await isReadyToAdvance())) return
     await game.advanceRound()
     saveError.value = ''
+    // The new round's heading, not <body>: the tapped button stays, but its round is gone.
+    await nextTick()
+    scoreEntryHeading.value?.focus()
   } catch (error) {
     saveError.value = describeSaveFailure(error, t('room.saveError.nextRound'))
   } finally {
@@ -375,9 +391,12 @@ async function handleFinish(): Promise<void> {
   isFinishing.value = true
   try {
     if (!(await isReadyToAdvance())) return
-    // No announcement here: WinnerBanner is its own live region and announces on mount.
+    // No announcement here: the reveal watcher announces the winner on every device.
     await game.finishGame()
     saveError.value = ''
+    // Finish and the score cards are gone: the page heading keeps the host's place.
+    await nextTick()
+    document.getElementById('main-heading')?.focus()
   } catch (error) {
     saveError.value = describeSaveFailure(error, t('room.saveError.finish'))
   } finally {
@@ -387,8 +406,8 @@ async function handleFinish(): Promise<void> {
 
 const routeCode = computed(() => String(route.params.code))
 /** Resuming an online room after a reload: 'opening' while this device's seat is looked up,
- * 'not-seated' when it has none there. */
-const resumeState = ref<'idle' | 'opening' | 'not-seated'>('idle')
+ * 'not-seated' when it has none there, 'unreachable' when it couldn't be looked up offline. */
+const resumeState = ref<'idle' | 'opening' | 'not-seated' | 'unreachable'>('idle')
 // Online, the store knows the room before its first snapshot arrives (just after joining, or
 // resuming), so "no players yet" means "still opening", not "no game".
 const isOpeningRoom = computed(
@@ -401,26 +420,37 @@ const isAbandoned = computed(() => status.value === 'abandoned')
 const isGameShown = computed(
   () =>
     !isOpeningRoom.value &&
-    resumeState.value !== 'not-seated' &&
+    (resumeState.value === 'idle' || resumeState.value === 'opening') &&
     hasActiveGame.value &&
     !isAbandoned.value,
 )
 const heading = computed(() => {
   if (isOpeningRoom.value) return t('room.opening', { code: routeCode.value })
   if (resumeState.value === 'not-seated') return t('room.notSeated.heading')
+  if (resumeState.value === 'unreachable') return t('room.unreachable.heading')
   if (isAbandoned.value) return t('room.end.endedTitle')
   if (!hasActiveGame.value) return t('room.empty.heading')
   return t('room.heading')
 })
 
+/** Offline on a cold cache the seat lookup fails: that's "no connection", not "not seated". */
 async function resumeOnlineRoom(code: string): Promise<void> {
   resumeState.value = 'opening'
   const repository = await resumeRepository(code)
-  const isResumed = repository
-    ? await game.resumeOnline(repository, code).catch(() => false)
-    : false
-  resumeState.value = isResumed ? 'idle' : 'not-seated'
+  if (!repository) {
+    resumeState.value = navigator.onLine ? 'not-seated' : 'unreachable'
+    return
+  }
+  try {
+    resumeState.value = (await game.resumeOnline(repository, code)) ? 'idle' : 'not-seated'
+  } catch (error) {
+    resumeState.value = !navigator.onLine || isUnavailable(error) ? 'unreachable' : 'not-seated'
+  }
 }
+
+useEventListener(window, 'online', () => {
+  if (resumeState.value === 'unreachable') void resumeOnlineRoom(routeCode.value)
+})
 
 /** Whether the store already holds the game this address names: the local one, or this room. */
 const isStoreOnThisGame = computed(() =>
@@ -464,6 +494,10 @@ onMounted(async () => {
 
     <!-- While the room opens, the heading alone says so. -->
     <template v-if="isOpeningRoom" />
+
+    <p v-else-if="resumeState === 'unreachable'" class="text-muted-foreground">
+      {{ t('room.unreachable.body') }}
+    </p>
 
     <template v-else-if="resumeState === 'not-seated'">
       <p class="text-muted-foreground">{{ t('room.notSeated.body') }}</p>
@@ -554,6 +588,7 @@ onMounted(async () => {
             v-if="isHost && missingThisRound.length > 0"
             variant="outline"
             class="h-11 shrink-0"
+            data-enter-all
             @click="isEnterAllOpen = true"
           >
             <ListChecks aria-hidden="true" class="size-4" />
@@ -564,6 +599,7 @@ onMounted(async () => {
           v-if="isHost"
           v-model:open="isEnterAllOpen"
           :players="missingThisRound"
+          @closed="restoreFocusAfterEnterAll"
           :round="currentRound"
           :save="handleScoreCommit"
         />
@@ -633,8 +669,7 @@ onMounted(async () => {
         <Button
           v-if="!isFinalRound"
           class="h-11 flex-1 aria-disabled:opacity-50"
-          :aria-disabled="!canAdvance"
-          :disabled="isAdvancing"
+          :aria-disabled="!canAdvance || isAdvancing"
           @click="handleNextRound"
         >
           {{ t('room.next.button') }}
@@ -642,8 +677,7 @@ onMounted(async () => {
         <Button
           v-else
           class="h-11 flex-1 aria-disabled:opacity-50"
-          :aria-disabled="!canAdvance"
-          :disabled="isFinishing"
+          :aria-disabled="!canAdvance || isFinishing"
           @click="handleFinish"
         >
           {{ t('room.finish.button') }}

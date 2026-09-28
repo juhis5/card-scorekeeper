@@ -4,6 +4,7 @@
  * nothing changes between runs.
  */
 import { expect, test, type Page } from '@playwright/test'
+import { winnerBanner } from './helpers'
 
 const THEMES = ['captain', 'captain-light', 'dark', 'light'] as const
 
@@ -75,7 +76,7 @@ for (const theme of THEMES) {
           .getByRole('button', { name: round < 5 ? 'Seuraava kierros' : 'Päätä peli' })
           .click()
       }
-      await expect(page.getByText(/voittaa!/)).toBeVisible()
+      await expect(winnerBanner(page, /voittaa!/)).toBeVisible()
       await expect(page).toHaveScreenshot(`room-finished-${theme}.png`, { fullPage: true })
     })
 

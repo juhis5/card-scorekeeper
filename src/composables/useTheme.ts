@@ -4,6 +4,7 @@
  * JSON-wrap the value.
  */
 import { ref } from 'vue'
+import { browserLocalStorage } from '@/lib/data/key-value-storage'
 import { isDarkTheme, paletteClass, parseTheme, THEMES, type Theme } from '@/lib/platform/themes'
 
 const THEME_STORAGE_KEY = 'theme'
@@ -21,7 +22,7 @@ function applyTheme(theme: Theme): void {
 }
 
 function storedTheme(): Theme {
-  return parseTheme(localStorage.getItem(THEME_STORAGE_KEY))
+  return parseTheme(browserLocalStorage().getItem(THEME_STORAGE_KEY))
 }
 
 /** At startup: the no-flash script already set the classes; this also sets the theme color. */
@@ -36,7 +37,7 @@ export function useTheme() {
   function setTheme(value: Theme): void {
     theme.value = value
     applyTheme(value)
-    localStorage.setItem(THEME_STORAGE_KEY, value)
+    browserLocalStorage().setItem(THEME_STORAGE_KEY, value)
   }
 
   return { theme, setTheme }

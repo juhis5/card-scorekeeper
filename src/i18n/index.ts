@@ -1,4 +1,5 @@
 import { createI18n } from 'vue-i18n'
+import { browserLocalStorage } from '@/lib/data/key-value-storage'
 import en from '@/locales/en.json'
 import fi from '@/locales/fi.json'
 
@@ -13,7 +14,7 @@ function isSupportedLocale(value: string | null): value is SupportedLocale {
 
 /** Device-default locale: a persisted choice wins, else the browser language, else `en`. */
 function detectLocale(): SupportedLocale {
-  const stored = localStorage.getItem(LOCALE_STORAGE_KEY)
+  const stored = browserLocalStorage().getItem(LOCALE_STORAGE_KEY)
   if (isSupportedLocale(stored)) return stored
 
   const deviceLanguage = navigator.language.slice(0, 2)
@@ -30,7 +31,7 @@ export const i18n = createI18n({
 /** Persist a locale choice and reflect it on `<html lang>` for a11y. */
 export function setLocale(locale: SupportedLocale): void {
   i18n.global.locale.value = locale
-  localStorage.setItem(LOCALE_STORAGE_KEY, locale)
+  browserLocalStorage().setItem(LOCALE_STORAGE_KEY, locale)
   document.documentElement.lang = locale
 }
 

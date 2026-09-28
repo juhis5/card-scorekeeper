@@ -3,7 +3,7 @@
  * or removes players in the room. One device only, so this also runs on WebKit.
  */
 import { expect, test } from '@playwright/test'
-import { enterRoundScore, roundHeading, startLocalGame } from './helpers'
+import { enterRoundScore, roundHeading, startLocalGame, winnerBanner } from './helpers'
 
 test.describe('play again, local game', () => {
   test('starts the next game at once, with the same players', async ({ page }) => {
@@ -14,13 +14,13 @@ test.describe('play again, local game', () => {
       await enterRoundScore(page, 'Alice', round, 0)
       await page.getByRole('button', { name: round < 5 ? 'Next round' : 'Finish game' }).click()
     }
-    await expect(page.getByText('Alice wins!')).toBeVisible()
+    await expect(winnerBanner(page, 'Alice wins!')).toBeVisible()
 
     await page.getByRole('button', { name: 'Play again' }).click()
 
     await expect(roundHeading(page, 1)).toBeVisible()
     await expect(page.getByRole('button', { name: "Enter Host's score" })).toBeVisible()
     await expect(page.getByRole('button', { name: "Enter Alice's score" })).toBeVisible()
-    await expect(page.getByText('Alice wins!')).toHaveCount(0)
+    await expect(winnerBanner(page, 'Alice wins!')).toHaveCount(0)
   })
 })

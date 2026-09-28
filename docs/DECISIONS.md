@@ -542,3 +542,20 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   kept, and what error reports carry. Sentry's scrubbing now covers streamed spans and replays,
   and props are off (see the Sentry entry). A malformed `FIREBASE_SERVICE_ACCOUNT` now fails with
   a fixed message: V8's JSON error quotes the input, which would put key characters in the logs.
+- 2026-09-28 — Accessibility and small screens (second audit, PR 6).
+  - Focus never drops to `<body>`: Next moves it to the new round's heading, Finish to the page
+    heading, Enter-all closing itself to its button or the round heading, and the Home ✕ to the
+    page heading. Next and Finish are no longer `disabled` while busy (a focused button that
+    becomes disabled loses focus); they are aria-disabled and the busy flag ignores the tap.
+  - The winner is announced through the room's persistent live region, like every reveal: a
+    live region inserted with its text already in it (the old WinnerBanner) is often not read.
+  - Destructive text meets 4.5:1 on its own tint (dialogs, the rules badge) and on `muted` in all
+    eight themes; the destructive red moved in five of them, and the contrast test checks these
+    pairs now.
+  - Blocked site data no longer gives a blank page: `browserLocalStorage()` itself is safe (reads
+    find nothing, writes are dropped), locale and theme go through it, and the no-flash script
+    catches too (new CSP hash).
+  - At 360 px the header hides the word "Huone" (still read out) so the room code never
+    truncates (`xs` breakpoint, 24rem).
+  - Reopening an online room offline on a cold cache says "No connection" and retries on the
+    `online` event, instead of "This room isn't open on this device".

@@ -13,6 +13,7 @@ import {
   roundHeading,
   scoreboardRow,
   startHostedGame,
+  winnerBanner,
 } from './helpers'
 
 const MAX_ROUND_SCORE = 1000
@@ -45,7 +46,7 @@ test('a finished online game shows up on Ennätykset', async ({ browser }) => {
     const finish = hostPage.getByRole('button', { name: 'Finish game' })
     await expect(finish).toBeEnabled()
     await finish.click()
-    await expect(hostPage.getByText('Voittaja wins!')).toBeVisible()
+    await expect(winnerBanner(hostPage, 'Voittaja wins!')).toBeVisible()
 
     await openFromMenu(hostPage, 'Highscores')
     await hostPage.getByRole('button', { name: 'Games' }).click()

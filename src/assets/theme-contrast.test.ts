@@ -11,6 +11,8 @@ const TEXT_MINIMUM = 4.5
 const NON_TEXT_MINIMUM = 3
 /** Matches `outline-ring/80` in main.css and `ring-ring/80` in the shadcn button and input. */
 const RING_OPACITY = 0.8
+/** The destructive button's own tint: `bg-destructive/10`, and `dark:bg-destructive/20`. */
+const DESTRUCTIVE_TINT = { light: 0.1, dark: 0.2 }
 
 // Node environment: CSS imports resolve to an empty string under happy-dom, even with `?raw`.
 const css = readFileSync(new URL('./main.css', import.meta.url), 'utf8')
@@ -73,20 +75,21 @@ const TEXT_PAIRS: [text: string, surface: string][] = [
   ['primary-foreground', 'primary'],
   ['destructive', 'background'],
   ['destructive', 'card'],
+  ['destructive', 'muted'],
   ['brand', 'background'],
   ['brand', 'card'],
 ]
 
 describe.each([
-  ['light', ':root, .theme-light'],
-  ['dark', '.dark'],
-  ['jani', '.theme-jani'],
-  ['nord', '.theme-nord'],
-  ['dracula', '.theme-dracula'],
-  ['solarized', '.theme-solarized'],
-  ['captain', '.theme-captain'],
-  ['captain light', '.theme-captain-light'],
-])('%s theme contrast', (_theme, selector) => {
+  ['light', ':root, .theme-light', 'light'],
+  ['dark', '.dark', 'dark'],
+  ['jani', '.theme-jani', 'dark'],
+  ['nord', '.theme-nord', 'dark'],
+  ['dracula', '.theme-dracula', 'dark'],
+  ['solarized', '.theme-solarized', 'light'],
+  ['captain', '.theme-captain', 'dark'],
+  ['captain light', '.theme-captain-light', 'light'],
+] as const)('%s theme contrast', (_theme, selector, mode) => {
   const tokens = tokensOf(selector)
   const token = (name: string): string => {
     // A theme that doesn't set its own brand colour uses its primary (`--brand: var(--primary)`).
@@ -98,6 +101,15 @@ describe.each([
   it.each(TEXT_PAIRS)('%s text on %s meets 4.5:1', (text, surface) => {
     expect(contrast(token(text), token(surface))).toBeGreaterThanOrEqual(TEXT_MINIMUM)
   })
+
+  // Poista, Lopeta peli, the rules' "ei käy" badge: destructive text on its own tint.
+  it.each(['popover', 'background', 'card'])(
+    'destructive text on its button tint over %s meets 4.5:1',
+    (surface) => {
+      const tint = composite(token('destructive'), token(surface), DESTRUCTIVE_TINT[mode])
+      expect(contrast(token('destructive'), tint)).toBeGreaterThanOrEqual(TEXT_MINIMUM)
+    },
+  )
 
   it.each(['background', 'card', 'muted'])('the focus ring on %s meets 3:1', (surface) => {
     const ring = composite(token('ring'), token(surface), RING_OPACITY)
