@@ -42,6 +42,15 @@ export default defineConfigWithVueTs(
   },
 
   {
+    // Command-line tools: printing is their output.
+    name: 'app/scripts',
+    files: ['scripts/**/*.{ts,mjs}'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
+
+  {
     // shadcn-vue primitives keep their ecosystem-wide single-word names (Button, Input, Table).
     name: 'app/ui-primitives',
     files: ['src/components/ui/**/*.vue'],

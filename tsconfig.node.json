@@ -5,7 +5,8 @@
     "vite.config.*",
     "vitest.config.*",
     "tests/e2e/playwright.config.ts",
-    "eslint.config.*"
+    "eslint.config.*",
+    "scripts/**/*.ts"
   ],
   "compilerOptions": {
     // The tools transpile these files rather than using Node's type-stripping.

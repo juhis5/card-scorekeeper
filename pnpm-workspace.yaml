@@ -8,6 +8,9 @@ allowBuilds:
   # Its install script only downloads the CLI binary, which already arrives through its per-platform
   # optional package (@sentry/cli-darwin, -linux-x64, ...).
   '@sentry/cli': false
+  # Its install script only checks the binary that arrives through its per-platform optional
+  # package (@esbuild/darwin-arm64, -linux-x64, ...); tsx and vite run it without the script.
+  esbuild: false
   protobufjs: true
   re2: true
   # sharp is pulled in only as vite-plugin-pwa's OPTIONAL peer `@vite-pwa/assets-generator` (its

@@ -597,3 +597,9 @@ it is.
   (`connectIfReachable`, `readPlayedGames`, `readTop`); the stores only map results to state,
   as the layering says. Still to do: `deviceUuid` names three different ids (the identity
   store's, a seat field and the stats key), which touches the Firestore schema the rules check.
+- 2026-09-28 — The highscore backfill (release step 3). `pnpm backfill:highscores --project <id>`
+  (dry run unless `--write`), with a pure planner in lib/game so it's unit-tested and inside the
+  coverage gate. It runs between the rules deploy and the app, when nothing else publishes, and
+  rebuilds totals instead of incrementing them, so it is safe to rerun. Credentials come from
+  Application Default Credentials, never a key in the repo. `tsx` runs it; esbuild's install
+  script stays denied (its binary comes from the per-platform package).

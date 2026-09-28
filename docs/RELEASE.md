@@ -28,7 +28,25 @@ app's Ennätykset queries fail until then. Rules go before the app because the a
 today (the old `main`) writes shapes the new rules still accept, while the new app needs the new
 rules and indexes.
 
-## 3. The app
+## 3. Backfill the public lists
+
+Games played in production before this release have stats rows but no leaderboard entries or
+player totals. Run the backfill now, between the rules and the app: the app still live (the old
+`main`) never publishes, so nothing races it.
+
+```sh
+gcloud auth application-default login          # once; or GOOGLE_APPLICATION_CREDENTIALS
+pnpm backfill:highscores --project card-scorekeeper-staging                 # dry run first
+pnpm backfill:highscores --project card-scorekeeper-prod-1673f              # read the plan
+pnpm backfill:highscores --project card-scorekeeper-prod-1673f --write      # apply it
+```
+
+It applies the rules' conditions itself (the Admin SDK bypasses them): only games whose room
+exists, is `finished` and has at least two participants. It creates missing entries and
+**rebuilds** each affected player's totals from all their counted games, so a rerun changes
+nothing. The planner is `src/lib/game/highscore-backfill.ts` (unit-tested).
+
+## 4. The app
 
 ```sh
 git fetch origin
@@ -38,24 +56,6 @@ git merge-base --is-ancestor origin/main origin/develop && git push origin origi
 Vercel builds `main` in about a minute. Installed apps keep their old version until the player
 taps the update banner (or Päivitä sovellus in the menu); the old version keeps working
 against the new rules.
-
-## 4. Backfill the public lists
-
-Games played in production before this release have stats rows but no leaderboard entries or
-player totals. The backfill runs once, with the Admin SDK (so it bypasses the rules, and must
-apply their conditions itself):
-
-- only games whose room exists, is `finished`, and has at least two participants;
-- for each of their `game_player` rows, create `leaderboard/{gameId}_{uid}` if it doesn't exist,
-  copying `displayName`, `finalScore`, `worstRound` and the game's `finishedAt`;
-- then **rebuild** each affected `player_totals/{uid}` from all of that player's leaderboard
-  entries (never increment): games played, wins (placement 1), score sum, win rate, average,
-  `qualified` (5 or more games) and `lastEntry` (any of the entries). Rebuilding makes it safe to
-  rerun and immune to games clients publish while it runs.
-
-Write it as a script with a `--dry-run` that only prints what it would write, run it against
-staging first, then against production with the owner's service account (kept out of the repo
-and the logs).
 
 ## 5. Check production
 
