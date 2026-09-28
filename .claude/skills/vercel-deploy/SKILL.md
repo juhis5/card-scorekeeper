@@ -37,7 +37,7 @@ Two very different classes — don't mix them up:
 | Name | Class | Where | Notes |
 |------|-------|-------|-------|
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_*` | **Public** | Client | Firebase web config is public by design; security is Firestore rules. `VITE_` = shipped to browser, that's fine here. |
-| `GEMINI_API_KEY` | Secret | Server only | Free-tier, no billing. Never `VITE_`. |
+| `GEMINI_API_KEY` | Secret | Server only | Production: a billed project with a budget alert and a quota cap (EEA users need paid services). Never `VITE_`. |
 | `GEMINI_MODEL` | Config | Server only | Optional; overrides the default Gemini model when Google renames or retires one. |
 | `FIREBASE_SERVICE_ACCOUNT` | Secret | Server only | Service-account JSON: its `project_id` checks caller ID tokens (`jose`), the Admin SDK reads the room. Never `VITE_`, never in the client. |
 

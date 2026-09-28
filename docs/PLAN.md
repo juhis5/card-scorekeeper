@@ -135,12 +135,13 @@ in their own game.
   fixes either and confirms. Nothing is saved without that.
 - **Extraction shape:** `{ cards: [{ rank, suit, value }], total }`. The server recomputes every
   value and the total with `rules.ts` and never trusts the model's sum. Over 60 cards is refused.
-- **Protecting your Gemini free tier.** `api/count.ts` checks the request shape and size (1.5 MB)
+- **Protecting the Gemini budget.** `api/count.ts` checks the request shape and size (1.5 MB)
   first, then verifies the ID token with `jose`. The room must exist, be neither finished nor
   expired, and have the caller seated. Limits: 30 calls per 15 min per room and 300 per hour
   overall, in memory per instance. Gemini (`GEMINI_MODEL`, default `gemini-3.8-flash`) gets 15 s.
-  The key has no billing and lives in its own Google Cloud project, so the worst case is "quota
-  used up today". Server env: `GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `GEMINI_MODEL`.
+  Production uses a key on a billed Google Cloud project of its own (the Gemini API terms allow
+  only paid services for apps with EEA users), with a budget alert and a hard daily quota cap, so
+  the worst case is "quota used up today", not a surprise invoice. Server env: `GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`, `GEMINI_MODEL`.
 
 ## Hosting
 

@@ -41,13 +41,13 @@ The client (`usePhotoCount`) maps each status to a reason, and `PhotoCountSheet`
 
 - **Rate limits are in memory, per function instance** (`InMemoryRateLimitStore`). Owner accepted this for a friends' game (DECISIONS, round 5): cold starts and parallel instances each get a fresh budget, so the real ceiling is Gemini's own free-tier quota. If abuse shows up, swap in an Upstash/Redis `RateLimitStore`; the interface already exists.
 - **Short-lived rooms.** Rooms expire after ≤7 h, so a leaked code stops working.
-- **Free-tier key, no billing.** Worst case is "quota exhausted today", never an invoice.
+- **Paid key, capped.** The Gemini API terms allow only paid services for apps with EEA users, so production uses a billed project with a budget alert and a hard daily quota cap: the worst case is "quota exhausted today", not a surprise invoice.
 
 Good enough for a friends' game, not airtight: a seated player can still burn calls. The caps bound it and it self-heals.
 
 ## Env vars (function env only, never in the repo)
 
-- `GEMINI_API_KEY` — free tier, **no billing attached**. Create it in a Google Cloud project **separate from the Firebase project**, and restrict it to the Generative Language API. Never reuse the Firebase browser key: that one is public by design.
+- `GEMINI_API_KEY` — on a **billed** Google Cloud project with a **budget alert and a hard quota cap** (production serves EEA users, whom the free tier may not serve). Create it in a Google Cloud project **separate from the Firebase project**, and restrict it to the Generative Language API. Never reuse the Firebase browser key: that one is public by design.
 - `GEMINI_MODEL` — optional; overrides `DEFAULT_GEMINI_MODEL` (`gemini-3.8-flash`) when Google retires or renames models. No code change, but Vercel only applies env changes to new deployments, so redeploy.
 - `FIREBASE_SERVICE_ACCOUNT` — single-line service-account JSON: its `project_id` for the `jose` token check, and the Admin SDK's credentials for the room read.
 

@@ -146,7 +146,8 @@ it is.
 - 2026-09-27 — **Review round 5, photo count deployable:**
   - Ships on, with in-memory rate limits per instance (owner's call). The real ceiling is the
     no-billing key's free quota, so a seated player could use up the day's quota for everyone.
-    Upgrade path: an Upstash/Redis `RateLimitStore`.
+    Upgrade path: an Upstash/Redis `RateLimitStore`. (Superseded: see the 2026-09-29 entry on the
+    paid, capped Gemini key.)
   - Model from `GEMINI_MODEL`, default `gemini-3.8-flash` (2.5 Flash is closed to new projects).
     Low thinking, capped output, 15 s abort, `maxDuration: 30`.
   - `api/` runs as native ESM on Vercel, so relative imports end in `.js`. `tsconfig.api.json`
@@ -636,3 +637,10 @@ it is.
   - Finnish says "isäntä" for the host everywhere; the owned Sheet's close button is translated;
     the 404 link is 44 px tall; the manifest has an id and lang 'fi'; CI cancels superseded runs.
   - Kept: `game.addPlayer` is unused in the app, but many tests seat players through it.
+- 2026-09-29 — Gemini on a paid, capped key (owner's decision). The Gemini API Additional Terms
+  (2026-04-28) allow only paid services when an app is made available to users in the EEA,
+  Switzerland or the UK; the free tier is for developing and testing. Production's
+  `GEMINI_API_KEY` is on its own billed Google Cloud project with a budget alert and a hard daily
+  quota cap; the per-room and global limits in `/api/count` keep use small. No code change: the
+  key is swapped in Vercel's Production env. (Supersedes "the no-billing key's free quota" in the
+  2026-09-27 review round 5 entry.)
