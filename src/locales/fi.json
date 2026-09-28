@@ -378,6 +378,19 @@
         "games": "Pelit"
       },
       "games": "{count} peli | {count} peliä"
+    },
+    "queue": {
+      "waiting": "{count} peli odottaa lähetystä. | {count} peliä odottaa lähetystä.",
+      "waitingBody": "Se lisätään tilastoihin, kun laite on verkossa. | Ne lisätään tilastoihin, kun laite on verkossa.",
+      "uploading": "Lähetetään…",
+      "failed": "{count} peli ei tallentunut tilastoihin. | {count} peliä ei tallentunut tilastoihin.",
+      "failedBody": "Palvelin hylkäsi tuloksen. Voit yrittää uudelleen myöhemmin tai poistaa sen. | Palvelin hylkäsi tulokset. Voit yrittää uudelleen myöhemmin tai poistaa ne.",
+      "retry": "Yritä uudelleen",
+      "discard": "Poista",
+      "discardTitle": "Poistetaanko tallentumattomat pelit?",
+      "discardDescription": "Niitä ei voi palauttaa, eivätkä ne tule tilastoihin.",
+      "keepLabel": "Säilytä pelit",
+      "confirmDiscardLabel": "Poista pelit"
     }
   },
   "invite": {

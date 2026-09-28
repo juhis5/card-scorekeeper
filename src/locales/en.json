@@ -378,6 +378,19 @@
         "games": "Games"
       },
       "games": "{count} game | {count} games"
+    },
+    "queue": {
+      "waiting": "{count} game is waiting to upload. | {count} games are waiting to upload.",
+      "waitingBody": "It's added to your stats once this device is online. | They're added to your stats once this device is online.",
+      "uploading": "Uploading…",
+      "failed": "{count} game couldn't be saved to your stats. | {count} games couldn't be saved to your stats.",
+      "failedBody": "The server refused the result. You can try again later or delete it. | The server refused the results. You can try again later or delete them.",
+      "retry": "Try again",
+      "discard": "Delete",
+      "discardTitle": "Delete the unsaved games?",
+      "discardDescription": "They can't be restored and won't reach your stats.",
+      "keepLabel": "Keep the games",
+      "confirmDiscardLabel": "Delete the games"
     }
   },
   "invite": {

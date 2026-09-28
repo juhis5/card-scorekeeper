@@ -471,3 +471,10 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     Android gets `interactive-widget=resizes-content`, the VirtualKeyboard API is Chromium-only,
     and on an iPhone the keyboard covers the page without resizing it, so the last card can only
     rise above it if there's page below. Following `visualViewport` fought the player's scrolling.
+- 2026-09-28 — Offline results you can see. Tilastot shows how many finished local games wait to
+  upload, and the ones Firestore refused for good. The queue no longer uploads only on launch:
+  also when the browser comes back online and when Tilastot opens, one upload at a time.
+  - Each queued write has a 15 s bound: an offline Firestore write never fails, it waits, so an
+    unbounded upload would stay "in flight" and block every later try.
+  - A refused game gets Yritä uudelleen, not only Poista: a refusal can be the rules being behind
+    (a release not yet deployed), so after a rules fix it may go through. Poista asks first.

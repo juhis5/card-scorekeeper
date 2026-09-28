@@ -56,6 +56,10 @@ export function readPendingResults(storage: KeyValueStorage): PendingResult[] {
   return readResults(storage, PENDING_RESULTS_STORAGE_KEY)
 }
 
+export function readFailedResults(storage: KeyValueStorage): PendingResult[] {
+  return readResults(storage, FAILED_RESULTS_STORAGE_KEY)
+}
+
 function readResults(storage: KeyValueStorage, key: string): PendingResult[] {
   try {
     // Blocked storage throws on read, too: that means nothing queued, not a crash.
@@ -91,6 +95,19 @@ function moveToFailedResults(storage: KeyValueStorage, entry: PendingResult): vo
   const failed = readResults(storage, FAILED_RESULTS_STORAGE_KEY)
   writeResults(storage, FAILED_RESULTS_STORAGE_KEY, [...failed, entry])
   removePendingResult(storage, entry.result.gameId)
+}
+
+/** Queues the failed games again, last, for when the rules that refused them have changed. */
+export function retryFailedResults(storage: KeyValueStorage): void {
+  const pending = readPendingResults(storage)
+  const waitingIds = new Set(pending.map((entry) => entry.result.gameId))
+  const retried = readFailedResults(storage).filter((entry) => !waitingIds.has(entry.result.gameId))
+  writeResults(storage, PENDING_RESULTS_STORAGE_KEY, [...pending, ...retried])
+  writeResults(storage, FAILED_RESULTS_STORAGE_KEY, [])
+}
+
+export function discardFailedResults(storage: KeyValueStorage): void {
+  writeResults(storage, FAILED_RESULTS_STORAGE_KEY, [])
 }
 
 export interface PendingResultWriter {

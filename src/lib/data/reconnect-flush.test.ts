@@ -21,18 +21,46 @@ vi.mock('./pending-results', () => ({
   readPendingResults: (...args: unknown[]) => readPendingResultsMock(...args),
 }))
 
-const { flushPendingResultsOnLaunch } = await import('./reconnect-flush')
+const { uploadPendingResults, UPLOAD_WRITE_TIMEOUT_MS } = await import('./reconnect-flush')
 
 beforeEach(() => {
   vi.clearAllMocks()
   readPendingResultsMock.mockReturnValue([{ result: { gameId: 'queued' }, players: [] }])
 })
 
-describe('flushPendingResultsOnLaunch', () => {
+describe('uploadPendingResults', () => {
+  it('reports how many games went up', async () => {
+    flushPendingResultsMock.mockResolvedValue({ flushed: 2, failed: 0, remaining: 0 })
+
+    await expect(uploadPendingResults()).resolves.toBe(2)
+  })
+
+  it('gives up on a write that hangs, so an offline upload never stays in flight', async () => {
+    vi.useFakeTimers()
+    ensureSignedInMock.mockResolvedValue('uid-1')
+    writeGameResultMock.mockReturnValue(new Promise(() => {}))
+    let writeError: unknown
+    flushPendingResultsMock.mockImplementation(async (_storage: unknown, writer: unknown) => {
+      await (writer as { write: (e: unknown) => Promise<void> })
+        .write({ result: { gameId: 'g1' }, players: [] })
+        .catch((error: unknown) => {
+          writeError = error
+        })
+      return { flushed: 0, failed: 0, remaining: 1 }
+    })
+
+    const upload = uploadPendingResults()
+    await vi.advanceTimersByTimeAsync(UPLOAD_WRITE_TIMEOUT_MS)
+
+    await expect(upload).resolves.toBe(0)
+    expect(writeError).toMatchObject({ code: 'deadline-exceeded' })
+    vi.useRealTimers()
+  })
+
   it('never touches Firebase when nothing is queued', async () => {
     readPendingResultsMock.mockReturnValue([])
 
-    await flushPendingResultsOnLaunch()
+    await expect(uploadPendingResults()).resolves.toBe(0)
 
     expect(getFirebaseAuthMock).not.toHaveBeenCalled()
     expect(flushPendingResultsMock).not.toHaveBeenCalled()
@@ -47,7 +75,7 @@ describe('flushPendingResultsOnLaunch', () => {
       return { flushed: 1, remaining: 0 }
     })
 
-    await flushPendingResultsOnLaunch()
+    await uploadPendingResults()
 
     expect(ensureSignedInMock).toHaveBeenCalledWith('auth-instance')
     expect(writeGameResultMock).toHaveBeenCalledWith('db-instance', { gameId: 'g1' }, [])
@@ -67,7 +95,7 @@ describe('flushPendingResultsOnLaunch', () => {
       return { flushed: 1, remaining: 0 }
     })
 
-    await flushPendingResultsOnLaunch()
+    await uploadPendingResults()
 
     expect(writeGameResultMock).toHaveBeenCalledWith('db-instance', { gameId: 'g1' }, [
       { gameId: 'g1', deviceUuid: 'current-uid', displayName: 'Host', finalScore: 10 },
@@ -77,7 +105,7 @@ describe('flushPendingResultsOnLaunch', () => {
   it('never throws when the flush itself rejects (still offline, or a write failed)', async () => {
     flushPendingResultsMock.mockRejectedValue(new Error('offline'))
 
-    await expect(flushPendingResultsOnLaunch()).resolves.toBeUndefined()
+    await expect(uploadPendingResults()).resolves.toBe(0)
   })
 
   it('never throws when loading firebase fails outright', async () => {
@@ -92,6 +120,6 @@ describe('flushPendingResultsOnLaunch', () => {
       return { flushed: 0, remaining: 1 }
     })
 
-    await expect(flushPendingResultsOnLaunch()).resolves.toBeUndefined()
+    await expect(uploadPendingResults()).resolves.toBe(0)
   })
 })
