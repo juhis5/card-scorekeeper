@@ -286,7 +286,8 @@
       "leaveRoomLabel": "Leave room {code}",
       "deleteLocalLabel": "Delete the game on this device",
       "endedTitle": "The game was ended",
-      "endedBody": "The host ended it early. It isn't recorded in stats."
+      "endedBody": "The host ended it early. It isn't recorded in stats.",
+      "queued": "No connection. The game ends for everyone as soon as this phone is back online."
     }
   },
   "notFound": {

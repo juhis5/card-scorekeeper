@@ -36,6 +36,14 @@ const rawValue = computed<string | number>({
     model.value = text === '' ? null : Number(text)
   },
 })
+
+/** On keydown, not keyup: Enter on a card's header opens it and moves focus here, and that
+ * same key's keyup must not save. A held key or an IME confirming text doesn't save either. */
+function handleEnter(event: KeyboardEvent): void {
+  if (event.repeat || event.isComposing) return
+  event.preventDefault()
+  emit('commit')
+}
 </script>
 
 <template>
@@ -54,7 +62,7 @@ const rawValue = computed<string | number>({
         :placeholder="placeholder"
         :aria-invalid="isInvalid"
         :aria-describedby="describedBy"
-        @keyup.enter="emit('commit')"
+        @keydown.enter="handleEnter"
       />
       <slot />
     </div>
