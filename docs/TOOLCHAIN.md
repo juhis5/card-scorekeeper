@@ -53,7 +53,8 @@ resolved versions, giving reproducible installs without hand-pinning:
 | Node major — `.nvmrc` and `engines` (`24.x`) | every other npm dependency (`^`) |
 | pnpm exact — `packageManager` | (lockfile captures exact resolved versions) |
 | GitHub Actions — commit SHA | |
-| TypeScript `~6.0` — vue-tsc/Volar has no TypeScript 7 support yet; lift it once it does | |
+| TypeScript `~6.0` — vue-tsc (3.3.11, Sept 2026) can't load TypeScript 7: it needs `typescript/lib/tsc`, which 7 doesn't export. Retry on each vue-tsc release | |
+| `@types/node` `^24` — the Node types follow the runtime (`.nvmrc`), not the newest Node | |
 | Prettier exact — a patch release can reformat the whole repo; bump it on purpose, with `pnpm format` in the same commit | |
 | Playwright — the `visual` job's Docker image tag must equal `@playwright/test` | |
 | `@vitest/coverage-v8` exact — must equal the installed `vitest` version; bump them together | |
