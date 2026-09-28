@@ -37,4 +37,4 @@ export const i18n = createI18n({
 
 ## This project (card-scorekeeper)
 
-`fi` + `en`. Default to the device language (`navigator.language`), `en` fallback; the switcher persists a choice. Rommi terms + the five contract descriptions live in locale files (display-only reminders — the rules themselves stay in `lib/rules.ts`). Scores/counts via Intl `n()`.
+`fi` + `en`. Default to the device language (`navigator.language`), `en` fallback; the switcher persists a choice. Rommi terms + the five contract descriptions live in locale files (display-only reminders — the rules themselves stay in `lib/game/rules.ts`). Scores/counts via Intl `n()`.

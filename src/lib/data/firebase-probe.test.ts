@@ -7,7 +7,9 @@ const signInAnonymouslyMock = vi.fn()
 vi.mock('firebase/app', () => ({ initializeApp: vi.fn() }))
 vi.mock('firebase/auth', () => ({
   connectAuthEmulator: vi.fn(),
-  getAuth: vi.fn(),
+  initializeAuth: vi.fn(),
+  indexedDBLocalPersistence: {},
+  browserLocalPersistence: {},
   signInAnonymously: (...args: unknown[]) => signInAnonymouslyMock(...args),
 }))
 vi.mock('firebase/firestore', () => ({

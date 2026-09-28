@@ -11,7 +11,7 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 - Package manager: **pnpm**. Always install the **latest stable** versions — version numbers in docs/skills are floors, not pins. Full policy + what's pinned: `docs/TOOLCHAIN.md`.
 - **Frontend hosting: Vercel** (git push → auto-deploy), same workflow as schedule-app. Gitflow: `develop` → test-rommi.vercel.app (staging Firebase), `main` → rommi.vercel.app (prod), releases fast-forward `main` (see `git-workflow`). Firestore is host-agnostic, so live sync works fine from Vercel. (All-Firebase via Firebase Hosting is the alternative if we ever want single-vendor.)
 - Realtime backend: **Firebase / Firestore** (Spark free tier). Client SDK, no server for core play.
-- Optional photo-count: one **Vercel serverless function** (`/api`) holding the Gemini key, gated by room + session token. Not needed for manual scoring.
+- Optional photo-count: one **Vercel serverless function** (`/api`) holding the Gemini key, gated by the caller's Firebase ID token (anonymous auth) plus a seat in a live room. Not needed for manual scoring.
 
 ## Golden rules
 
@@ -29,14 +29,14 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 - `vue-pinia` — Vue 3.5 / Pinia 4 conventions, lightweight architecture (GameRepository seam), mobile-first.
 - `clean-code` — naming, function size, typing, Prettier/ESLint. Read before writing any code.
 - `tdd` — pragmatic test-first (rules/stats strict, components behavior, rules on emulator, a few E2E).
-- `design-system` — Tailwind v4 + shadcn theme tokens, dark-first theming + light, styling conventions. The visual layer.
+- `design-system` — Tailwind v4 + shadcn theme tokens, the eight named themes (Kapteeni default), styling conventions. The visual layer.
 - `component-library` — shadcn-vue (Reka UI + Tailwind v4): setup, which primitive to use, own & tweak, keep a11y.
 - `routing` — Vue Router: lazy routes, named, thin guards, offline-safe nav, focus on nav.
 - `i18n` — vue-i18n (fi/en): no hardcoded strings, Intl formatting, typed messages.
-- `error-ux` — loading/empty/error/offline states, toasts, validation, confirms.
+- `error-ux` — loading/empty/error/offline states, inline alerts + live regions, validation, confirms.
 - `a11y-mobile` — semantic HTML, focus, labels, live regions (score announcements), contrast, tap targets.
 - `pwa` — installable app + offline shell that makes offline host mode load (vite-plugin-pwa).
-- `firestore-realtime` — live sync, room-code flow, device-UUID identity, security rules, offline host mode, stats.
+- `firestore-realtime` — live sync, room-code flow, anonymous-auth identity, security rules, offline host mode, stats.
 - `vercel-gemini` — the optional room-gated photo card-count function.
 - `vercel-deploy` — vercel.json, /api runtime, Firebase public/secret env split, last-mile deploy steps.
 - `review-checklist` — the merge gate: skills followed, no regressions, tests sufficient, security/a11y, no hacks. Used by `/feature` + standalone.
@@ -44,7 +44,7 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 
 ## Where things live
 
-`src/` (layers split by area; see `src/CLAUDE.md`), `api/` (the photo-count function; `api/CLAUDE.md`), `tests/` (rules, integration, e2e, visual; `tests/CLAUDE.md`), `firebase/firestore.rules`, `docs/` (`PLAN.md` = the app as it is, `DECISIONS.md` = why).
+`src/` (layers split by area; see `src/CLAUDE.md`), `api/` (the photo-count function; `api/CLAUDE.md`), `tests/` (rules, integration, e2e, visual; `tests/CLAUDE.md`), `firebase/` (`firestore.rules`, `firestore.indexes.json`), `docs/` (`PLAN.md` = the app as it is, `DECISIONS.md` = why).
 
 ## Commands
 
@@ -52,4 +52,4 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 - `pnpm lint:check` / `pnpm format:check` — the non-fixing checks CI runs. `pnpm lint` / `pnpm format` rewrite files.
 - `pnpm test:run` (unit), `pnpm test:api`, `pnpm test:rules` + `pnpm test:integration` (start the Firebase emulator themselves), `pnpm test:e2e` / `test:e2e:ci`, `pnpm test:visual` / `test:visual:update` (Docker).
 - `vercel dev` — run the app + `/api` photo-count function together locally.
-- Rules deploys: always `--project` (`card-scorekeeper-staging` before merging into `develop`, `card-scorekeeper-prod-1673f` before a release). Never `firebase use`.
+- Rules + indexes deploys: `pnpm exec firebase deploy --only firestore:rules,firestore:indexes --project <id>`, always `--project` (`card-scorekeeper-staging` before merging into `develop`, `card-scorekeeper-prod-1673f` before a release; see `docs/RELEASE.md`). Never `firebase use`.

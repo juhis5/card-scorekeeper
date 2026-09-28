@@ -40,7 +40,7 @@ Stack: **Vite + Vue 3.5+ + TypeScript (strict) + Pinia 4 + pnpm**. Composition A
 Use the function (setup) form. Firestore subscriptions live inside the store and are cleaned up:
 
 ```ts
-// src/stores/room.ts
+// illustrative; the real one is src/stores/game.ts over a GameRepository
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
@@ -60,7 +60,7 @@ export const useRoomStore = defineStore('room', () => {
 ```
 
 - Return `ref`s/`computed`s directly. Destructure in components with `storeToRefs`; call actions off the store.
-- Persist only the device identity (UUID + display name) with `pinia-plugin-persistedstate`. Never persist **online** room/game data locally — Firestore is the source of truth for online games. The offline exceptions are deliberate: `LocalGameRepository` keeps the local game in localStorage and `lib/pending-results.ts` queues finished local games for upload (see `firestore-realtime`).
+- `pinia-plugin-persistedstate` persists only the identity store (`deviceUuid` + display name). Other per-device state (theme, locale, the last online room) goes through `browserLocalStorage()` (`lib/data/key-value-storage.ts`), which never throws when site data is blocked. Never persist **online** room/game data locally — Firestore is the source of truth for online games. The offline exceptions are deliberate: `LocalGameRepository` keeps the local game in localStorage, and `lib/data/pending-results.ts` queues finished local games (and unpublished highscore entries) for upload (see `firestore-realtime`).
 
 ## Composables
 
@@ -71,13 +71,15 @@ export const useRoomStore = defineStore('room', () => {
 ```
 src/
   components/     PascalCase .vue, one folder per area:
-                  home/ room/ header/ menu/ stats/ rules/ (ui/ = owned shadcn-vue primitives)
-  views/          route-level components (Home, Room, Stats, Rules, Join)
-  stores/         Pinia setup stores (game, identity, stats, install)
+                  home/ room/ header/ menu/ stats/ rules/ shared/ (ui/ = owned shadcn-vue primitives)
+  views/          route-level components (Home, Room, Join, Rules, Stats, Highscores, Privacy, NotFound)
+  stores/         Pinia setup stores: game, identity, stats, highscores, result-queue,
+                  install, app-update
   composables/    useX.ts
   lib/            game/     pure domain: rules (the 5 contracts), types, scoring, names, stats
                   data/     GameRepository + local/Firestore implementations, Firebase, storage
-                  platform/ browser helpers: connectivity, timeout, scrolling, install guide
+                  platform/ browser helpers: connectivity, timeout, scrolling, install guide,
+                            themes, update checks, error reporting
                   utils.ts  cn() (shadcn expects it here)
   router/         routes + guards (see routing)
   locales/        i18n messages fi/en (see i18n)
@@ -118,7 +120,7 @@ Phones held one-handed at a card table are the **primary** target — but the ap
 ## Tooling
 
 - `pnpm` for everything. `vue-tsc` in the build so type errors fail the build.
-- Minimal dependencies. Firebase modular SDK is the one big one — import only the pieces used (`firebase/app`, `firebase/firestore`).
+- Minimal dependencies. Firebase modular SDK is the one big one — import only the pieces used (`firebase/app`, `firebase/auth`, `firebase/firestore`), and load them lazily (see `firestore-realtime`).
 - UI is built on **shadcn-vue** (Reka UI + Tailwind v4) — copy-in, accessible components in `src/components/ui/`. See `component-library` + `design-system`.
 
 ## This project (card-scorekeeper)

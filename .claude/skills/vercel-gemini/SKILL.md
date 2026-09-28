@@ -16,7 +16,7 @@ The card game is joined by strangers via a room code, and any player can snap a 
 ## Contract
 
 - **Method**: `POST` only (else 405).
-- **Auth**: `Authorization: Bearer <Firebase ID token>` — the caller's anonymous-auth ID token (`user.getIdToken()`). No separate session token: the uid is what player docs are keyed by, so the Admin SDK can check membership directly (see DECISIONS, "photo-count ID-token gate").
+- **Auth**: `Authorization: Bearer <Firebase ID token>` — the caller's anonymous-auth ID token (`user.getIdToken()`). No separate session token: the uid is what seats are keyed by (`room/{code}/players/{uid}`), so the Admin SDK can check the seat directly (see DECISIONS, "photo-count ID-token gate").
 - **Request** (JSON): `{ roomCode: string, image: string /* base64 */, mimeType: string }`. `roomCode` must pass `isValidRoomCode`; `mimeType` is jpeg/png/webp/heic/heif; `image` must be real base64.
 - **Response** (JSON): the extraction shape from docs/PLAN.md:
   ```json
@@ -49,7 +49,7 @@ Good enough for a friends' game, not airtight: a seated player can still burn ca
 
 - `GEMINI_API_KEY` — free tier, **no billing attached**. Create it in a Google Cloud project **separate from the Firebase project**, and restrict it to the Generative Language API. Never reuse the Firebase browser key: that one is public by design.
 - `GEMINI_MODEL` — optional; overrides `DEFAULT_GEMINI_MODEL` (`gemini-3.8-flash`) when Google retires or renames models. No code change, but Vercel only applies env changes to new deployments, so redeploy.
-- `FIREBASE_SERVICE_ACCOUNT` — single-line service-account JSON for the Admin SDK (token verify + room read).
+- `FIREBASE_SERVICE_ACCOUNT` — single-line service-account JSON: its `project_id` for the `jose` token check, and the Admin SDK's credentials for the room read.
 
 `.env.example` lists the names. `.env*` is gitignored.
 

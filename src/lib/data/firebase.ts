@@ -14,7 +14,14 @@ import {
   persistentSingleTabManager,
   type Firestore,
 } from 'firebase/firestore'
-import { connectAuthEmulator, getAuth, signInAnonymously, type Auth } from 'firebase/auth'
+import {
+  browserLocalPersistence,
+  connectAuthEmulator,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  signInAnonymously,
+  type Auth,
+} from 'firebase/auth'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -84,7 +91,12 @@ let cachedAuth: Auth | undefined
 
 export function getFirebaseAuth(): Auth {
   if (cachedAuth) return cachedAuth
-  cachedAuth = getAuth(getFirebaseApp())
+  // Not getAuth(): that adds the popup/redirect resolver, which loads Google's gapi script and an
+  // auth iframe on phones and Safari. Sign-in here is anonymous only, and an enforcing CSP would
+  // block both. Same persistence as getAuth's default, minus the resolver.
+  cachedAuth = initializeAuth(getFirebaseApp(), {
+    persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  })
   if (useEmulator) {
     connectAuthEmulator(cachedAuth, 'http://localhost:9299', { disableWarnings: true })
   }

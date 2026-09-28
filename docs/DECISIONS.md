@@ -1,8 +1,9 @@
 # Decisions log
 
 Why the app works the way it does. Format: `YYYY-MM-DD — decision`, with the reasons in
-sub-bullets. When a later decision replaces an earlier one, the earlier entry is removed or folded
-into the later one, so every entry here is current. `PLAN.md` describes the app as it is.
+sub-bullets. Entries are appended, not rewritten: when a later decision replaces an earlier one,
+the earlier entry ends with a "(Superseded: …)" note pointing at it. `PLAN.md` describes the app as
+it is.
 
 - 2026-07-24 — **Tie handling:** equal lowest totals are co-winners and share placement 1
   (standard competition ranking: 1, 1, 3). The least surprising rule for a friendly game, and
@@ -51,6 +52,8 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   device enters only its own score, so a local record never saw "everyone scored".
 - 2026-07-24 — **Reconnect = push final result only:** a local game's Finish queues its result in
   localStorage (`pending-results.ts`), and the next online launch flushes it (`reconnect-flush.ts`).
+  (Superseded in part: see the 2026-09-28 entry on offline results you can see, which also uploads
+  when the browser comes back online and when Tilastot opens.)
   - `writeGameResult` is idempotent per doc (read before write). A partial failure is retried on
     the next launch, and the rules deny updates, so rewriting an existing doc would block that
     game, and every game queued after it, forever.
@@ -120,8 +123,11 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - A reload resumes `/room/CODE` through `findSeat()` and an idempotent `addPlayer`.
   - Listener errors show "no longer in this room" (permission-denied) or "connection lost".
   - The launch flush doesn't load Firebase when nothing is queued. The local banner says "Playing
-    a local game on this device", not "You're offline".
-  - Still open: a "not synced yet" indicator, and showing the failed-results list.
+    a local game on this device", not "You're offline". (Superseded: see the 2026-09-28 fifth-round
+    small fixes on `LocalGameBadge`, which says the same words.)
+  - Still open: a "not synced yet" indicator, and showing the failed-results list. (Superseded in
+    part: a waiting-to-upload count and the refused-results list shipped, see the 2026-09-28 entry
+    on offline results you can see; there is no per-score "not synced" mark.)
 - 2026-09-27 — **Review round 4, stats you can trust:**
   - Every `game_result`/`game_player` doc carries `participantUids`. Only participants can get or
     list, and every stats query filters `array-contains uid`. This replaced "stats readable by any
@@ -319,9 +325,12 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - The app frame is the full-height flex column and each view is `flex-1`. `min-h-dvh` views
     under a sticky header always showed a scroll bar.
   - A round can't have two zeros (`roundsWithSeveralZeros`): Next and Finish stay disabled and the
-    host sees which round to check. "At most one", not "exactly one".
+    host sees which round to check. "At most one", not "exactly one". (Superseded: see the
+    2026-09-29 sixth-round entry, exactly one 0, and the 2026-09-28 round-flow entry, judged only
+    for the round being closed.)
   - "Vain tällä puhelimella" under Uusi peli starts a local game without the probe, for a table
-    where nobody else has a phone. Off by default, remembered per device.
+    where nobody else has a phone. Off by default, remembered per device. (Superseded: renamed
+    "Vain tällä laitteella", see the 2026-09-29 sixth-round entry.)
 - 2026-09-28 — **Score entry:**
   - A card saves only on ✓ or Enter; leaving the field saves nothing. A tap outside the open card
     closes it and drops the typed number, and so does another card opening: one card is open at a
@@ -332,7 +341,8 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - Removing a player asks in an AlertDialog with ✕ (keep) and 🗑 (remove). Focus starts on ✕.
 - 2026-09-28 — **Themes and app updates:**
   - Teema: Tumma (default), Vaalea, Jani, Nord, Dracula, Solarized. Colours that failed AA were
-    adjusted, and `theme-contrast.test.ts` checks every palette.
+    adjusted, and `theme-contrast.test.ts` checks every palette. (Superseded: see the 2026-09-29
+    entry on the Kapteeni themes; Kapteeni is the default, Tumma and Vaalea are now Vihreä.)
   - Each palette is a `.theme-<id>` class; the dark ones also carry `dark`. The list lives in
     `lib/platform/themes.ts`, and index.html's no-flash script repeats it (a test keeps them
     equal). The theme is stored as a raw string, not through pinia-persistedstate, which would
@@ -342,17 +352,20 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     may stay open for hours. It now checks every 30 minutes and when it comes back on screen. A
     waiting version shows in the menu and the banner, never as an automatic reload mid-game.
 - 2026-09-28 — **Global highscores** (owner's choice: best game, hall of shame and biggest round;
-  "most wins" later, as its cost grows with every game):
+  "most wins" later, as its cost grows with every game) (Superseded in part: "most wins" came
+  with the 2026-09-28 entry on global player lists):
   - `leaderboard/{gameId}_{deviceUuid}`, one entry per stats row, written right after the row.
     Readable by anyone signed in, at most 10 per query.
   - **Leaderboard trust:** the rules accept only an entry that copies its own `game_player` row
     (and the game's `finishedAt`) exactly, written by one of that game's players. So who may write
     a stats row decides what reaches the board. A host could still enter made-up scores in their
-    own game; accepted when choosing a global board.
+    own game; accepted when choosing a global board. (Superseded in part: see the 2026-09-28
+    second-audit PR 3 entry; only a finished online room with two or more players counts.)
   - Names on the board are public to anyone holding the public web config (anonymous sign-in).
     The entry id carries the game code and the player's anonymous uid (see 2026-09-28 below).
   - An entry is an extra: if it can't be written, the game still finishes and the entry is left
-    out, not retried.
+    out, not retried. (Superseded: see the 2026-09-28 second-audit PR 4 entry; a passing failure
+    is now queued and retried.)
   - At the next release, the production games played since the wipe get their entries copied in
     once.
 - 2026-09-28 — **Visual snapshots** with Playwright, not Chromatic, whose free 5,000 snapshots a
@@ -436,7 +449,8 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - Win rate and average rank only qualified players, which needs two composite indexes
     (`firebase/firestore.indexes.json`), deployed with the rules.
   - Tilastot's records split into tabs: Pelaajat (the four player lists, each with its game count)
-    and Pelit (best game, hall of shame, biggest round).
+    and Pelit (best game, hall of shame, biggest round). (Superseded: see the 2026-09-28 entry on
+    Ennätykset's own page and the 2026-09-29 sixth-round entry on `SegmentedToggle`.)
   - Totals start with this release; at the release they're built once from the production games,
     together with the highscore entries.
 - 2026-09-29 — App icon and the Kapteeni themes. The owner asked for icons like the Captain Morgan

@@ -37,13 +37,13 @@ A change ships only if it is **correct, regression-free, well-tested, follows ev
 ### 3. Skills adherence — check the diff against each relevant skill
 - **`vue-pinia`**: `<script setup lang="ts">`, setup stores + `storeToRefs`, typed emits / `defineModel`, small single-job components, dependencies point inward (`lib/` pure — no Vue/Firebase/IO in it), store depends on the `GameRepository` **interface** not Firestore directly.
 - **`clean-code`**: intent-revealing names, small functions, guard clauses, no dead/commented code, no magic values (card values / contracts come from `rules.ts`), errors at the boundary, no `console.log`, DRY-but-not-premature.
-- **`design-system`**: token utility classes only — **no raw hex, no arbitrary values**; both dark + light; elevation via surface (`bg-card`/`bg-muted`) not shadow; reduced-motion on score flashes / win celebration.
-- **`component-library`**: reached for a shadcn-vue primitive (Table/Sheet/AlertDialog/Sonner/Tabs) instead of hand-rolling; Reka a11y intact; no pointless `ui/` fork.
-- **`a11y-mobile`**: semantic scoreboard table, labelled inputs (`inputmode="numeric"` for scores), focus trap+restore in dialogs, **live-region announcements for score/round changes**, contrast both themes, ≥44px targets, leader/offline not conveyed by color alone.
+- **`design-system`**: token utility classes only — **no raw hex, no arbitrary values**; works in all eight themes (dark and light), contrast pairs in `theme-contrast.test.ts`; elevation via surface (`bg-card`/`bg-muted`) not shadow; reduced-motion on score flashes / win celebration.
+- **`component-library`**: reached for an existing primitive (`ui/` Table/Sheet/AlertDialog/Popover/RadioGroup/Switch, or `shared/` SegmentedToggle/InfoPopover) instead of hand-rolling; Reka a11y intact; no pointless `ui/` fork.
+- **`a11y-mobile`**: semantic scoreboard table, labelled inputs (`inputmode="numeric"` for scores), focus trap+restore in dialogs, **live-region announcements for score/round changes**, contrast in every theme, ≥44px targets, leader/offline not conveyed by color alone.
 - **Cross-platform:** works on **Android (Chrome), iOS (Safari), and a desktop browser**; responsive ~360px→wide with no overflow; camera (photo-count) has a file-upload fallback on desktop; no touch-only or hover-only interactions.
-- **`error-ux`**: all four states; the **two offline modes** handled and distinguished (never-connected → local game banner; blip mid-game → reconnecting); manual scoring always reachable.
+- **`error-ux`**: all four states; the **two offline modes** handled and distinguished (never-connected → local game, `LocalGameBadge`; blip mid-game → reconnecting); failures inline (`role="alert"`), no toasts; manual scoring always reachable.
 - **`pwa`**: shell precache intact so **offline cold-start still loads and a local game is playable**; Firestore/Gemini not SW-cached (Firestore uses its own `persistentLocalCache`).
-- **backend (`firestore-realtime`, `vercel-gemini`, `vercel-deploy`)**: Firestore rules are the security boundary (not the UI); public web config (`VITE_FIREBASE_*`) vs server-only secrets (`GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`) kept separate; photo-count room+token gate + per-room/global rate limits present; total recomputed server-side; listeners unsubscribed.
+- **backend (`firestore-realtime`, `vercel-gemini`, `vercel-deploy`)**: Firestore rules are the security boundary (not the UI); public web config (`VITE_FIREBASE_*`) vs server-only secrets (`GEMINI_API_KEY`, `FIREBASE_SERVICE_ACCOUNT`) kept separate; photo-count gate (Firebase ID token, then a seat in a live room) + per-room/global rate limits present; total recomputed server-side; listeners unsubscribed.
 - **`routing`**: routes lazy-loaded + named; guards thin (delegate to stores, no logic/mutation/network in a guard — offline nav must not block); focus moved + announced on navigation.
 - **`i18n`**: no hardcoded user-facing strings (all via `t()` keys); numbers/dates via Intl; `<html lang>` = the active locale.
 - **domain (`rules.ts`)**: card values (2–9=5, 10=10, J/Q/K=10, Ace=15, Joker=25; round score = multiple of 5; duplicates from 2–3 decks count per card), the 5 contracts, low-total-wins, tie handling — all correct and unit-tested.
@@ -58,7 +58,7 @@ The bar: code should read like the surrounding code and be pleasant to maintain.
 
 ### 5. Security
 - Firestore rules enforce the permission model (own score vs host-any; expired rooms rejected; room-scoped reads). Admin creds + Gemini key server-only. Photo-count gate + rate limits correct; untrusted text never interpolated unsafely.
-- Run `/security-review` for anything touching rules, `/api`, or identity/session tokens.
+- Run `/security-review` for anything touching rules, `/api`, or identity (anonymous auth uid, ID tokens).
 
 ### 6. Performance (proportionate)
 - No leaked `onSnapshot`/timers (cleaned up in `onScopeDispose`/`onUnmounted`); batch multi-player writes; stable list keys; no giant re-renders on each snapshot; image/base64 bounded.

@@ -1,15 +1,15 @@
 ---
 name: design-system
-description: The visual design system — Tailwind v4 + shadcn-vue theme tokens (CSS variables), dark-first theming with a light option, and styling conventions. Read before writing any styles, choosing a color, tuning the theme, or building the theme toggle. This is the look layer; a11y-mobile is the access layer; component-library is the parts. Use all three.
+description: The visual design system — Tailwind v4 + shadcn-vue theme tokens (CSS variables), the eight named themes (Kapteeni default), and styling conventions. Read before writing any styles, choosing a color, tuning or adding a theme, or touching the theme picker. This is the look layer; a11y-mobile is the access layer; component-library is the parts. Use all three.
 ---
 
-# Design system — dark-first, Tailwind v4 + shadcn tokens
+# Design system — named themes, Tailwind v4 + shadcn tokens
 
-Styling engine is **Tailwind v4**; the palette lives in **shadcn-vue's CSS-variable theme** (`:root` + `.dark`), consumed through **semantic Tailwind classes**. **Never hardcode a color or arbitrary size in a component** — use a token class. Dark is the default and the identity; light is supported.
+Styling engine is **Tailwind v4**; the palettes live in **shadcn-vue's CSS-variable theme** (`:root`, `.dark` and one `.theme-<id>` block per named palette), consumed through **semantic Tailwind classes**. **Never hardcode a color or arbitrary size in a component** — use a token class, so every theme works.
 
 ## Where tokens live
 
-`shadcn-vue init` generates the theme (in `src/assets/index.css` or similar):
+All tokens are in `src/assets/main.css`. The shadcn scaffolding looks like this (abridged; the real file has more tokens, e.g. `--brand` for the app name and the leader's crown):
 
 ```css
 @import 'tailwindcss';
@@ -43,7 +43,7 @@ Styling engine is **Tailwind v4**; the palette lives in **shadcn-vue's CSS-varia
 @theme { --ease-standard: cubic-bezier(0.2, 0, 0.2, 1); }   /* generates the `ease-standard` utility */
 ```
 
-The CLI writes this scaffolding (v4 uses **oklch** by default — hex or oklch both fine). Our job: **set the values dark-first, keep the token names.** Every text pair the app uses passes the `a11y-mobile` contrast bar (≥ 4.5:1 text, ≥ 3:1 focus ring at `ring/80`) in **both** themes. `src/assets/theme-contrast.test.ts` reads `main.css` and enforces it; add a pair there when a token lands on a new surface.
+Values are hex (the contrast test parses hex). Keep the token names. Every text pair the app uses passes the `a11y-mobile` contrast bar (≥ 4.5:1 text, ≥ 3:1 focus ring at `ring/80`) in **every** theme. `src/assets/theme-contrast.test.ts` reads `main.css` and enforces it; add a pair there when a token lands on a new surface.
 
 ## Token map (nothing was lost adopting Tailwind)
 
@@ -70,14 +70,14 @@ Named motion lives in the CSS block above:
 - **Duration:** `--dur-fast` / `--dur` are plain vars (Tailwind has no named-duration utility) — use `duration-[var(--dur)]`, or Tailwind's numeric `duration-200`.
 - Gate non-essential motion so it respects `prefers-reduced-motion` (see `a11y-mobile`), e.g. the live score-change highlight → `class="transition-colors duration-[var(--dur)] ease-standard motion-reduce:transition-none"`.
 
-## Theming behavior (dark default)
+## Themes
 
-- shadcn convention: `:root` = light, `.dark` = dark. We make **dark the default by adding the `.dark` class** unless the user chose light.
-- **No flash** — inline script in `index.html` `<head>` before paint:
-  ```html
-  <script>document.documentElement.classList.toggle('dark',(localStorage.getItem('theme')??'dark')==='dark')</script>
-  ```
-- A `useTheme()` composable toggles the `.dark` class + persists (`localStorage` / `pinia-plugin-persistedstate`, key `theme`) — the identity store that holds the device UUID + display name is a natural home. Toggle is a labelled `Switch` (see `component-library`, `a11y-mobile`).
+- **Eight themes**, listed in `src/lib/platform/themes.ts` (`THEMES`): `captain` (Kapteeni, **`DEFAULT_THEME`**), `captain-light`, `dark` / `light` (Vihreä, the original emerald), `jani`, `nord`, `dracula`, `solarized`. `isDarkTheme()` knows which are dark.
+- **Classes on `<html>`:** a dark theme also carries `.dark`, so Tailwind's `dark:` variant applies. `paletteClass()` gives `theme-<id>` for the named palettes; `dark` and `light` have none and use the `.dark` / `:root` blocks. (`.theme-light` exists only so the picker's swatch can show light tokens on a dark page.) Named palettes come after `.dark` in `main.css` so they win.
+- **No flash:** an inline script in `index.html` `<head>` reads `localStorage.theme` (in try/catch), falls back to `captain`, and sets the classes before paint. It repeats the theme lists, and a test keeps them equal to `themes.ts`; its hash is in `vercel.json`'s CSP and `src/security-headers.test.ts` checks it, so editing the script means updating the hash.
+- **`useTheme()`** (`src/composables/useTheme.ts`) applies the classes, stores the id as a raw string under `theme` via `browserLocalStorage()` (not persistedstate, which would JSON-wrap it and break the script), and sets `<meta name="theme-color">` from `--background`.
+- **Picker:** `ThemePicker.vue` in the menu, a `RadioGroup` with a swatch per theme (see `component-library`).
+- **Adding a theme:** a `.theme-<id>` block in `main.css`, the id in `THEMES` (and `LIGHT_THEMES` if light), the same in `index.html`'s script, a name under `app.theme.names` in both locales, and a row in `src/assets/theme-contrast.test.ts`'s list (it doesn't read `THEMES`), then a new CSP hash in `vercel.json`.
 
 ## Styling conventions
 
@@ -89,18 +89,18 @@ Named motion lives in the CSS block above:
 
 - Not pure black bg, not pure white text.
 - **Elevation = a lighter surface, not a heavier shadow.** Lift the scoreboard/cards/sheets with `bg-card` / `bg-muted` + `border-border`.
-- Desaturate accents in the `.dark` block.
+- Desaturate accents in dark palettes.
 
 ## Consistency rules
 
 - Tokens/scale only — no raw hex, no magic px, in components.
 - Honor `prefers-reduced-motion` (score-change flashes, win celebration).
-- Both apps share this token structure → same feel; only `--primary` differs.
+- Both apps share this token structure → same feel; only the palettes differ.
 
 ## Charts (stats screens)
 
-Stats/head-to-head use the built-in **`dataviz`** skill. Feed it these tokens: dark-first, `--primary` as the key series, `--muted-foreground` for axes/gridlines, and never rely on color alone for series identity (label/pattern too — same rule as `a11y-mobile`).
+Stats/head-to-head use the built-in **`dataviz`** skill. Feed it these tokens (they must work in every theme): `--primary` as the key series, `--muted-foreground` for axes/gridlines, and never rely on color alone for series identity (label/pattern too — same rule as `a11y-mobile`).
 
 ## This project (card-scorekeeper)
 
-Accent `--primary` is a card-table **emerald**. Key surfaces: the **scoreboard `Table`** (sorted ascending, leader row lifted with `bg-muted` + a text/icon marker not just color; live changes get a brief highlight gated by reduced-motion); the round/contract banner; the join screen; the offline banner (custom, `bg-muted`/warning tint, text + icon, announced per `a11y-mobile`). A win celebration is fine but must respect `prefers-reduced-motion`.
+The default Kapteeni palette matches the app icon: brown-black, gold `--primary` actions, label-red `--brand` (danger is a separate coral, always with an icon or words). Key surfaces: the **scoreboard `Table`** (sorted ascending, leader row lifted with `bg-muted` + a text/icon marker not just color; live changes get a brief highlight gated by reduced-motion); the round/contract banner; the join screen; the local-game badge in the header (`LocalGameBadge`: no-wifi icon + popover text, announced per `a11y-mobile`). A win celebration is fine but must respect `prefers-reduced-motion`.

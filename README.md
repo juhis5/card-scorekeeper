@@ -51,8 +51,8 @@ the browsers with `pnpm exec playwright install`.
 ```
 src/
   views/                one per route
-  components/           home, room, header, menu, stats, rules (ui/ is shadcn-vue)
-  stores/               Pinia: game, identity, stats, highscores, install, app-update
+  components/           home, room, header, menu, stats, rules, shared (ui/ is shadcn-vue)
+  stores/               Pinia: game, identity, stats, highscores, result-queue, install, app-update
   composables/
   lib/game/             pure rules, scoring, stats (no Vue, no network)
   lib/data/             GameRepository: local and Firestore, stats writes, reconnect flush

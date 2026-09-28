@@ -8,7 +8,7 @@ Layers, each split by area. Dependencies point inward: views → components/stor
 - `lib/utils.ts` — `cn()`; stays here because the shadcn CLI imports it from this path.
 - `stores/` — Pinia setup stores that orchestrate: `game` (over a `GameRepository`), `identity`, `stats`, `highscores`, `result-queue` (offline games not yet uploaded), `install`, `app-update`.
 - `composables/` — small reusable pieces (`useGameConnectivity` picks local vs online, `useSingleOpenCard`, `useKeepInView`, `useTheme`, …).
-- `components/{home,room,header,menu,stats,rules}/` — small single-job components. `components/ui/` is owned shadcn-vue code: add with `pnpm dlx shadcn-vue@latest add <name>` and never let it overwrite `button/`.
+- `components/{home,room,header,menu,stats,rules,shared}/` — small single-job components (`shared/` = `SegmentedToggle`, `InfoPopover`). `components/ui/` is owned shadcn-vue code: add with `pnpm dlx shadcn-vue@latest add <name>` and never let it overwrite `button/`.
 - `views/` — one per route; thin.
 - `locales/{fi,en}.json` — every user-facing string (no hardcoded text).
 
