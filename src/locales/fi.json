@@ -293,6 +293,11 @@
     "unreachable": {
       "heading": "Ei yhteyttä",
       "body": "Puhelin on offline-tilassa, joten huonetta ei voi vielä avata. Se aukeaa itsestään, kun yhteys palaa."
+    },
+    "highscores": {
+      "heading": "Pääsi ennätyksiin",
+      "line": "{name} · {list} · #{rank} · {value} pistettä",
+      "record": "Uusi ennätys!"
     }
   },
   "notFound": {
