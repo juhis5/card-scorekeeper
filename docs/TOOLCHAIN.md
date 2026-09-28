@@ -56,3 +56,4 @@ resolved versions, giving reproducible installs without hand-pinning:
 | TypeScript `~6.0` — vue-tsc/Volar has no TypeScript 7 support yet; lift it once it does | |
 | Prettier exact — a patch release can reformat the whole repo; bump it on purpose, with `pnpm format` in the same commit | |
 | Playwright — the `visual` job's Docker image tag must equal `@playwright/test` | |
+| `@vitest/coverage-v8` exact — must equal the installed `vitest` version; bump them together | |

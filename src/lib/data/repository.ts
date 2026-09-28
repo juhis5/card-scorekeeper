@@ -19,6 +19,9 @@ export interface CreatedGame {
   hostPlayerId: PlayerId
 }
 
+/** An online room always has a code. */
+export type CreatedOnlineGame = CreatedGame & { roomCode: string }
+
 /** Anyone but the host, whom `createGame` seats. */
 export interface AddPlayerInput {
   name: string
@@ -87,7 +90,7 @@ export function isResumable(repository: GameRepository): repository is Resumable
 /** An online room whose host can start the next game from it once it has finished (Play again). */
 export interface ReplayableGameRepository extends GameRepository {
   /** Like `createGame`, for a room that names the finished room its players come from. */
-  createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedGame>
+  createNextGame(config: GameConfig, previousRoomCode: string): Promise<CreatedOnlineGame>
   /** Host only, finished room only: records the next room's code, which every device in this
    * room then sees as `GameState.nextRoomCode`. Set once; firestore.rules refuses a change. */
   linkNextRoom(nextRoomCode: string): Promise<void>

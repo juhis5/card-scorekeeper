@@ -50,6 +50,6 @@ Mobile-first web app: a host creates a room code, players join, scores sync **li
 
 - `pnpm dev` — local dev server. `pnpm build` — typecheck (`vue-tsc`) + build. `pnpm preview` — serve build.
 - `pnpm lint:check` / `pnpm format:check` — the non-fixing checks CI runs. `pnpm lint` / `pnpm format` rewrite files.
-- `pnpm test:run` (unit), `pnpm test:api`, `pnpm test:rules` + `pnpm test:integration` (start the Firebase emulator themselves), `pnpm test:e2e` / `test:e2e:ci`, `pnpm test:visual` / `test:visual:update` (Docker).
+- `pnpm test:run` (unit), `pnpm test:api`, `pnpm test:coverage` (both, with the coverage gates CI runs), `pnpm test:rules` + `pnpm test:integration` (start the Firebase emulator themselves), `pnpm test:e2e` / `test:e2e:ci`, `pnpm test:visual` / `test:visual:update` (Docker).
 - `vercel dev` — run the app + `/api` photo-count function together locally.
 - Rules + indexes deploys: `pnpm exec firebase deploy --only firestore:rules,firestore:indexes --project <id>`, always `--project` (`card-scorekeeper-staging` before merging into `develop`, `card-scorekeeper-prod-1673f` before a release; see `docs/RELEASE.md`). Never `firebase use`.

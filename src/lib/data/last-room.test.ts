@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { forgetRoom, lastRoom, rememberRoom } from './last-room'
 import { ROOM_TTL_MS } from '../game/room-code'
 import type { KeyValueStorage } from './key-value-storage'
@@ -47,6 +47,16 @@ describe('last online room', () => {
     expect(lastRoom({ storage, now: () => 0 })).toBeNull()
   })
 
+  it.each(['null', '"7K4RQ"', '{"code":"7K4RQ"}', '{"code":7,"savedAtMs":0}'])(
+    'treats a stored value of the wrong shape (%s) as no room',
+    (stored) => {
+      const storage = makeMemoryStorage()
+      storage.setItem('card-scorekeeper:last-room', stored)
+
+      expect(lastRoom({ storage, now: () => 0 })).toBeNull()
+    },
+  )
+
   it('never throws when storage is unavailable, as in some private windows', () => {
     const broken: KeyValueStorage = {
       getItem: () => {
@@ -60,5 +70,33 @@ describe('last online room', () => {
     expect(() => rememberRoom('7K4RQ', { storage: broken })).not.toThrow()
     expect(lastRoom({ storage: broken })).toBeNull()
     expect(() => forgetRoom('7K4RQ', { storage: broken })).not.toThrow()
+  })
+})
+
+describe('last online room without injected deps', () => {
+  afterEach(() => {
+    localStorage.clear()
+    vi.useRealTimers()
+  })
+
+  it("keeps the room in the browser's localStorage, timed by the real clock", () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    rememberRoom('7K4RQ')
+
+    vi.setSystemTime(ROOM_TTL_MS - 1)
+    expect(lastRoom()).toBe('7K4RQ')
+
+    vi.setSystemTime(ROOM_TTL_MS)
+    expect(lastRoom()).toBeNull()
+  })
+
+  it("forgets the room from the browser's localStorage", () => {
+    rememberRoom('7K4RQ')
+    expect(lastRoom()).toBe('7K4RQ')
+
+    forgetRoom('7K4RQ')
+
+    expect(lastRoom()).toBeNull()
   })
 })

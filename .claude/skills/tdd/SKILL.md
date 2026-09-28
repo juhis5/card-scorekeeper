@@ -18,7 +18,13 @@ Install latest stable: `pnpm add -D vitest @vue/test-utils happy-dom @testing-li
 | Critical user flows | **A few Playwright E2E** — host creates room → second client joins with the code → a score entered on one client shows as entered on the other, and both reveal it when the host moves on. |
 | CSS, layout, exact styling, animations, framework glue | **Don't unit-test.** Verify by eye on a phone viewport. |
 
-Don't chase a coverage number. Coverage is a signal (untested logic branch = write a test), not a target.
+**Coverage gates (the owner's target, enforced in CI by `pnpm test:coverage`):**
+
+- **100%** lines, branches, functions and statements for `src/lib/**`, `src/stores/**`, `src/composables/**` and `api/_lib/**`. New logic arrives with the tests that cover it.
+- **A floor that only goes up** for `src/components/**` and `src/views/**`: the numbers in `vitest.config.ts`. When coverage rises, raise them in the same PR; never lower them.
+- Excluded, with the reason in the config: the owned shadcn `components/ui/`, and pure SDK/runtime wiring (`main.ts`, `lib/data/firebase.ts`, `api/count.ts`, `api/_lib/firebase-admin.ts`, `api/_lib/production-deps.ts`), which the integration suite, `test:api-load` and production exercise.
+- Coverage is reached with behaviour tests that assert effects, never by executing a line to tick it. A branch that can't happen is deleted, not covered. `/* v8 ignore */` only for a branch that truly can't be reached from a test, with the reason on the same line.
+- Line coverage still isn't proof: the mutation spot-checks (plant a bug, see a test fail) are the stronger signal. A covered bug that no test catches is a missing assertion.
 
 ## The loop (for logic)
 

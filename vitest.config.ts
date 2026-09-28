@@ -17,6 +17,10 @@ const firestoreBrowserEntry = join(
   'dist/index.esm.js',
 )
 
+/** 100% on the logic layers (the owner's target); a floor that only goes up on components and
+ * views. Their numbers here are the floor: raise them when coverage rises, never lower them. */
+const FULL = { lines: 100, branches: 100, functions: 100, statements: 100 }
+
 /** One project per suite; rules and integration need the emulator (`pnpm test:rules` etc.). */
 export default mergeConfig(
   viteConfig,
@@ -24,6 +28,32 @@ export default mergeConfig(
     test: {
       globals: true,
       root: fileURLToPath(new URL('./', import.meta.url)),
+      coverage: {
+        provider: 'v8',
+        reporter: ['text-summary', 'json-summary'],
+        include: ['src/**/*.{ts,vue}', 'api/**/*.ts'],
+        exclude: [
+          '**/*.test.ts',
+          '**/*.d.ts',
+          // Owned shadcn-vue copies: upstream's, tested there.
+          'src/components/ui/**',
+          // Wiring, not logic: the real SDKs and runtime, exercised by tests/integration (the
+          // Firestore emulator), `pnpm test:api-load` and production, not by unit tests.
+          'src/main.ts',
+          'src/lib/data/firebase.ts',
+          'api/count.ts',
+          'api/_lib/firebase-admin.ts',
+          'api/_lib/production-deps.ts',
+        ],
+        thresholds: {
+          'src/lib/**': FULL,
+          'src/stores/**': FULL,
+          'src/composables/**': FULL,
+          'api/_lib/**': FULL,
+          'src/components/**': { lines: 97, branches: 90.7, functions: 96.2, statements: 95.5 },
+          'src/views/**': { lines: 96.5, branches: 90.6, functions: 97.3, statements: 95.2 },
+        },
+      },
       projects: [
         {
           extends: true,

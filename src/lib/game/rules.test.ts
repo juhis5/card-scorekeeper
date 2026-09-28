@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   canCloseRound,
   canFinishGame,
+  GameIncompleteError,
   isGameOver,
   roundsWithoutWinner,
   roundsWithSeveralZeros,
@@ -351,6 +352,10 @@ describe('roundsWithoutWinner', () => {
 
     expect(roundsWithoutWinner(['bob', 'carol'], scores, 3)).toEqual([])
   })
+
+  it('flags nothing when nobody is seated', () => {
+    expect(roundsWithoutWinner([], [], 1)).toEqual([])
+  })
 })
 
 describe('canCloseRound', () => {
@@ -418,6 +423,18 @@ describe('canFinishGame', () => {
 
   it('never finishes with a seated player who has no scores (a seat that just arrived)', () => {
     expect(canFinishGame(['alice', 'bob', 'carol'], fullGame, 5)).toBe(false)
+  })
+})
+
+describe('GameIncompleteError', () => {
+  it('is an Error that names itself and says why the game cannot be finished', () => {
+    const error = new GameIncompleteError()
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error.name).toBe('GameIncompleteError')
+    expect(error.message).toBe(
+      'The game is not complete: the last round is not reached or not fully scored',
+    )
   })
 })
 

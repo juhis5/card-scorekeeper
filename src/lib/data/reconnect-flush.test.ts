@@ -5,6 +5,14 @@ const writeGameResultMock = vi.fn()
 const flushPendingResultsMock = vi.fn()
 const readPendingResultsMock = vi.fn()
 const getFirebaseAuthMock = vi.fn(() => 'auth-instance')
+const publishHighscoresMock = vi.fn()
+const flushPendingHighscoresMock = vi.fn()
+const readPendingHighscoresMock = vi.fn()
+const reportHandledErrorMock = vi.fn()
+
+vi.mock('../platform/error-reporting', () => ({
+  reportHandledError: (...args: unknown[]) => reportHandledErrorMock(...args),
+}))
 
 vi.mock('./firebase', () => ({
   getFirebaseAuth: () => getFirebaseAuthMock(),
@@ -14,18 +22,23 @@ vi.mock('./firebase', () => ({
 
 vi.mock('./firestore-stats', () => ({
   writeGameResult: (...args: unknown[]) => writeGameResultMock(...args),
+  publishHighscores: (...args: unknown[]) => publishHighscoresMock(...args),
 }))
 
 vi.mock('./pending-results', () => ({
   flushPendingResults: (...args: unknown[]) => flushPendingResultsMock(...args),
   readPendingResults: (...args: unknown[]) => readPendingResultsMock(...args),
+  flushPendingHighscores: (...args: unknown[]) => flushPendingHighscoresMock(...args),
+  readPendingHighscores: (...args: unknown[]) => readPendingHighscoresMock(...args),
 }))
 
-const { uploadPendingResults, UPLOAD_WRITE_TIMEOUT_MS } = await import('./reconnect-flush')
+const { uploadPendingHighscores, uploadPendingResults, UPLOAD_WRITE_TIMEOUT_MS } =
+  await import('./reconnect-flush')
 
 beforeEach(() => {
   vi.clearAllMocks()
   readPendingResultsMock.mockReturnValue([{ result: { gameId: 'queued' }, players: [] }])
+  readPendingHighscoresMock.mockReturnValue([{ result: { gameId: 'queued' }, players: [] }])
 })
 
 describe('uploadPendingResults', () => {
@@ -121,5 +134,61 @@ describe('uploadPendingResults', () => {
     })
 
     await expect(uploadPendingResults()).resolves.toBe(0)
+  })
+
+  it('reports a failed upload as handled, so the queue waits quietly for the next try', async () => {
+    const offline = new Error('offline')
+    flushPendingResultsMock.mockRejectedValue(offline)
+
+    await uploadPendingResults()
+
+    expect(reportHandledErrorMock).toHaveBeenCalledWith(offline, 'upload-pending-results')
+  })
+})
+
+describe('uploadPendingHighscores', () => {
+  it('never touches Firebase when no highscores are queued', async () => {
+    readPendingHighscoresMock.mockReturnValue([])
+
+    await uploadPendingHighscores()
+
+    expect(ensureSignedInMock).not.toHaveBeenCalled()
+    expect(flushPendingHighscoresMock).not.toHaveBeenCalled()
+  })
+
+  it('signs in before flushing, so the publish runs as an authenticated user', async () => {
+    const calls: string[] = []
+    ensureSignedInMock.mockImplementation(async () => calls.push('sign-in'))
+    flushPendingHighscoresMock.mockImplementation(async () => calls.push('flush'))
+
+    await uploadPendingHighscores()
+
+    expect(calls).toEqual(['sign-in', 'flush'])
+  })
+
+  it('publishes each queued entry to the highscores with its result and players', async () => {
+    ensureSignedInMock.mockResolvedValue('uid-1')
+    publishHighscoresMock.mockResolvedValue(undefined)
+    const entry = {
+      result: { gameId: 'g1' },
+      players: [{ gameId: 'g1', deviceUuid: 'uid-1', displayName: 'Host', finalScore: 10 }],
+    }
+    flushPendingHighscoresMock.mockImplementation(async (_storage: unknown, publisher: unknown) => {
+      await (publisher as { publish: (e: typeof entry) => Promise<void> }).publish(entry)
+    })
+
+    await uploadPendingHighscores()
+
+    expect(publishHighscoresMock).toHaveBeenCalledWith('db-instance', entry.result, entry.players)
+  })
+
+  it('never throws when signing in fails, and reports it as handled', async () => {
+    const signInFailure = new Error('offline')
+    ensureSignedInMock.mockRejectedValue(signInFailure)
+
+    await expect(uploadPendingHighscores()).resolves.toBeUndefined()
+
+    expect(flushPendingHighscoresMock).not.toHaveBeenCalled()
+    expect(reportHandledErrorMock).toHaveBeenCalledWith(signInFailure, 'upload-pending-highscores')
   })
 })

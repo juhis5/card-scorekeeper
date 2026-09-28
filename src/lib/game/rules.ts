@@ -177,18 +177,32 @@ export function runningTotal(playerId: string, roundScores: RoundScore[]): numbe
 }
 
 /** Lowest total first. Equal totals share a placement and the next one skips ahead: 1, 1, 3. */
-function rankAscending(players: Player[]): Standing[] {
-  const sorted = [...players].sort((a, b) => a.totalScore - b.totalScore)
+/** Lowest total first; equal totals share a placement (1, 1, 3). Generic, so the scoreboard ranks
+ * its own rows. */
+export function rankByTotal<T>(
+  items: readonly T[],
+  totalOf: (item: T) => number,
+): { item: T; placement: number }[] {
+  const sorted = [...items].sort((a, b) => totalOf(a) - totalOf(b))
 
   let previousTotal: number | null = null
   let previousPlacement = 0
 
-  return sorted.map((player, index) => {
-    const placement = player.totalScore === previousTotal ? previousPlacement : index + 1
-    previousTotal = player.totalScore
+  return sorted.map((item, index) => {
+    const total = totalOf(item)
+    const placement = total === previousTotal ? previousPlacement : index + 1
+    previousTotal = total
     previousPlacement = placement
-    return { player, total: player.totalScore, placement }
+    return { item, placement }
   })
+}
+
+function rankAscending(players: Player[]): Standing[] {
+  return rankByTotal(players, (player) => player.totalScore).map(({ item, placement }) => ({
+    player: item,
+    total: item.totalScore,
+    placement,
+  }))
 }
 
 export function standings(players: Player[]): Standing[] {

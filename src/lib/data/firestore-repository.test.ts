@@ -48,6 +48,7 @@ vi.mock('firebase/firestore', () => ({
 const { FirestoreGameRepository } = await import('./firestore-repository')
 const { NameTakenError } = await import('../game/player-names')
 const { GameIncompleteError } = await import('../game/rules')
+const { isValidRoomCode } = await import('../game/room-code')
 
 const ROOM_CODE = 'ABCDE'
 const HOST_UID = 'host-uid'
@@ -79,6 +80,7 @@ beforeEach(() => {
   batchCommitMock.mockResolvedValue(undefined)
   setDocMock.mockResolvedValue(undefined)
   getDocMock.mockResolvedValue({ exists: () => false, data: () => undefined })
+  onSnapshotMock.mockImplementation(() => () => undefined)
 })
 
 function snapshot(data: Record<string, unknown> | undefined) {
@@ -86,6 +88,7 @@ function snapshot(data: Record<string, unknown> | undefined) {
 }
 
 const permissionDenied = Object.assign(new Error('denied'), { code: 'permission-denied' })
+const unavailable = Object.assign(new Error('offline'), { code: 'unavailable' })
 
 describe('FirestoreGameRepository.findSeat', () => {
   function repository(uid: string) {
@@ -941,5 +944,269 @@ describe('FirestoreGameRepository.finishGame — stats-building', () => {
       bestRound: 50,
       worstRound: 50,
     })
+  })
+})
+
+describe('FirestoreGameRepository.createGame room codes', () => {
+  const HOST_CONFIG = { hostDeviceUuid: 'd', hostDisplayName: 'Host' }
+
+  function hostRepository(generateRoomCode?: () => string) {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      generateRoomCode,
+    })
+  }
+
+  function roomPathsWritten(): string[] {
+    return setDocMock.mock.calls.map(([ref]) => (ref as { path: string }).path)
+  }
+
+  it('mints a valid room code when none is injected', async () => {
+    const created = await hostRepository().createGame(HOST_CONFIG)
+
+    expect(isValidRoomCode(created.roomCode ?? '')).toBe(true)
+    expect(roomPathsWritten()).toEqual([`room/${created.roomCode}`])
+  })
+
+  it('tries a fresh code when the first one belongs to an existing room', async () => {
+    const codes = ['AAAAA', 'BBBBB']
+    setDocMock.mockRejectedValueOnce(permissionDenied)
+
+    const created = await hostRepository(() => codes.shift() ?? 'ZZZZZ').createGame(HOST_CONFIG)
+
+    expect(created).toEqual({ gameId: 'BBBBB', roomCode: 'BBBBB', hostPlayerId: HOST_UID })
+    expect(roomPathsWritten()).toEqual(['room/AAAAA', 'room/BBBBB'])
+  })
+
+  it('gives up after five colliding codes, passing on the refusal', async () => {
+    setDocMock.mockRejectedValue(permissionDenied)
+
+    const error = await hostRepository(() => ROOM_CODE)
+      .createGame(HOST_CONFIG)
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBe(permissionDenied)
+    expect(setDocMock).toHaveBeenCalledTimes(5)
+  })
+
+  it('passes on a failure that is not a collision without trying another code', async () => {
+    setDocMock.mockRejectedValueOnce(unavailable)
+
+    const error = await hostRepository(() => ROOM_CODE)
+      .createGame(HOST_CONFIG)
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBe(unavailable)
+    expect(setDocMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses to create a room when sign-in left this device without a uid', async () => {
+    const repo = new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: null } as never,
+      generateRoomCode: () => ROOM_CODE,
+    })
+
+    await expect(repo.createGame(HOST_CONFIG)).rejects.toThrow(/not signed in/)
+    expect(setDocMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('FirestoreGameRepository seat refusals', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function repository(uid: string, deps: { newGuestId?: () => string } = {}) {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid } } as never,
+      roomCode: ROOM_CODE,
+      ...deps,
+    })
+  }
+
+  it("passes on the refusal, not a name clash, when the name record is this device's own", async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path === `room/${ROOM_CODE}/names/n_alice`
+          ? snapshot({ ownerUid: ALICE_UID })
+          : snapshot(undefined),
+      ),
+    )
+
+    const error = await repository(ALICE_UID)
+      .addPlayer({ name: 'Alice', deviceUuid: 'd' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBe(permissionDenied)
+  })
+
+  it('takes a guest seat id from crypto.randomUUID when none is injected', async () => {
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001')
+
+    const guestId = await repository(HOST_UID).addGuest({ name: 'Mummo' })
+
+    expect(guestId).toBe('guest-00000000-0000-4000-8000-000000000001')
+  })
+
+  it('passes on a guest refusal when no seat in the room has the name', async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+
+    const error = await repository(HOST_UID)
+      .addGuest({ name: 'Mummo' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBe(permissionDenied)
+  })
+
+  it('passes on a guest write failure that is not a refusal, without looking up the name', async () => {
+    batchCommitMock.mockRejectedValueOnce(unavailable)
+
+    const error = await repository(HOST_UID)
+      .addGuest({ name: 'Mummo' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBe(unavailable)
+    expect(getDocMock).not.toHaveBeenCalled()
+  })
+
+  it('passes on a failure to read the seat that is not a refusal', async () => {
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      ref.path === `room/${ROOM_CODE}`
+        ? Promise.resolve(snapshot({ hostUid: HOST_UID }))
+        : Promise.reject(unavailable),
+    )
+
+    await expect(repository(ALICE_UID).findSeat()).rejects.toBe(unavailable)
+  })
+})
+
+describe('FirestoreGameRepository.subscribe lifecycle', () => {
+  const NEXT_CODE = 'FGHJK'
+
+  function repository(uid: string | null = ALICE_UID) {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: uid === null ? null : { uid } } as never,
+      roomCode: ROOM_CODE,
+    })
+  }
+
+  function listenerAt(index: number, argument: 1 | 2): (value: unknown) => void {
+    return (onSnapshotMock.mock.calls[index] as unknown[])[argument] as (value: unknown) => void
+  }
+
+  function nextSeatWatches() {
+    return onSnapshotMock.mock.calls.filter((call) =>
+      (call[0] as { path: string }).path.startsWith(`room/${NEXT_CODE}/`),
+    )
+  }
+
+  it('emits nothing until the room doc has arrived', () => {
+    const onChange = vi.fn()
+    repository().subscribe(onChange)
+
+    listenerAt(1, 1)({ docs: [playerDoc(ALICE_UID, 'Alice', 'd')] })
+    listenerAt(2, 1)({ docs: [] })
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('emits nothing for a room doc with no data, as when the room is gone', () => {
+    const onChange = vi.fn()
+    repository().subscribe(onChange)
+
+    listenerAt(0, 1)({ data: () => undefined })
+    listenerAt(1, 1)({ docs: [playerDoc(ALICE_UID, 'Alice', 'd')] })
+
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('watches for its seat in the next room only once, however often the link arrives', () => {
+    repository().subscribe(() => undefined)
+    const linkedRoom = { status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE }
+
+    listenerAt(0, 1)({ data: () => linkedRoom })
+    listenerAt(0, 1)({ data: () => linkedRoom })
+
+    expect(nextSeatWatches()).toHaveLength(1)
+  })
+
+  it('does not watch the next room while no user is signed in', () => {
+    const onChange = vi.fn()
+    repository(null).subscribe(onChange)
+
+    listenerAt(
+      0,
+      1,
+    )({ data: () => ({ status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE }) })
+
+    expect(nextSeatWatches()).toHaveLength(0)
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ nextRoomCode: NEXT_CODE }))
+  })
+
+  it('keeps a failed watch on the next-room seat to itself, as the join button still works', () => {
+    const onChange = vi.fn()
+    const onError = vi.fn()
+    repository().subscribe(onChange, onError)
+    listenerAt(
+      0,
+      1,
+    )({ data: () => ({ status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE }) })
+    const changesBefore = onChange.mock.calls.length
+
+    listenerAt(3, 2)(permissionDenied)
+
+    expect(onError).not.toHaveBeenCalled()
+    expect(onChange).toHaveBeenCalledTimes(changesBefore)
+  })
+
+  it('stops every listener, the next-room seat watch included, on unsubscribe', () => {
+    const stops: ReturnType<typeof vi.fn>[] = []
+    onSnapshotMock.mockImplementation(() => {
+      const stop = vi.fn()
+      stops.push(stop)
+      return stop
+    })
+    const unsubscribe = repository().subscribe(() => undefined)
+    listenerAt(
+      0,
+      1,
+    )({ data: () => ({ status: 'finished', currentRound: 5, nextRoomCode: NEXT_CODE }) })
+
+    unsubscribe()
+
+    expect(stops).toHaveLength(4)
+    stops.forEach((stop) => expect(stop).toHaveBeenCalledTimes(1))
+  })
+
+  it('stops every open subscription on leave', () => {
+    const stops: ReturnType<typeof vi.fn>[] = []
+    onSnapshotMock.mockImplementation(() => {
+      const stop = vi.fn()
+      stops.push(stop)
+      return stop
+    })
+    const repo = repository()
+    repo.subscribe(() => undefined)
+    repo.subscribe(() => undefined)
+
+    repo.leave()
+
+    expect(stops).toHaveLength(6)
+    stops.forEach((stop) => expect(stop).toHaveBeenCalledTimes(1))
+  })
+
+  it('refuses to subscribe before there is a room to listen to', () => {
+    const host = new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+    })
+
+    expect(() => host.subscribe(() => undefined)).toThrow(/no room code/)
+    expect(onSnapshotMock).not.toHaveBeenCalled()
   })
 })

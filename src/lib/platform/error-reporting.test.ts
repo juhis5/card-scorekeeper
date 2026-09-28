@@ -111,6 +111,20 @@ describe('startErrorReporting', () => {
     })
   })
 
+  it('cuts room codes from breadcrumbs, such as a navigation into a room', async () => {
+    vi.stubEnv('VITE_SENTRY_DSN', 'https://key@o1.ingest.de.sentry.io/2')
+
+    await startErrorReporting(app, router)
+
+    const options = init.mock.calls[0]?.[0]
+    expect(
+      options.beforeBreadcrumb({
+        category: 'navigation',
+        data: { from: '/join/7K4RQ', to: '/room/7K4RQ' },
+      }),
+    ).toEqual({ category: 'navigation', data: { from: '/join/:code', to: '/room/:code' } })
+  })
+
   it('reports with click breadcrumbs off and personal data left out', async () => {
     vi.stubEnv('VITE_SENTRY_DSN', 'https://key@o1.ingest.de.sentry.io/2')
 

@@ -86,6 +86,22 @@ describe('probeBackendReachable, online device', () => {
   })
 })
 
+describe('probeBackendReachable, broken online check', () => {
+  it('counts a device whose online check throws as unreachable, without calling checkBackend', async () => {
+    const checkBackend = vi.fn().mockResolvedValue(undefined)
+
+    const result = await probeBackendReachable({
+      isOnline: () => {
+        throw new Error('no navigator')
+      },
+      checkBackend,
+    })
+
+    expect(result).toBe(false)
+    expect(checkBackend).not.toHaveBeenCalled()
+  })
+})
+
 describe('probeBackendReachable defaults', () => {
   it('falls back to navigator.onLine when isOnline is not provided', async () => {
     vi.stubGlobal('navigator', { onLine: false })

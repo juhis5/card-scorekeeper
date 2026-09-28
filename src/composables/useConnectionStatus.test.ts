@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { effectScope } from 'vue'
 import { useConnectionStatus } from './useConnectionStatus'
 
@@ -97,5 +97,32 @@ describe('useConnectionStatus, cleanup', () => {
 
     expect(eventTarget.listenerCount('online')).toBe(0)
     expect(eventTarget.listenerCount('offline')).toBe(0)
+  })
+})
+
+describe('useConnectionStatus, in the browser (its defaults)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('starts reconnecting when navigator.onLine says the device is offline', () => {
+    vi.stubGlobal('navigator', { onLine: false })
+
+    const { result, dispose } = runInScope(() => useConnectionStatus())
+
+    expect(result.isReconnecting.value).toBe(true)
+    dispose()
+  })
+
+  it("follows the window's offline and online events", () => {
+    vi.stubGlobal('navigator', { onLine: true })
+    const { result, dispose } = runInScope(() => useConnectionStatus())
+
+    window.dispatchEvent(new Event('offline'))
+    expect(result.isReconnecting.value).toBe(true)
+
+    window.dispatchEvent(new Event('online'))
+    expect(result.isReconnecting.value).toBe(false)
+    dispose()
   })
 })

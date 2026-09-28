@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { isPermanentWriteError, isPermissionDenied } from './write-errors'
+import { isPermanentWriteError, isPermissionDenied, isUnavailable } from './write-errors'
 
 function firestoreError(code: string): Error & { code: string } {
   return Object.assign(new Error(code), { code })
 }
+
+describe('isUnavailable', () => {
+  it.each(['unavailable', 'deadline-exceeded'])(
+    'treats %s as unreachable: worth retrying once back online',
+    (code) => {
+      expect(isUnavailable(firestoreError(code))).toBe(true)
+    },
+  )
+
+  it('is false for a rejection from the server, which retrying will not fix', () => {
+    expect(isUnavailable(firestoreError('permission-denied'))).toBe(false)
+  })
+
+  it('is false for values without a string code', () => {
+    expect(isUnavailable(new Error('offline'))).toBe(false)
+    expect(isUnavailable({ code: 14 })).toBe(false)
+    expect(isUnavailable(undefined)).toBe(false)
+  })
+})
 
 describe('isPermissionDenied', () => {
   it('recognises the permission-denied code Firestore rejects a write with', () => {

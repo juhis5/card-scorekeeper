@@ -107,6 +107,19 @@ const ALL_RESULTS: Record<string, string> = {
   g3: '2026-01-15T00:00:00.000Z',
 }
 
+/** A row whose scores don't matter to the test, only who played which game under what name. */
+function nameRow(gameId: string, deviceUuid: string, displayName: string): GamePlayer {
+  return {
+    gameId,
+    deviceUuid,
+    displayName,
+    finalScore: 50,
+    placement: 1,
+    bestRound: 5,
+    worstRound: 20,
+  }
+}
+
 function docsFor(rows: GamePlayer[]) {
   return { docs: rows.map((row) => ({ id: `${row.gameId}_${row.deviceUuid}`, data: () => row })) }
 }
@@ -219,6 +232,38 @@ describe('useStatsStore.load — success', () => {
 
     // g2 finished after g1, so Bob's g2 name wins.
     expect(statsStore.opponents.at(0)?.displayName).toBe('Bob (game 2)')
+  })
+
+  it('lists opponents alphabetically by name, whatever order their rows arrive in', async () => {
+    ensureSignedInMock.mockResolvedValue(ME)
+    installFixtureGetDocs([
+      nameRow('g1', ME, 'Me'),
+      nameRow('g1', 'uid-ville', 'Ville'),
+      nameRow('g1', 'uid-anna', 'Anna'),
+    ])
+    const statsStore = useStatsStore()
+
+    await statsStore.load()
+
+    expect(statsStore.opponents.map((opponent) => opponent.displayName)).toEqual(['Anna', 'Ville'])
+  })
+
+  it('prefers the opponent’s name from a game with a known finish time over games without one', async () => {
+    // Only g1 has a game_result; u1 and u2 have none, so their finish time is unknown.
+    ensureSignedInMock.mockResolvedValue(ME)
+    installFixtureGetDocs([
+      nameRow('u1', ME, 'Me'),
+      nameRow('u1', BOB, 'Bob (untimed 1)'),
+      nameRow('g1', ME, 'Me'),
+      nameRow('g1', BOB, 'Bob (timed)'),
+      nameRow('u2', ME, 'Me'),
+      nameRow('u2', BOB, 'Bob (untimed 2)'),
+    ])
+    const statsStore = useStatsStore()
+
+    await statsStore.load()
+
+    expect(statsStore.opponents.at(0)?.displayName).toBe('Bob (timed)')
   })
 
   it('loads game results by participant, never by document id', async () => {
