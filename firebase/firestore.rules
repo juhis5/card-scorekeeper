@@ -119,10 +119,10 @@ service cloud.firestore {
       // nextRoomCode once, below). hostUid, code, createdAt and expiresAt never change: a longer
       // expiry would defeat auto-expiry. Rounds move forward one at a time within 1..5 (other
       // values crash every client's contract banner), the game finishes only in round 5, and a
-      // finished room never reopens (the /api photo gate trusts 'finished').
+      // finished or abandoned room never reopens (the /api photo gate trusts 'finished').
       function isRoundUpdate() {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentRound'])
-          && resource.data.status != 'finished'
+          && resource.data.status in ['waiting', 'playing']
           && request.resource.data.status in ['waiting', 'playing', 'finished']
           && request.resource.data.currentRound is int
           && request.resource.data.currentRound >= resource.data.currentRound
@@ -142,10 +142,18 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/room/$(request.resource.data.nextRoomCode)).data.hostUid == request.auth.uid;
       }
 
+      // Ending a game early: the host abandons it. Nothing is recorded for it, and like a finished
+      // room it takes no more rounds, scores or seats.
+      function isAbandon() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && resource.data.status in ['waiting', 'playing']
+          && request.resource.data.status == 'abandoned';
+      }
+
       allow update: if isSignedIn()
         && resource.data.hostUid == request.auth.uid
         && resource.data.expiresAt > request.time
-        && (isRoundUpdate() || isNextRoomLink());
+        && (isRoundUpdate() || isNextRoomLink() || isAbandon());
 
       allow delete: if false;
 
@@ -184,7 +192,7 @@ service cloud.firestore {
             && isHost(code)
             && isGuestId(playerUid)
             && roomNotExpired(code)
-            && roomData(code).status != 'finished'
+            && roomData(code).status in ['waiting', 'playing']
             && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder', 'isGuest'])
             && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder', 'isGuest'])
             && request.resource.data.isGuest == true
@@ -298,7 +306,7 @@ service cloud.firestore {
         function isValidRoundScore(code, scoreId) {
           return isSignedIn()
             && roomNotExpired(code)
-            && roomData(code).status != 'finished'
+            && roomData(code).status in ['waiting', 'playing']
             && (isRoomMember(code) || isHost(code))
             && request.resource.data.playerId == request.resource.data.ownerUid
             && (request.resource.data.ownerUid == request.auth.uid || isHost(code))
@@ -363,7 +371,7 @@ service cloud.firestore {
         && request.resource.data.participantUids.size() >= 1
         && request.resource.data.participantUids.size() <= 50
         && (
-          (roomExists(gameId) && isHost(gameId))
+          (roomExists(gameId) && isHost(gameId) && roomData(gameId).status != 'abandoned')
           || (!roomExists(gameId)
             && isLocalGameId(gameId)
             && request.resource.data.participantUids == [request.auth.uid])

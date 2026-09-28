@@ -84,6 +84,7 @@ class FakeRoom implements ReplayableGameRepository {
   async finishGame(): Promise<GameResult> {
     return { gameId: 'game', finishedAt: 'now', totalRounds: 5 }
   }
+  async abandonGame(): Promise<void> {}
   leave(): void {
     this.listeners.clear()
   }

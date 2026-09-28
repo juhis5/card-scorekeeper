@@ -452,6 +452,21 @@ describe('LocalGameRepository persistence', () => {
   })
 })
 
+describe('LocalGameRepository.abandonGame', () => {
+  it('deletes the game on this device, queues no result, and tells listeners it ended', async () => {
+    const storage = makeMemoryStorage()
+    const repository = makeRepository({ storage })
+    await repository.createGame(HOST_CONFIG)
+    const emissions = recordEmissions(repository)
+
+    await repository.abandonGame()
+
+    expect(emissions.at(-1)?.status).toBe('abandoned')
+    expect(hasPersistedGame(storage)).toBe(false)
+    expect(readPendingResults(storage)).toEqual([])
+  })
+})
+
 describe('LocalGameRepository.finishGame on a damaged save', () => {
   it('stays unfinished when the host row cannot be built, so nothing is marked done without its result', async () => {
     const storage = makeMemoryStorage()

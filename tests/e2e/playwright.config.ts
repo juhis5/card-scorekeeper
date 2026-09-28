@@ -67,6 +67,7 @@ export default defineConfig({
       testIgnore: [
         '**/visual.spec.ts',
         '**/live-sync.spec.ts',
+        '**/end-game.spec.ts',
         '**/host-powers.spec.ts',
         '**/online-game.spec.ts',
         '**/unique-names.spec.ts',

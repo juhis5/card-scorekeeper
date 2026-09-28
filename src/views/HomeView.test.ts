@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/vue'
+import { flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import HomeView from './HomeView.vue'
@@ -84,5 +85,22 @@ describe('HomeView, joining or starting', () => {
     expect((screen.getByLabelText('Your name') as HTMLInputElement).value).toBe('Juho')
     expect(screen.queryByLabelText('Room code')).toBeNull()
     expect(screen.getByRole('button', { name: 'Start game' })).toBeTruthy()
+  })
+})
+
+describe('HomeView, leaving a game in progress', () => {
+  it('deletes the game on this device after asking, and stops offering it', async () => {
+    await new LocalGameRepository().createGame({
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Host',
+    })
+    await renderHome()
+
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete the game on this device' }))
+    await fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await flushPromises()
+
+    expect(screen.queryByRole('link', { name: 'Continue the game on this device' })).toBeNull()
+    expect(new LocalGameRepository().getResumeInfo()).toBeNull()
   })
 })

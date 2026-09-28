@@ -266,6 +266,14 @@ export class LocalGameRepository implements GameRepository {
     return result
   }
 
+  /** Deletes the game on this device: no result is queued. Listeners hear it ended. */
+  async abandonGame(): Promise<void> {
+    const ended: GameState = { ...this.game.state, status: 'abandoned' }
+    this.game = emptyStoredGame()
+    this.persistAndNotify()
+    this.listeners.forEach((listener) => listener(ended))
+  }
+
   leave(): void {
     this.listeners.clear()
   }

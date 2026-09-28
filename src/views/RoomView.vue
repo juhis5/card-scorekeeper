@@ -358,12 +358,18 @@ const isOpeningRoom = computed(
     (isOnline.value && !hasActiveGame.value && connectionError.value === null),
 )
 
+const isAbandoned = computed(() => status.value === 'abandoned')
 const isGameShown = computed(
-  () => !isOpeningRoom.value && resumeState.value !== 'not-seated' && hasActiveGame.value,
+  () =>
+    !isOpeningRoom.value &&
+    resumeState.value !== 'not-seated' &&
+    hasActiveGame.value &&
+    !isAbandoned.value,
 )
 const heading = computed(() => {
   if (isOpeningRoom.value) return t('room.opening', { code: routeCode.value })
   if (resumeState.value === 'not-seated') return t('room.notSeated.heading')
+  if (isAbandoned.value) return t('room.end.endedTitle')
   if (!hasActiveGame.value) return t('room.empty.heading')
   return t('room.heading')
 })
@@ -427,6 +433,13 @@ onMounted(async () => {
         class="text-primary underline underline-offset-4"
       >
         {{ t('room.notSeated.join', { code: routeCode }) }}
+      </RouterLink>
+    </template>
+
+    <template v-else-if="isAbandoned">
+      <p role="status" class="text-muted-foreground">{{ t('room.end.endedBody') }}</p>
+      <RouterLink :to="{ name: 'home' }" class="text-primary underline underline-offset-4">
+        {{ t('room.empty.backHome') }}
       </RouterLink>
     </template>
 

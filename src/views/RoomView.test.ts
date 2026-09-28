@@ -184,6 +184,11 @@ class FakeOnlineRepository implements GameRepository {
     return { gameId: this.roomCode, finishedAt: 'now', totalRounds: 5 }
   }
 
+  async abandonGame(): Promise<void> {
+    this.state = { ...this.state, status: 'abandoned' }
+    this.emit()
+  }
+
   leave(): void {
     this.listeners.clear()
   }
@@ -954,6 +959,21 @@ describe('RoomView after a reload of an online room', () => {
 
     expect(useGameStore().roomCode).toBe(ROOM_CODE)
     expect(screen.queryByText('Local host')).toBeNull()
+  })
+
+  it('tells everyone still in the room that the host ended the game', async () => {
+    const room = await roomCreatedBeforeReload()
+    room.seat = { playerId: 'player-1', isHost: false }
+    resumeRepository.mockResolvedValue(room)
+    const reloaded = createPinia()
+    setActivePinia(reloaded)
+    await renderAt(reloaded)
+
+    await room.abandonGame()
+    await flushPromises()
+
+    expect(screen.getByRole('heading', { name: 'The game was ended' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Next round' })).toBeNull()
   })
 
   it('offers to join again when this device has no seat in the room', async () => {

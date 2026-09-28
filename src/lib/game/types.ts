@@ -37,7 +37,8 @@ export interface Player {
   isGuest?: boolean
 }
 
-export type GameStatus = 'waiting' | 'playing' | 'finished'
+/** 'abandoned': the host ended the game early; nothing about it is recorded. */
+export type GameStatus = 'waiting' | 'playing' | 'finished' | 'abandoned'
 
 export interface GameState {
   status: GameStatus
