@@ -384,7 +384,7 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
     info, cookies, bodies or query params (only the User-Agent header). Replay's compression
     worker needs `blob:` in the CSP's `worker-src`.
   - Source maps: built hidden, uploaded by `@sentry/vite-plugin` with `SENTRY_AUTH_TOKEN` (a
-    Vercel secret), then deleted, so browsers never get them. `@sentry/cli`'s install script is
+    Vercel secret; the token carries Sentry's address), then deleted, so browsers never get them. `@sentry/cli`'s install script is
     denied in pnpm-workspace.yaml; its binary comes from the per-platform package.
   - The CSP allows `https://*.ingest.de.sentry.io`. The Sentry MCP server is set up locally for
     reading issues.

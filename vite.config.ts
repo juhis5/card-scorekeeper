@@ -58,7 +58,6 @@ export default defineConfig({
           sentryVitePlugin({
             org: 'juho-lahtinen',
             project: 'rommi',
-            url: 'https://de.sentry.io/',
             authToken: process.env.SENTRY_AUTH_TOKEN,
             release: { name: release },
             sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
