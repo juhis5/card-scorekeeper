@@ -13,6 +13,7 @@ import { ListChecks, WifiOff } from '@lucide/vue'
 import AddPlayerCard from '@/components/room/AddPlayerCard.vue'
 import ContractBanner from '@/components/room/ContractBanner.vue'
 import EnterAllScoresSheet from '@/components/room/EnterAllScoresSheet.vue'
+import GameHighscores from '@/components/room/GameHighscores.vue'
 import PlayAgain from '@/components/room/PlayAgain.vue'
 import RemovePlayerControl from '@/components/room/RemovePlayerControl.vue'
 import ScoreCard from '@/components/room/ScoreCard.vue'
@@ -556,6 +557,8 @@ onMounted(async () => {
       <ScoreBoard :rows="board" :completed-rounds="completedRounds" />
 
       <WinnerBanner v-if="isFinished" :winners="winners" />
+      <!-- Only online games reach the public lists. -->
+      <GameHighscores v-if="isFinished && isOnline && roomCode" :game-id="roomCode" />
 
       <section
         v-if="!isFinished && missedRoundCards.length > 0"

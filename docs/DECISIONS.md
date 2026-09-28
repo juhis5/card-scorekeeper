@@ -619,3 +619,8 @@ it is.
   - Inside views tw-animate-css is fine: the score card's entry area slides open, the saved ✓ and
     the winner banner pop in, notices and save errors fade in. Dialogs, sheets and popovers
     already animated; the scoreboard already moves its rows on a reveal.
+- 2026-09-29 — The finish screen shows the public lists the game made (owner's request): best
+  game, hall of shame and biggest round, with each player's place, "#1" marked as a new record.
+  Online games only, as only they reach the lists. It watches the three top-10 lists live
+  (`watchTop`), so the entries appear the moment the host's publish lands, with no polling; a
+  failure just shows nothing and is reported. Ranking is shared with Ennätykset (`rankAt`).

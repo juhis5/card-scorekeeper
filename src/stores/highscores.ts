@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { TopDoc, TopQuery } from '@/lib/data/stats-reads'
+import { rankAt } from '@/lib/game/highscores'
 import { reportHandledError } from '@/lib/platform/error-reporting'
 
 /** Also the most firestore.rules lets one query read. */
@@ -37,7 +38,7 @@ export type HighscoresStatus = 'loading' | 'loaded' | 'error'
 
 type ListQuery = TopQuery
 
-const LISTS: Record<HighscoreListName, ListQuery> = {
+export const HIGHSCORE_LISTS: Record<HighscoreListName, ListQuery> = {
   bestGames: { collection: 'leaderboard', field: 'finalScore', direction: 'asc' },
   worstGames: { collection: 'leaderboard', field: 'finalScore', direction: 'desc' },
   biggestRounds: { collection: 'leaderboard', field: 'worstRound', direction: 'desc' },
@@ -64,10 +65,10 @@ function isValidDate(value: unknown): value is string {
 }
 
 function toEntries(rows: TopDoc[], list: ListQuery, uid: string): HighscoreEntry[] {
-  return rows.map(({ id, data }) => ({
+  const values = rows.map((row) => row.data[list.field])
+  return rows.map(({ id, data }, index) => ({
     id,
-    // The list is sorted, so the first entry with this value holds the shared rank.
-    rank: rows.findIndex((row) => row.data[list.field] === data[list.field]) + 1,
+    rank: rankAt(values, index),
     displayName: String(data.displayName),
     value: Number(data[list.field]),
     ...(isValidDate(data.finishedAt) && { finishedAt: data.finishedAt }),
@@ -105,10 +106,12 @@ export const useHighscoresStore = defineStore('highscores', () => {
       }
       const { db, uid } = connection
       const loaded = await Promise.all(
-        (Object.entries(LISTS) as [HighscoreListName, ListQuery][]).map(async ([name, list]) => {
-          const docs = await readTop(db, list, HIGHSCORE_LIMIT)
-          return [name, toEntries(docs, list, uid)] as const
-        }),
+        (Object.entries(HIGHSCORE_LISTS) as [HighscoreListName, ListQuery][]).map(
+          async ([name, list]) => {
+            const docs = await readTop(db, list, HIGHSCORE_LIMIT)
+            return [name, toEntries(docs, list, uid)] as const
+          },
+        ),
       )
       lists.value = { ...emptyLists(), ...Object.fromEntries(loaded) }
       status.value = 'loaded'

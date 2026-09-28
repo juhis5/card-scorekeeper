@@ -4,11 +4,13 @@ import {
   collection,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   where,
   type DocumentData,
   type Firestore,
+  type Unsubscribe,
 } from 'firebase/firestore'
 import { probeBackendReachable } from '../platform/connectivity'
 import type { GamePlayer, GameResult } from '../game/types'
@@ -100,15 +102,35 @@ export interface TopDoc {
   data: DocumentData
 }
 
+function topQuery(db: Firestore, list: TopQuery, count: number) {
+  return query(
+    collection(db, list.collection),
+    ...(list.qualifiedOnly ? [where('qualified', '==', true)] : []),
+    orderBy(list.field, list.direction),
+    limit(count),
+  )
+}
+
 /** One public list, sorted, at most `count` long (the rules allow ten). */
 export async function readTop(db: Firestore, list: TopQuery, count: number): Promise<TopDoc[]> {
-  const snapshot = await getDocs(
-    query(
-      collection(db, list.collection),
-      ...(list.qualifiedOnly ? [where('qualified', '==', true)] : []),
-      orderBy(list.field, list.direction),
-      limit(count),
-    ),
-  )
+  const snapshot = await getDocs(topQuery(db, list, count))
   return snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, data: snapshotDoc.data() }))
+}
+
+/** The same list, live: `onChange` hears it now and after every change. */
+export function watchTop(
+  db: Firestore,
+  list: TopQuery,
+  count: number,
+  onChange: (docs: TopDoc[]) => void,
+): Unsubscribe {
+  return onSnapshot(
+    topQuery(db, list, count),
+    (snapshot) =>
+      onChange(
+        snapshot.docs.map((snapshotDoc) => ({ id: snapshotDoc.id, data: snapshotDoc.data() })),
+      ),
+    // An extra on the finish screen: a refused or broken listener just shows nothing.
+    () => undefined,
+  )
 }

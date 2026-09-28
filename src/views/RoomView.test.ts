@@ -33,6 +33,13 @@ vi.mock('@/composables/useGameConnectivity', () => ({
   }),
 }))
 
+// The finish's public-list places come from Firestore listeners; a fixed result stands in here.
+vi.mock('@/composables/useGameHighscores', () => ({
+  useGameHighscores: () => ({
+    value: [{ list: 'bestGames', rank: 1, displayName: 'Alice', value: 0 }],
+  }),
+}))
+
 // The finish's fireworks draw on a canvas; here only whether they were called matters.
 const { celebrate } = vi.hoisted(() => ({ celebrate: vi.fn() }))
 vi.mock('@/lib/platform/celebrate', () => ({ celebrate }))
@@ -891,6 +898,18 @@ describe('RoomView online mode', () => {
         "Playing a local game on this device. Others can't join, and photo count is off.",
       ),
     ).toBeNull()
+  })
+
+  it('shows the public lists the game made once an online game is finished', async () => {
+    const { hostPinia, repository } = await setUpOnlineRoom()
+    setActivePinia(hostPinia)
+    await renderAs(hostPinia)
+    expect(screen.queryByRole('heading', { name: 'Made the highscores' })).toBeNull()
+
+    await repository.finishGame()
+    await flushPromises()
+
+    expect(screen.getByRole('heading', { name: 'Made the highscores' })).toBeTruthy()
   })
 
   it("shows only this device's own player as an editable score card for a joiner", async () => {

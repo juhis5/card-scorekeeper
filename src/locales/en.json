@@ -293,6 +293,11 @@
     "unreachable": {
       "heading": "No connection",
       "body": "This phone is offline, so the room can't be opened yet. It opens by itself once you're back online."
+    },
+    "highscores": {
+      "heading": "Made the highscores",
+      "line": "{name} · {list} · #{rank} · {value} points",
+      "record": "New record!"
     }
   },
   "notFound": {

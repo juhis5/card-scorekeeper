@@ -1,6 +1,6 @@
 /**
- * A finished online game reaches Ennätykset: the host scores the most points a round allows, so
- * their game tops the Hall of shame on a shared emulator, marked as theirs.
+ * A finished online game reaches Ennätykset and its finish screen: the host scores the most points
+ * a round allows, so their game tops the Hall of shame on a shared emulator, marked as theirs.
  */
 import { expect, test, type Page } from '@playwright/test'
 import {
@@ -47,6 +47,10 @@ test('a finished online game shows up on Ennätykset', async ({ browser }) => {
     await expect(finish).toBeEnabled()
     await finish.click()
     await expect(winnerBanner(hostPage, 'Voittaja wins!')).toBeVisible()
+
+    // The finish screen shows it too, as soon as the host's publish lands.
+    await expect(hostPage.getByRole('heading', { name: 'Made the highscores' })).toBeVisible()
+    await expect(hostPage.getByText(/Häviäjä · Hall of shame · #\d+ · 5,000 points/)).toBeVisible()
 
     await openFromMenu(hostPage, 'Highscores')
     await hostPage.getByRole('button', { name: 'Games' }).click()
