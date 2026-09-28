@@ -5,6 +5,9 @@ allowBuilds:
   # already contains node/index.mjs + node/node.d.ts as installed). Nothing to build; denied like
   # sharp below, for the same "nothing here calls it" reason.
   '@google/genai': false
+  # Its install script only downloads the CLI binary, which already arrives through its per-platform
+  # optional package (@sentry/cli-darwin, -linux-x64, ...).
+  '@sentry/cli': false
   protobufjs: true
   re2: true
   # sharp is pulled in only as vite-plugin-pwa's OPTIONAL peer `@vite-pwa/assets-generator` (its

@@ -5,6 +5,15 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
+
+// Vercel's build tells which branch and commit it builds; error reports carry both.
+const branch = process.env.VERCEL_GIT_COMMIT_REF
+const deployEnv =
+  branch === 'main' ? 'production' : branch === 'develop' ? 'test' : branch ? 'preview' : 'local'
+const release = process.env.VERCEL_GIT_COMMIT_SHA ?? ''
+// Source maps go to Sentry only, never to the browser: made hidden, uploaded, then deleted.
+const uploadsSourceMaps = Boolean(process.env.SENTRY_AUTH_TOKEN && release)
 
 export default defineConfig({
   plugins: [
@@ -44,7 +53,26 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
     }),
+    ...(uploadsSourceMaps
+      ? [
+          sentryVitePlugin({
+            org: 'juho-lahtinen',
+            project: 'rommi',
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            release: { name: release },
+            sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+            telemetry: false,
+          }),
+        ]
+      : []),
   ],
+  define: {
+    'import.meta.env.VITE_DEPLOY_ENV': JSON.stringify(deployEnv),
+    'import.meta.env.VITE_RELEASE': JSON.stringify(release),
+  },
+  build: {
+    sourcemap: uploadsSourceMaps ? 'hidden' : false,
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
