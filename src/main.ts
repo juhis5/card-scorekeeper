@@ -9,9 +9,9 @@ import router from './router'
 import { i18n } from './i18n'
 import { useIdentityStore } from './stores/identity'
 import { useInstallStore } from './stores/install'
+import { useResultQueueStore } from './stores/result-queue'
 import { applyStoredTheme } from './composables/useTheme'
 import { startErrorReporting } from './lib/platform/error-reporting'
-import { flushPendingResultsOnLaunch } from './lib/data/reconnect-flush'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -31,8 +31,8 @@ app.mount('#app')
 void startErrorReporting(app, router)
 applyStoredTheme()
 
-// Push results of games finished offline. Not awaited, so it never delays mount; a failure
-// leaves them queued for the next launch.
-if (navigator.onLine) {
-  void flushPendingResultsOnLaunch()
-}
+// Push results of games finished offline, now and whenever the browser comes back online. Not
+// awaited, so it never delays mount; a failure leaves them queued.
+const resultQueue = useResultQueueStore()
+resultQueue.listen(window)
+void resultQueue.upload()

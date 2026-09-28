@@ -5,6 +5,8 @@ import { flushPromises } from '@vue/test-utils'
 import StatsView from './StatsView.vue'
 import { i18n } from '@/i18n'
 import type { GamePlayer } from '@/lib/game/types'
+import { appendPendingResult } from '@/lib/data/pending-results'
+import { useStatsStore } from '@/stores/stats'
 
 /** Covers the view's four states only (the store's logic is in stores/stats.test.ts), mocking
  * the same Firebase boundary as the store. */
@@ -30,6 +32,11 @@ interface FakeQuery {
 }
 
 const getDocsMock = vi.fn()
+const uploadPendingResultsMock = vi.fn()
+
+vi.mock('@/lib/data/reconnect-flush', () => ({
+  uploadPendingResults: () => uploadPendingResultsMock(),
+}))
 
 vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, path: string) => ({ collectionPath: path }),
@@ -110,6 +117,8 @@ beforeEach(() => {
   setActivePinia(createPinia())
   vi.clearAllMocks()
   getDbMock.mockReturnValue({})
+  localStorage.clear()
+  uploadPendingResultsMock.mockResolvedValue(0)
 })
 
 // In afterEach, so a failing assertion can't leave `navigator` stubbed.
@@ -118,6 +127,24 @@ afterEach(() => {
 })
 
 describe('StatsView', () => {
+  it('uploads games finished offline and reloads the stats once they are in', async () => {
+    appendPendingResult(localStorage, {
+      result: { gameId: 'g2', finishedAt: '2026-01-02T00:00:00.000Z', totalRounds: 5 },
+      players: [],
+    })
+    uploadPendingResultsMock.mockImplementation(async () => {
+      localStorage.clear()
+      return 1
+    })
+    const load = vi.spyOn(useStatsStore(), 'load').mockResolvedValue()
+
+    renderStatsView()
+    await flushPromises()
+
+    expect(uploadPendingResultsMock).toHaveBeenCalledTimes(1)
+    expect(load).toHaveBeenCalledTimes(2)
+  })
+
   it('always states the identity caveats, regardless of load state', () => {
     ensureSignedInMock.mockReturnValue(new Promise(() => {})) // never resolves, so it stays loading
     renderStatsView()

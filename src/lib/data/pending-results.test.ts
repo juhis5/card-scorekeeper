@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   appendPendingResult,
+  discardFailedResults,
   FAILED_RESULTS_STORAGE_KEY,
   flushPendingResults,
   PENDING_RESULTS_STORAGE_KEY,
+  readFailedResults,
   readPendingResults,
+  retryFailedResults,
 } from './pending-results'
 import type { PendingResult, PendingResultWriter } from './pending-results'
 import type { KeyValueStorage } from './key-value-storage'
@@ -220,6 +223,55 @@ describe('flushPendingResults', () => {
   })
 })
 
+describe('failed results', () => {
+  function storageWithFailed(...gameIds: string[]): KeyValueStorage {
+    const storage = makeMemoryStorage()
+    storage.setItem(
+      FAILED_RESULTS_STORAGE_KEY,
+      JSON.stringify(gameIds.map((id) => pendingResult(id))),
+    )
+    return storage
+  }
+
+  it('reads the games Firestore rejected for good', () => {
+    const storage = storageWithFailed('g1', 'g2')
+
+    expect(readFailedResults(storage).map((entry) => entry.result.gameId)).toEqual(['g1', 'g2'])
+  })
+
+  it('queues failed games again behind the waiting ones, so a fixed rule lets them upload', () => {
+    const storage = storageWithFailed('failed-1')
+    appendPendingResult(storage, pendingResult('waiting-1'))
+
+    retryFailedResults(storage)
+
+    expect(readPendingResults(storage).map((entry) => entry.result.gameId)).toEqual([
+      'waiting-1',
+      'failed-1',
+    ])
+    expect(readFailedResults(storage)).toEqual([])
+  })
+
+  it('never queues a game twice when it is already waiting', () => {
+    const storage = storageWithFailed('g1')
+    appendPendingResult(storage, pendingResult('g1'))
+
+    retryFailedResults(storage)
+
+    expect(readPendingResults(storage)).toHaveLength(1)
+  })
+
+  it('discards failed games without touching the waiting ones', () => {
+    const storage = storageWithFailed('failed-1')
+    appendPendingResult(storage, pendingResult('waiting-1'))
+
+    discardFailedResults(storage)
+
+    expect(readFailedResults(storage)).toEqual([])
+    expect(readPendingResults(storage)).toHaveLength(1)
+  })
+})
+
 describe('pending results when storage refuses to be read', () => {
   it('reads nothing and queues without throwing, like a blocked storage in a private window', () => {
     const blocked: KeyValueStorage = {
@@ -232,6 +284,9 @@ describe('pending results when storage refuses to be read', () => {
     }
 
     expect(readPendingResults(blocked)).toEqual([])
+    expect(readFailedResults(blocked)).toEqual([])
+    expect(() => retryFailedResults(blocked)).not.toThrow()
+    expect(() => discardFailedResults(blocked)).not.toThrow()
     expect(() =>
       appendPendingResult(blocked, {
         result: { gameId: 'g', finishedAt: '2026-01-01T00:00:00.000Z', totalRounds: 5 },

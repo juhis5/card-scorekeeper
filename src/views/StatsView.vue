@@ -8,16 +8,24 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import HeadToHeadList from '@/components/stats/HeadToHeadList.vue'
 import HighscoresSection from '@/components/stats/HighscoresSection.vue'
+import ResultQueueNotice from '@/components/stats/ResultQueueNotice.vue'
 import StatSummary from '@/components/stats/StatSummary.vue'
 import { Button } from '@/components/ui/button'
+import { useResultQueueStore } from '@/stores/result-queue'
 import { useStatsStore } from '@/stores/stats'
 
 const { t } = useI18n()
 const statsStore = useStatsStore()
 const { status, stats, opponents } = storeToRefs(statsStore)
+const resultQueue = useResultQueueStore()
+
+async function uploadQueuedGames(): Promise<void> {
+  if ((await resultQueue.upload()) > 0) void statsStore.load()
+}
 
 onMounted(() => {
   void statsStore.load()
+  void uploadQueuedGames()
 })
 </script>
 
@@ -38,6 +46,8 @@ onMounted(() => {
       <h2 id="stats-caveats-heading" class="font-semibold">{{ t('stats.caveats.heading') }}</h2>
       <p class="text-muted-foreground mt-1">{{ t('stats.caveats.body') }}</p>
     </section>
+
+    <ResultQueueNotice @uploaded="statsStore.load()" />
 
     <p v-if="status === 'loading'" role="status" class="text-muted-foreground text-sm">
       {{ t('stats.loading') }}

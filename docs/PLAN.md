@@ -68,9 +68,10 @@ and Finish wait until everyone has a score for every round so far and no round h
 - Used when the probe fails, when online setup throws (bad config, sign-in refused), or with
   "Vain tällä puhelimella" on. No photo count.
 - **Reconnect = push final result only.** Finish queues the host's own stats row in
-  `card-scorekeeper:pending-results`, and the next online launch uploads it under the device's
-  anonymous uid. No mid-game merge. A result the rules reject for good moves to
-  `card-scorekeeper:pending-results-failed`, so it can't block later ones.
+  `card-scorekeeper:pending-results`, uploaded under the device's anonymous uid on launch, when
+  the browser comes back online, and when Tilastot opens. No mid-game merge. A result the rules
+  reject for good moves to `card-scorekeeper:pending-results-failed`, so it can't block later
+  ones. Tilastot says how many games wait, and offers the refused ones a retry or a delete.
 - Firebase loads with a dynamic `import()` on first use, so it never delays the first screen.
 
 ## Data model (Firestore)
