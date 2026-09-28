@@ -4,8 +4,10 @@
     "theme": {
       "label": "Theme",
       "names": {
-        "dark": "Dark",
-        "light": "Light",
+        "captain": "Captain",
+        "captain-light": "Captain light",
+        "dark": "Green",
+        "light": "Green light",
         "jani": "Jani",
         "nord": "Nord",
         "dracula": "Dracula",

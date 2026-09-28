@@ -73,6 +73,8 @@ const TEXT_PAIRS: [text: string, surface: string][] = [
   ['primary-foreground', 'primary'],
   ['destructive', 'background'],
   ['destructive', 'card'],
+  ['brand', 'background'],
+  ['brand', 'card'],
 ]
 
 describe.each([
@@ -82,10 +84,13 @@ describe.each([
   ['nord', '.theme-nord'],
   ['dracula', '.theme-dracula'],
   ['solarized', '.theme-solarized'],
+  ['captain', '.theme-captain'],
+  ['captain light', '.theme-captain-light'],
 ])('%s theme contrast', (_theme, selector) => {
   const tokens = tokensOf(selector)
   const token = (name: string): string => {
-    const value = tokens[name]
+    // A theme that doesn't set its own brand colour uses its primary (`--brand: var(--primary)`).
+    const value = tokens[name] ?? (name === 'brand' ? tokens.primary : undefined)
     if (!value) throw new Error(`missing --${name} in ${selector}`)
     return value
   }

@@ -12,17 +12,17 @@ beforeEach(() => {
 })
 
 describe('useTheme', () => {
-  it('defaults to dark when nothing is stored, like the no-flash script', () => {
+  it('defaults to Kapteeni when nothing is stored, like the no-flash script', () => {
     const { theme } = useTheme()
 
-    expect(theme.value).toBe('dark')
-    expect(rootClasses()).toEqual(['dark'])
+    expect(theme.value).toBe('captain')
+    expect(rootClasses().sort()).toEqual(['dark', 'theme-captain'])
   })
 
   it('treats an unknown stored value as the default, like the no-flash script', () => {
     localStorage.setItem('theme', 'banana')
 
-    expect(useTheme().theme.value).toBe('dark')
+    expect(useTheme().theme.value).toBe('captain')
   })
 
   it('applies a light theme without the dark class', () => {
