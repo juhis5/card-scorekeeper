@@ -17,10 +17,13 @@ import {
   scoreboardRow,
 } from './helpers'
 
+/** Waits for the filled-in card to go: its section closing moves the cards below it. */
 async function fillMissedRound(page: Page, name: string, round: number, points: number) {
-  await page.getByRole('button', { name: `Fill in ${name}'s missed round ${round}` }).click()
+  const missedCard = page.getByRole('button', { name: `Fill in ${name}'s missed round ${round}` })
+  await missedCard.click()
   await page.getByLabel(`${name}'s round ${round} score`).fill(String(points))
   await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(missedCard).toHaveCount(0)
 }
 
 /** The host scores itself and its guests, the phone player scores themselves. */

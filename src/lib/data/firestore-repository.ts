@@ -11,7 +11,6 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
-  where,
   writeBatch,
   type Firestore,
   type QueryDocumentSnapshot,
@@ -377,7 +376,16 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     // Nothing coherent to emit before the room doc's first snapshot.
     const emit = () => {
       if (!room) return
-      onChange({ ...room, players, roundScores, ...(hasSeatInNextRoom && { hasSeatInNextRoom }) })
+      const scoredPlayers = players.map((player) => ({
+        ...player,
+        totalScore: runningTotal(player.id, roundScores),
+      }))
+      onChange({
+        ...room,
+        players: scoredPlayers,
+        roundScores,
+        ...(hasSeatInNextRoom && { hasSeatInNextRoom }),
+      })
     }
 
     // Play again: the host seats everyone in the next room right after linking it, so this
@@ -441,33 +449,18 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     return unsubscribe
   }
 
+  /** One write, no read first, so the score shows at once (Firestore applies it locally) and an
+   * offline save doesn't wait on the server. Totals come from roundScores, never the seat's
+   * `totalScore`, which stays 0. */
   async setRoundScore(input: SetRoundScoreInput): Promise<void> {
     await ensureSignedIn(this.auth)
     const roomCode = this.requireRoomCode()
-
-    // A fresh read, not the live cache, which may not exist before subscribe().
-    const ownScores = await getDocs(
-      query(
-        collection(this.db, `room/${roomCode}/roundScores`),
-        where('playerId', '==', input.playerId),
-      ),
-    )
-    const roundScores = ownScores.docs
-      .map(toRoundScore)
-      .filter((score) => score.round !== input.round)
-    roundScores.push({ playerId: input.playerId, round: input.round, points: input.points })
-
-    const batch = writeBatch(this.db)
-    batch.set(doc(this.db, `room/${roomCode}/roundScores/${input.playerId}_${input.round}`), {
+    await setDoc(doc(this.db, `room/${roomCode}/roundScores/${input.playerId}_${input.round}`), {
       playerId: input.playerId,
       ownerUid: input.playerId,
       round: input.round,
       points: input.points,
     })
-    batch.update(doc(this.db, `room/${roomCode}/players/${input.playerId}`), {
-      totalScore: runningTotal(input.playerId, roundScores),
-    })
-    await batch.commit()
   }
 
   async removePlayer(playerId: PlayerId): Promise<void> {

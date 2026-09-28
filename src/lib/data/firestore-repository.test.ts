@@ -368,6 +368,41 @@ describe('FirestoreGameRepository guest seats', () => {
   })
 })
 
+describe('FirestoreGameRepository scores', () => {
+  function repository() {
+    return new FirestoreGameRepository({ db: {} as never, auth: {} as never, roomCode: ROOM_CODE })
+  }
+
+  it('saves a score as one write with no read first, so it shows at once and never waits offline', async () => {
+    await repository().setRoundScore({ playerId: ALICE_UID, round: 2, points: 15 })
+
+    expect(getDocsMock).not.toHaveBeenCalled()
+    expect(setDocMock).toHaveBeenCalledTimes(1)
+    expect(setDocMock).toHaveBeenCalledWith(
+      { path: `room/${ROOM_CODE}/roundScores/${ALICE_UID}_2` },
+      { playerId: ALICE_UID, ownerUid: ALICE_UID, round: 2, points: 15 },
+    )
+  })
+
+  it("passes on totals summed from the round scores, never the seat's stored totalScore", () => {
+    const onChange = vi.fn()
+    repository().subscribe(onChange)
+    const [onRoom, onPlayers, onScores] = onSnapshotMock.mock.calls.map(
+      (call) => (call as unknown[])[1] as (snapshot: unknown) => void,
+    )
+
+    onRoom?.({ data: () => ({ status: 'playing', currentRound: 2 }) })
+    onPlayers?.({
+      docs: [{ id: ALICE_UID, data: () => ({ name: 'Alice', totalScore: 999, joinOrder: 0 }) }],
+    })
+    onScores?.({ docs: [roundScoreDoc(ALICE_UID, 1, 10), roundScoreDoc(ALICE_UID, 2, 15)] })
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ players: [{ id: ALICE_UID, name: 'Alice', totalScore: 25 }] }),
+    )
+  })
+})
+
 describe('FirestoreGameRepository.subscribe errors', () => {
   it("reports a listener error, such as losing this device's seat, to the caller", () => {
     const onError = vi.fn()

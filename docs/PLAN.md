@@ -88,7 +88,8 @@ and Finish wait until everyone has a score for every round so far and no round h
 
 - `{id}` is the anonymous uid, or `guest-<uuid>` for a guest; stats rows carry it as `deviceUuid`.
   A name key is `n_` plus the lowercased name. `gameId` is the room code online, a UUID locally.
-- Standings and stats come from `roundScores`, never from the writable `totalScore`.
+- Standings and stats come from `roundScores`. A seat's `totalScore` is created as 0 and no longer
+  written (older clients may still update it); nothing reads it.
 - Rooms are never deleted: online stats are keyed by room code, so a TTL needs a per-game id first.
 
 ## Security
