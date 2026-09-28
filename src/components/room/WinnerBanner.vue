@@ -15,7 +15,7 @@ const message = computed(() => winnerMessage(i18n, winners))
 
 <template>
   <p
-    class="bg-muted border-primary text-foreground flex items-center gap-2 rounded-lg border px-4 py-3 text-lg font-semibold"
+    class="bg-muted border-primary text-foreground animate-in zoom-in-95 fade-in-0 flex items-center gap-2 rounded-lg border px-4 py-3 text-lg font-semibold duration-(--dur) motion-reduce:animate-none"
   >
     <Trophy aria-hidden="true" class="text-primary size-5 shrink-0" />
     <span>{{ message }}</span>

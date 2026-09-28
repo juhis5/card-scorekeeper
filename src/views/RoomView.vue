@@ -34,6 +34,7 @@ import {
   TOTAL_ROUNDS,
 } from '@/lib/game/rules'
 import { isPermissionDenied, isUnavailable } from '@/lib/data/write-errors'
+import { celebrate } from '@/lib/platform/celebrate'
 import { TimeoutError, withTimeout } from '@/lib/platform/timeout'
 import { useGameStore } from '@/stores/game'
 import type { PlayerId } from '@/lib/data/repository'
@@ -259,9 +260,13 @@ watch(
       completed > revealBaseline.completed
     revealBaseline = { gameId: id, completed }
     if (!isNewReveal) return
-    void announce(
-      status.value === 'finished' ? winnerMessage(i18n, winners.value) : revealMessage(completed),
-    )
+    if (status.value !== 'finished') {
+      void announce(revealMessage(completed))
+      return
+    }
+    void announce(winnerMessage(i18n, winners.value))
+    // Only a finish seen live, on every phone, never when a finished room is reopened.
+    void celebrate()
   },
   { immediate: true },
 )
@@ -628,7 +633,13 @@ onMounted(async () => {
         </ul>
       </section>
 
-      <p v-if="saveError" role="alert" class="text-destructive text-sm">{{ saveError }}</p>
+      <p
+        v-if="saveError"
+        role="alert"
+        class="text-destructive animate-in fade-in-0 text-sm duration-(--dur) motion-reduce:animate-none"
+      >
+        {{ saveError }}
+      </p>
 
       <div aria-live="polite" class="sr-only">{{ announcement }}</div>
 

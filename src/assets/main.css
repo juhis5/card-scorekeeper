@@ -300,6 +300,20 @@
 
 /* Scoreboard motion (ScoreBoard.vue): on a reveal, rows slide to their new places and a changed
  * total fades in. Unlayered for the same reason as the rule above. */
+@keyframes view-enter {
+  from {
+    opacity: 0;
+  }
+}
+.view-enter {
+  animation: view-enter var(--dur) var(--ease-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-enter {
+    animation: none;
+  }
+}
+
 .board-row-move {
   transition: transform 450ms var(--ease-standard);
 }

@@ -94,7 +94,10 @@ const updateAnnouncement = computed(() => (needRefresh.value ? t('app.update.ava
     <!-- Keyed by path: a room's view state belongs to that room, so the next room after Play
          again starts afresh. -->
     <RouterView v-slot="{ Component, route: current }">
-      <component :is="Component" :key="current.path" />
+      <!-- Each view fades in: an opacity-only animation on its root. Not tw-animate-css (its
+           keyframes carry a transform, which breaks the keyboard-aware scroll of sticky parts)
+           and not a Transition (the old view would linger with a second #main-heading). -->
+      <component :is="Component" :key="current.path" class="view-enter" />
     </RouterView>
   </div>
 </template>

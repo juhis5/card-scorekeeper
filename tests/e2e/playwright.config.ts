@@ -53,7 +53,17 @@ export default defineConfig({
     // Screenshots, compared only in Playwright's Linux image, where the baselines are made
     // (tests/e2e/visual.sh); anywhere else fonts render differently.
     ...(process.env.VISUAL
-      ? [{ name: 'visual', use: { ...devices['Desktop Chrome'] }, testMatch: '**/visual.spec.ts' }]
+      ? [
+          {
+            name: 'visual',
+            // Reduced motion: no view animation mid-flight, no fireworks on the finished game.
+            use: {
+              ...devices['Desktop Chrome'],
+              contextOptions: { reducedMotion: 'reduce' as const },
+            },
+            testMatch: '**/visual.spec.ts',
+          },
+        ]
       : []),
     {
       name: 'webkit',
