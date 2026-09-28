@@ -304,7 +304,7 @@
     "loading": "Ladataan tilastojasi…",
     "caveats": {
       "heading": "Tietoa tilastoista",
-      "body": "Tilastot seuraavat tätä laitetta: uusi laite tai tyhjennetty selaimen tallennustila aloittaa alusta; jaettu laite sekoittaa pelaajien tilastot keskenään; eivätkä tilastot synkronoidu laitteidesi välillä."
+      "body": "Tilastot seuraavat tätä laitetta: uusi laite tai tyhjennetty selaimen tallennustila aloittaa alusta; jaettu laite sekoittaa pelaajien tilastot keskenään; eivätkä tilastot synkronoidu laitteidesi välillä. iPhonessa ja Macissa Safari tyhjentää sivuston tiedot, jos sillä ei ole käyty 7 päivään, ellei sovellusta ole asennettu kotivalikkoon. Asenna se, niin tilastosi säilyvät."
     },
     "empty": {
       "message": "Ei vielä päättyneitä pelejä — pelaa peli!"
@@ -488,7 +488,7 @@
     "sections": {
       "device": {
         "title": "Tällä laitteella",
-        "body": "Nimesi, kesken oleva peli, lähetystä odottavat tulokset sekä teema ja kieli tallennetaan tämän laitteen selaimeen. Selaimen tietojen tyhjentäminen poistaa ne."
+        "body": "Nimesi, kesken oleva peli, lähetystä odottavat tulokset sekä teema ja kieli tallennetaan tämän laitteen selaimeen. Selaimen tietojen tyhjentäminen poistaa ne. Safari poistaa ne 7 päivän käyttämättömyyden jälkeen, ellei sovellusta ole asennettu."
       },
       "online": {
         "title": "Verkkopelit",

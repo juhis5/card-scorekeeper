@@ -26,6 +26,57 @@ function gamePlayer(
 }
 
 describe('playerStats', () => {
+  it("counts only this device's rows, even where an opponent holds every extreme", () => {
+    // Two games; Alice beats the host in both, with the lowest final and round, and the highest
+    // round too. None of her numbers may leak into the host's stats.
+    const rows = [
+      gamePlayer({
+        gameId: 'g1',
+        deviceUuid: HOST,
+        finalScore: 60,
+        placement: 2,
+        bestRound: 5,
+        worstRound: 30,
+      }),
+      gamePlayer({
+        gameId: 'g1',
+        deviceUuid: ALICE,
+        finalScore: 10,
+        placement: 1,
+        bestRound: 0,
+        worstRound: 90,
+      }),
+      gamePlayer({
+        gameId: 'g2',
+        deviceUuid: HOST,
+        finalScore: 40,
+        placement: 2,
+        bestRound: 10,
+        worstRound: 20,
+      }),
+      gamePlayer({
+        gameId: 'g2',
+        deviceUuid: ALICE,
+        finalScore: 5,
+        placement: 1,
+        bestRound: 0,
+        worstRound: 95,
+      }),
+    ]
+
+    expect(playerStats(HOST, rows)).toEqual({
+      deviceUuid: HOST,
+      gamesPlayed: 2,
+      wins: 0,
+      winRate: 0,
+      bestFinalScore: 40,
+      worstFinalScore: 60,
+      bestRound: 5,
+      worstRound: 30,
+      averageFinalScore: 50,
+    })
+  })
+
   it('reports zeroed counts and null scores for a player with no games', () => {
     expect(playerStats(HOST, [])).toEqual({
       deviceUuid: HOST,

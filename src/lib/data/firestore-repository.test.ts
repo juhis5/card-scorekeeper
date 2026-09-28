@@ -669,6 +669,39 @@ describe('FirestoreGameRepository write timeouts', () => {
     expect(await outcome).toMatchObject({ code: 'deadline-exceeded' })
   })
 
+  it('gives up removing a player when the write never reaches the server', async () => {
+    const outcome = repository(ROOM_CODE)
+      .removePlayer(ALICE_UID)
+      .catch((error: unknown) => error)
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
+    expect(await outcome).toMatchObject({ code: 'deadline-exceeded' })
+  })
+
+  it('gives up finishing when the stats write never reaches the server', async () => {
+    getDocsMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path === `room/${ROOM_CODE}/players`
+          ? { docs: [playerDoc(HOST_UID, 'Host', 'd'), playerDoc(ALICE_UID, 'Alice', 'd')] }
+          : {
+              docs: [1, 2, 3, 4, 5].flatMap((round) => [
+                roundScoreDoc(HOST_UID, round, 20),
+                roundScoreDoc(ALICE_UID, round, 0),
+              ]),
+            },
+      ),
+    )
+    getDocMock.mockResolvedValue(snapshot({ status: 'playing', currentRound: 5 }))
+    writeGameResultMock.mockReturnValue(new Promise(() => undefined))
+    const outcome = repository(ROOM_CODE)
+      .finishGame()
+      .catch((error: unknown) => error)
+
+    await vi.advanceTimersByTimeAsync(TIMEOUT_MS)
+    expect(await outcome).toMatchObject({ code: 'deadline-exceeded' })
+    expect(updateDocMock).not.toHaveBeenCalled()
+  })
+
   it('gives up taking a seat when the write never reaches the server', async () => {
     const outcome = repository(ROOM_CODE)
       .addPlayer({ name: 'Alice', deviceUuid: 'd' })

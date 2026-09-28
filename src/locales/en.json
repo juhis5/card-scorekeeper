@@ -304,7 +304,7 @@
     "loading": "Loading your stats…",
     "caveats": {
       "heading": "About these stats",
-      "body": "Stats follow this device: a new device or cleared browser storage starts fresh; a shared device blends players; and stats don't sync across your devices."
+      "body": "Stats follow this device: a new device or cleared browser storage starts fresh; a shared device blends players; and stats don't sync across your devices. On an iPhone or a Mac, Safari clears a site's data after 7 days without a visit unless the app is installed on the home screen, so install it to keep your stats."
     },
     "empty": {
       "message": "No finished games yet — play a game!"
@@ -488,7 +488,7 @@
     "sections": {
       "device": {
         "title": "On this device",
-        "body": "Your name, a game in progress, results waiting to upload, and your theme and language are kept in this device's browser. Clearing the browser's data removes them."
+        "body": "Your name, a game in progress, results waiting to upload, and your theme and language are kept in this device's browser. Clearing the browser's data removes them. Safari removes them after 7 days without a visit unless the app is installed."
       },
       "online": {
         "title": "Online games",
