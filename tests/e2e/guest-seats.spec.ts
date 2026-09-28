@@ -79,7 +79,6 @@ test.describe('players without a phone', () => {
       await expect(scoreboardRow(joinerPage, 'Ripa')).toContainText('150')
 
       await openFromMenu(hostPage, 'Stats')
-      // Scoped to Head-to-head: the highscores below list players from every game.
       await expect(
         hostPage.getByRole('region', { name: 'Head-to-head' }).getByRole('row', { name: /Mummo/ }),
       ).toBeVisible()

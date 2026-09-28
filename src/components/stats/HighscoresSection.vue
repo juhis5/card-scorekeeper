@@ -1,8 +1,6 @@
 <script setup lang="ts">
-/**
- * Single job: the Stats screen's global highscores, player lists or game records at a time.
- * It has its own loading and error states, so a failure never hides this device's stats above it.
- */
+/** Single job: the global highscores, the player lists or the game records at a time, with its
+ * own loading and error states. The page heading is HighscoresView's. */
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
@@ -56,13 +54,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <section aria-labelledby="highscores-heading" class="flex flex-col gap-4">
-    <div>
-      <h2 id="highscores-heading" class="text-lg font-semibold">
-        {{ t('stats.highscores.heading') }}
-      </h2>
-      <p class="text-muted-foreground text-sm">{{ t('stats.highscores.lede') }}</p>
-    </div>
+  <div class="flex flex-col gap-4">
     <p v-if="status === 'loading'" role="status" class="text-muted-foreground text-sm">
       {{ t('stats.highscores.loading') }}
     </p>
@@ -91,5 +83,5 @@ onMounted(() => {
         :entries="lists[list.name]"
       />
     </template>
-  </section>
+  </div>
 </template>

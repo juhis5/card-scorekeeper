@@ -19,6 +19,7 @@ function makeRouter() {
     routes: [
       { path: '/', name: 'home', component: { render: () => null } },
       { path: '/stats', name: 'stats', component: { render: () => null } },
+      { path: '/highscores', name: 'highscores', component: { render: () => null } },
       { path: '/rules', name: 'rules', component: { render: () => null } },
       { path: '/room/:code', name: 'room', component: { render: () => null } },
     ],
@@ -53,6 +54,7 @@ describe('AppMenu', () => {
     expect(panel).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Stats' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Highscores' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Rules' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Language/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Theme/ })).toBeTruthy()

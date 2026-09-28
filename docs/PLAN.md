@@ -38,8 +38,8 @@ photo count reads a picture of the cards left in a hand and suggests the points.
   says so first when the room has finished, expired or doesn't exist.
 - **Stats** (`/stats`), **Rules** (`/rules`) and a 404 page.
 - **Header**, sticky: Back (not on Home), the room code with copy and Kutsu (a sheet with a QR
-  code and a share link) in an online room, and the menu: Tilastot, Säännöt, Kieli, Teema (six
-  themes), Asenna sovellus, and Päivitä sovellus when a new version is waiting.
+  code and a share link) in an online room, and the menu: Tilastot, Ennätykset, Säännöt, Kieli,
+  Teema (eight themes), Asenna sovellus, and Päivitä sovellus when a new version is waiting.
 
 One score card is open at a time and saves only on ✓ or Enter; a tap outside drops the typed
 number. The scoreboard has five round columns and a total. During a round it shows only who has
@@ -107,14 +107,16 @@ in their own game.
 
 - Keyed by the anonymous uid. Clearing browser storage or changing device starts a new identity,
   and a shared phone shares one.
-- Stats shows games played, wins and win rate, best and worst final score, best and worst round,
+- Tilastot (this device) shows games played, wins and win rate, best and worst final score, best and worst round,
   average final score, and head-to-head records per opponent. Every query filters
-  `participantUids array-contains uid`.
+  `participantUids array-contains uid`. The identity caveats sit behind an ⓘ by its heading.
 - A local game uploads only the host's row, since the other players on that phone have no
   identity. A guest keeps its id only through Play again, so its stats don't carry over to other
   games.
-- Highscores: three public top-10 lists (best game, worst game, biggest round) from `leaderboard`.
-  An entry that can't be written is left out and never blocks the game.
+- Ennätykset, its own page: public top-10 lists. Pelit: best game, worst game, biggest round
+  from `leaderboard`. Pelaajat: most wins, best win rate, best average, most games from
+  `player_totals` (rate and average need 5 games). An entry that can't be written is left out and
+  never blocks the game.
 
 ## Photo count
 
