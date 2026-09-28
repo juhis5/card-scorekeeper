@@ -102,9 +102,10 @@ function isStoredGame(value: unknown): value is StoredGame {
 }
 
 function readStoredGame(storage: KeyValueStorage): StoredGame | null {
-  const raw = storage.getItem(STORAGE_KEY)
-  if (!raw) return null
   try {
+    // Blocked storage throws on read, too: that means no saved game, not a crash.
+    const raw = storage.getItem(STORAGE_KEY)
+    if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
     return isStoredGame(parsed) ? parsed : null
   } catch {
@@ -248,17 +249,19 @@ export class LocalGameRepository implements GameRepository {
         `finishGame called at round ${this.game.state.currentRound}, before the final round ${TOTAL_ROUNDS}`,
       )
     }
-    this.game = { ...this.game, state: { ...this.game.state, status: 'finished' } }
-    this.persistAndNotify()
-
+    // The host's row first: if it can't be built, the game stays unfinished rather than finishing
+    // with no result to sync.
+    const hostRow = this.buildHostGamePlayer()
     const result: GameResult = {
       gameId: this.game.gameId,
       finishedAt: this.now(),
       totalRounds: TOTAL_ROUNDS,
     }
+    this.game = { ...this.game, state: { ...this.game.state, status: 'finished' } }
+    this.persistAndNotify()
 
     // Best-effort, like persistAndNotify: a queueing failure must not fail the finished game.
-    appendPendingResult(this.storage, { result, players: [this.buildHostGamePlayer()] })
+    appendPendingResult(this.storage, { result, players: [hostRow] })
 
     return result
   }
