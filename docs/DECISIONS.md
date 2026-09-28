@@ -403,3 +403,17 @@ into the later one, so every entry here is current. `PLAN.md` describes the app 
   - V–H–T in head-to-head gets an ⓘ: voitot, häviöt, tasapelit against that player.
   - Vitest already runs the unit files in parallel (about 5 s). CI's e2e job now caches the
     Playwright browsers per version instead of downloading them on every run.
+- 2026-09-28 — Ending a game early (fifth round; the owner chose "abandon, no stats"):
+  - A new room status, `abandoned`: only the host sets it, from waiting or playing. Like a
+    finished room it then takes no rounds, scores or guest seats, never reopens, and no stats
+    can be written for it (the host's `game_result` create checks the status). Nothing about it
+    reaches Tilastot or the highscores.
+  - In a room, the menu gets "Tämä peli": the host's "Lopeta peli" ends it for everyone (on a
+    local game it deletes it), a player's "Poistu pelistä" only leaves it here and their seat
+    stays for the host to remove. Both confirm first; ending shows an error and stays put if it
+    doesn't go through. Every other phone in the room sees "Peli lopetettiin" and forgets it.
+  - Home's "Peli kesken" rows get ✕ (the owner's call: it depends on who you are). Home can't
+    tell who hosts a room without asking the room, so ✕ asks it: the host ends the game, a player
+    just forgets it; without a connection it's only forgotten here, which the confirm says.
+  - The store's `leave()` now clears `gameId` and `roomCode` too, so an ended game doesn't linger
+    as "in progress".

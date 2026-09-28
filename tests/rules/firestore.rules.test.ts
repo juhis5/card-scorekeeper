@@ -1548,6 +1548,96 @@ describe('leaderboard: the public highscores', () => {
   })
 })
 
+describe('ending a game early: the host abandons it', () => {
+  async function seedRoom(fields: Record<string, unknown> = {}) {
+    await seed(async (db) => {
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}`),
+        roomFixture({ status: 'playing', currentRound: 2, ...fields }),
+      )
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${HOST_UID}`),
+        playerFixture(HOST_UID, { name: 'Host' }),
+      )
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${ALICE_UID}`),
+        playerFixture(ALICE_UID, { name: 'Alice' }),
+      )
+    })
+  }
+
+  function abandonAs(uid: string, fields: Record<string, unknown> = { status: 'abandoned' }) {
+    const db = testEnv.authenticatedContext(uid).firestore()
+    return updateDoc(doc(db, `room/${ROOM_CODE}`), fields)
+  }
+
+  it('lets the host abandon a game that is waiting or under way', async () => {
+    await seedRoom()
+    await assertSucceeds(abandonAs(HOST_UID))
+
+    await testEnv.clearFirestore()
+    await seedRoom({ status: 'waiting', currentRound: 1 })
+    await assertSucceeds(abandonAs(HOST_UID))
+  })
+
+  it('denies anyone but the host, a finished game, other fields with it, or an expired room', async () => {
+    await seedRoom()
+    await assertFails(abandonAs(ALICE_UID))
+    await assertFails(abandonAs(HOST_UID, { status: 'abandoned', currentRound: 3 }))
+
+    await testEnv.clearFirestore()
+    await seedRoom({ status: 'finished', currentRound: 5 })
+    await assertFails(abandonAs(HOST_UID))
+
+    await testEnv.clearFirestore()
+    await seedRoom({ expiresAt: pastExpiry() })
+    await assertFails(abandonAs(HOST_UID))
+  })
+
+  it('keeps an abandoned room closed: no reopening, no rounds, no scores, no guests', async () => {
+    await seedRoom({ status: 'abandoned' })
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(updateDoc(doc(host, `room/${ROOM_CODE}`), { status: 'playing' }))
+    await assertFails(
+      updateDoc(doc(host, `room/${ROOM_CODE}`), { status: 'playing', currentRound: 3 }),
+    )
+    await assertFails(
+      setDoc(
+        doc(host, `room/${ROOM_CODE}/roundScores/${HOST_UID}_2`),
+        roundScoreFixture(HOST_UID, { round: 2 }),
+      ),
+    )
+    const guestId = 'guest-3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'
+    const batch = writeBatch(host as unknown as Firestore)
+    batch.set(doc(host, `room/${ROOM_CODE}/players/${guestId}`), {
+      name: 'Mummo',
+      ownerUid: HOST_UID,
+      deviceUuid: guestId,
+      totalScore: 0,
+      joinOrder: 1,
+      isGuest: true,
+    })
+    batch.set(doc(host, `room/${ROOM_CODE}/names/${rulesNameKey('Mummo')}`), {
+      ownerUid: HOST_UID,
+      playerId: guestId,
+    })
+    await assertFails(batch.commit())
+  })
+
+  it('records nothing for an abandoned game, even from its host', async () => {
+    await seedRoom({ status: 'abandoned' })
+    const host = testEnv.authenticatedContext(HOST_UID).firestore()
+
+    await assertFails(
+      setDoc(
+        doc(host, `game_result/${ROOM_CODE}`),
+        gameResultFixture({ gameId: ROOM_CODE, participantUids: [HOST_UID, ALICE_UID] }),
+      ),
+    )
+  })
+})
+
 describe('roundScores tied to the room', () => {
   beforeEach(async () => {
     await seed(async (db) => {

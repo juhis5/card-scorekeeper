@@ -52,6 +52,8 @@ export interface GameRepository {
   removePlayer(playerId: PlayerId): Promise<void>
   advanceRound(): Promise<void>
   finishGame(): Promise<GameResult>
+  /** Host only: ends the game early for everyone. Nothing about it is recorded. */
+  abandonGame(): Promise<void>
   /** Stops every live subscription. */
   leave(): void
 }

@@ -35,6 +35,7 @@ function makeFakeOnlineRepository(): GameRepository {
     setRoundScore: vi.fn(),
     advanceRound: vi.fn(),
     finishGame: vi.fn(),
+    abandonGame: vi.fn(),
     leave: vi.fn(),
   }
 }

@@ -3,10 +3,11 @@
  * Single job: the app menu, a side panel with what the header has no room for: the app's name,
  * pages, settings and install. Reka's dialog traps focus and returns it to the menu button.
  */
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { ChevronRight, Menu, RefreshCw, X } from '@lucide/vue'
+import GameExitRow from '@/components/menu/GameExitRow.vue'
 import InstallAppRow from '@/components/menu/InstallAppRow.vue'
 import LocaleToggle from '@/components/menu/LocaleToggle.vue'
 import { MENU_ROW_CLASS } from '@/components/menu/menu-row'
@@ -22,11 +23,21 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { useAppUpdateStore } from '@/stores/app-update'
+import { useGameStore } from '@/stores/game'
 import { useInstallStore } from '@/stores/install'
 
 const { t } = useI18n()
 const install = useInstallStore()
 const appUpdate = useAppUpdateStore()
+const route = useRoute()
+const game = useGameStore()
+/** In a room whose game is still going: the menu offers the way out of it. */
+const isInRunningGame = computed(
+  () =>
+    route.name === 'room' &&
+    game.gameId !== null &&
+    (game.status === 'waiting' || game.status === 'playing'),
+)
 const isOpen = ref(false)
 
 const pages = [
@@ -70,6 +81,10 @@ function close(): void {
           </li>
         </ul>
       </nav>
+
+      <ul v-if="isInRunningGame" role="list" :aria-label="t('app.menu.thisGame')">
+        <li class="border-border border-b"><GameExitRow @done="close" /></li>
+      </ul>
 
       <ul role="list" :aria-label="t('app.menu.settings')">
         <li v-if="appUpdate.needRefresh" class="border-border border-b">

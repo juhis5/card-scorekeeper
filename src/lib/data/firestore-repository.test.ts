@@ -175,6 +175,11 @@ describe('FirestoreGameRepository.roomAvailability', () => {
     await expect(repository().roomAvailability()).resolves.toBe('open')
   })
 
+  it('says an abandoned room has ended, like a finished one', async () => {
+    getDocMock.mockResolvedValue(roomSnapshot('abandoned', NOW + 1))
+    await expect(repository().roomAvailability()).resolves.toBe('finished')
+  })
+
   it('says finished, expired or missing, so the join page can say so before a join fails', async () => {
     getDocMock.mockResolvedValueOnce(roomSnapshot('finished', NOW + 1))
     await expect(repository().roomAvailability()).resolves.toBe('finished')
@@ -414,6 +419,15 @@ describe('FirestoreGameRepository play again', () => {
 
     expect(onChange).toHaveBeenLastCalledWith(
       expect.not.objectContaining({ nextRoomCode: 'not a code' }),
+    )
+  })
+
+  it('abandons the room for everyone in it', async () => {
+    await repository().abandonGame()
+
+    expect(updateDocMock).toHaveBeenCalledWith(
+      { path: `room/${ROOM_CODE}` },
+      { status: 'abandoned' },
     )
   })
 

@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import GameSetup from '@/components/home/GameSetup.vue'
+import LeaveGameButton from '@/components/home/LeaveGameButton.vue'
 import JoinGame from '@/components/home/JoinGame.vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -24,14 +25,22 @@ const playerName = ref(identity.displayName)
 
 // Leaving a room never ends its game, so Home offers the way back: from the store, or from
 // storage after a reload.
-const rememberedRoom = lastRoom()
-const hasSavedLocalGame = hasUnfinishedPersistedGame()
-const isStoreGameRunning = computed(() => game.gameId !== null && game.status !== 'finished')
+const rememberedRoom = ref(lastRoom())
+const hasSavedLocalGame = ref(hasUnfinishedPersistedGame())
+const isStoreGameRunning = computed(
+  () => game.gameId !== null && (game.status === 'waiting' || game.status === 'playing'),
+)
+
+/** After ✕: read again what's left to continue. */
+function refreshGamesInProgress(): void {
+  rememberedRoom.value = lastRoom()
+  hasSavedLocalGame.value = hasUnfinishedPersistedGame()
+}
 const onlineRoomToContinue = computed(() =>
-  isStoreGameRunning.value && game.roomCode ? game.roomCode : rememberedRoom,
+  isStoreGameRunning.value && game.roomCode ? game.roomCode : rememberedRoom.value,
 )
 const canContinueLocalGame = computed(
-  () => (isStoreGameRunning.value && !game.isOnline) || hasSavedLocalGame,
+  () => (isStoreGameRunning.value && !game.isOnline) || hasSavedLocalGame.value,
 )
 </script>
 
@@ -49,16 +58,22 @@ const canContinueLocalGame = computed(
       <h2 id="continue-heading" class="text-lg font-semibold">
         {{ t('home.continue.heading') }}
       </h2>
-      <Button v-if="onlineRoomToContinue" as-child class="h-11">
-        <RouterLink :to="{ name: 'room', params: { code: onlineRoomToContinue } }">
-          {{ t('home.continue.room', { code: onlineRoomToContinue }) }}
-        </RouterLink>
-      </Button>
-      <Button v-if="canContinueLocalGame" as-child variant="secondary" class="h-11">
-        <RouterLink :to="{ name: 'room', params: { code: LOCAL_GAME_ROUTE_CODE } }">
-          {{ t('home.continue.local') }}
-        </RouterLink>
-      </Button>
+      <div v-if="onlineRoomToContinue" class="flex gap-2">
+        <Button as-child class="h-11 flex-1">
+          <RouterLink :to="{ name: 'room', params: { code: onlineRoomToContinue } }">
+            {{ t('home.continue.room', { code: onlineRoomToContinue }) }}
+          </RouterLink>
+        </Button>
+        <LeaveGameButton :room-code="onlineRoomToContinue" @left="refreshGamesInProgress" />
+      </div>
+      <div v-if="canContinueLocalGame" class="flex gap-2">
+        <Button as-child variant="secondary" class="h-11 flex-1">
+          <RouterLink :to="{ name: 'room', params: { code: LOCAL_GAME_ROUTE_CODE } }">
+            {{ t('home.continue.local') }}
+          </RouterLink>
+        </Button>
+        <LeaveGameButton @left="refreshGamesInProgress" />
+      </div>
     </section>
     <!-- One card: join or start a game, sharing one name field. -->
     <Card class="gap-4 px-4">

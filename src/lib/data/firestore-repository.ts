@@ -350,7 +350,7 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     const data = room.data() as RoomDocData | undefined
     if (!data) return 'missing'
     if (data.expiresAt.toMillis() <= this.now()) return 'expired'
-    return data.status === 'finished' ? 'finished' : 'open'
+    return data.status === 'finished' || data.status === 'abandoned' ? 'finished' : 'open'
   }
 
   /** A refused read means not seated: rules without the own-seat `get` only let members read. */
@@ -547,6 +547,13 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     await updateDoc(doc(this.db, `room/${roomCode}`), { status: 'finished' })
 
     return result
+  }
+
+  /** Bounded, so a host with no connection hears it didn't go through. */
+  async abandonGame(): Promise<void> {
+    await ensureSignedIn(this.auth)
+    const roomRef = doc(this.db, `room/${this.requireRoomCode()}`)
+    await withTimeout(updateDoc(roomRef, { status: 'abandoned' }), this.writeTimeoutMs)
   }
 
   /** Bounded, as the host waits on it. A write that times out stays queued in the SDK and still

@@ -30,7 +30,8 @@
       "pages": "Sivut",
       "home": "Etusivu",
       "language": "Kieli",
-      "settings": "Asetukset"
+      "settings": "Asetukset",
+      "thisGame": "Tämä peli"
     },
     "install": {
       "label": "Asenna sovellus",
@@ -261,6 +262,27 @@
       "skip": "Ohita {name}",
       "next": "Seuraavana: {name}",
       "skipButton": "Ohita"
+    },
+    "end": {
+      "endButton": "Lopeta peli",
+      "leaveButton": "Poistu pelistä",
+      "cancel": "Peruuta",
+      "hostTitle": "Lopetetaanko peli kaikilta?",
+      "hostBody": "Peliä ei tallenneta tilastoihin eikä ennätyksiin.",
+      "localTitle": "Poistetaanko tämän laitteen peli?",
+      "localBody": "Peliä ei tallenneta tilastoihin eikä ennätyksiin.",
+      "playerTitle": "Poistutaanko pelistä?",
+      "playerBody": "Paikkasi jää peliin, ja järjestäjä voi poistaa sen.",
+      "roomTitle": "Poistutaanko huoneesta {code}?",
+      "roomBody": "Jos olet pelin järjestäjä, peli päättyy kaikilta eikä sitä tallenneta. Muuten paikkasi jää peliin. Ilman yhteyttä peli unohdetaan vain tältä laitteelta.",
+      "confirmEnd": "Lopeta peli",
+      "confirmLeave": "Poistu",
+      "confirmDelete": "Poista",
+      "failed": "Peliä ei voitu lopettaa. Tarkista yhteys ja yritä uudelleen.",
+      "leaveRoomLabel": "Poistu huoneesta {code}",
+      "deleteLocalLabel": "Poista tämän laitteen peli",
+      "endedTitle": "Peli lopetettiin",
+      "endedBody": "Järjestäjä lopetti pelin kesken. Sitä ei tallenneta tilastoihin."
     }
   },
   "notFound": {

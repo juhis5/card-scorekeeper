@@ -58,7 +58,8 @@ export const useGameStore = defineStore('game', () => {
       (next) => {
         state.value = next
         // Nothing left to continue: Home stops offering this room.
-        if (next.status === 'finished' && roomCode.value) forgetRoom(roomCode.value)
+        const isOver = next.status === 'finished' || next.status === 'abandoned'
+        if (isOver && roomCode.value) forgetRoom(roomCode.value)
       },
       (error) => {
         connectionError.value = isPermissionDenied(error) ? 'removed' : 'lost'
@@ -232,6 +233,18 @@ export const useGameStore = defineStore('game', () => {
     await requireRepository().advanceRound()
   }
 
+  /** Host only: ends the game early for everyone, unrecorded, and leaves it on this device. */
+  async function abandonGame(): Promise<void> {
+    await requireRepository().abandonGame()
+    leaveGame()
+  }
+
+  /** Leaves the game on this device only; for a player, the game goes on without them here. */
+  function leaveGame(): void {
+    if (roomCode.value) forgetRoom(roomCode.value)
+    leave()
+  }
+
   async function finishGame(): Promise<GameResult> {
     return requireRepository().finishGame()
   }
@@ -242,6 +255,8 @@ export const useGameStore = defineStore('game', () => {
     unsubscribe = null
     repository?.leave()
     repository = null
+    gameId.value = null
+    roomCode.value = null
     isHost.value = false
     myPlayerId.value = null
     connectionError.value = null
@@ -278,6 +293,8 @@ export const useGameStore = defineStore('game', () => {
     resumeOnline,
     advanceRound,
     finishGame,
+    abandonGame,
+    leaveGame,
     leave,
   }
 })

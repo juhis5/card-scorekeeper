@@ -30,7 +30,8 @@
       "pages": "Pages",
       "home": "Home",
       "language": "Language",
-      "settings": "Settings"
+      "settings": "Settings",
+      "thisGame": "This game"
     },
     "install": {
       "label": "Install the app",
@@ -261,6 +262,27 @@
       "skip": "Skip {name}",
       "next": "Next: {name}",
       "skipButton": "Skip"
+    },
+    "end": {
+      "endButton": "End the game",
+      "leaveButton": "Leave the game",
+      "cancel": "Cancel",
+      "hostTitle": "End the game for everyone?",
+      "hostBody": "It won't be recorded in stats or highscores.",
+      "localTitle": "Delete the game on this device?",
+      "localBody": "It won't be recorded in stats or highscores.",
+      "playerTitle": "Leave the game?",
+      "playerBody": "Your seat stays in the game, and the host can remove it.",
+      "roomTitle": "Leave room {code}?",
+      "roomBody": "If you're its host, the game ends for everyone and isn't recorded. Otherwise your seat stays for the host. Without a connection, it's only forgotten on this device.",
+      "confirmEnd": "End the game",
+      "confirmLeave": "Leave",
+      "confirmDelete": "Delete",
+      "failed": "Couldn't end the game. Check your connection and try again.",
+      "leaveRoomLabel": "Leave room {code}",
+      "deleteLocalLabel": "Delete the game on this device",
+      "endedTitle": "The game was ended",
+      "endedBody": "The host ended it early. It isn't recorded in stats."
     }
   },
   "notFound": {

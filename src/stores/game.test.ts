@@ -95,6 +95,13 @@ class FakeGameRepository implements GameRepository {
     return { gameId: 'fake-game', finishedAt: 'now', totalRounds: 5 }
   }
 
+  abandonCalls = 0
+
+  async abandonGame(): Promise<void> {
+    this.abandonCalls += 1
+    this.emit({ ...this.state, status: 'abandoned' })
+  }
+
   leave(): void {
     this.leaveCalls += 1
     this.listeners.clear()
@@ -797,6 +804,47 @@ describe('useGameStore.playAgain on this device', () => {
 
     expect(next.callOrder).toEqual(['createGame', 'addGuest:Mummo', 'addGuest:Ukki', 'subscribe'])
     expect(game.status).toBe('waiting')
+  })
+})
+
+describe('useGameStore ending a game early', () => {
+  async function runningOnlineGame() {
+    const game = useGameStore()
+    const room = new FakeGameRepository()
+    room.roomCodeToReturn = 'ABCDE'
+    await game.start(room, HOST_CONFIG)
+    return { game, room }
+  }
+
+  it('lets the host abandon the game: the room ends, is forgotten here, and the store is left', async () => {
+    const { game, room } = await runningOnlineGame()
+
+    await game.abandonGame()
+
+    expect(room.abandonCalls).toBe(1)
+    expect(lastRoom()).toBeNull()
+    expect(room.leaveCalls).toBe(1)
+    expect(game.gameId).toBeNull()
+    expect(game.roomCode).toBeNull()
+  })
+
+  it('lets a player leave without ending it for the others', async () => {
+    const { game, room } = await runningOnlineGame()
+
+    game.leaveGame()
+
+    expect(room.abandonCalls).toBe(0)
+    expect(lastRoom()).toBeNull()
+    expect(room.leaveCalls).toBe(1)
+  })
+
+  it('forgets a room the host abandoned, as seen from another phone', async () => {
+    const { game, room } = await runningOnlineGame()
+
+    room.emit({ ...room.state, status: 'abandoned' })
+
+    expect(game.status).toBe('abandoned')
+    expect(lastRoom()).toBeNull()
   })
 })
 
