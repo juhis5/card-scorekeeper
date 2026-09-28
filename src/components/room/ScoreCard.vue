@@ -195,7 +195,10 @@ function handleKeyDown(event: KeyboardEvent): void {
         <span v-if="isMissedRound" class="text-muted-foreground shrink-0 text-sm">
           {{ t('room.score.missedRoundLabel', { round }) }}
         </span>
-        <span v-if="isScored" class="text-primary flex shrink-0 items-center gap-1 text-sm">
+        <span
+          v-if="isScored"
+          class="text-primary animate-in zoom-in-75 fade-in-0 flex shrink-0 items-center gap-1 text-sm duration-(--dur) motion-reduce:animate-none"
+        >
           <Check aria-hidden="true" class="size-4" />
           {{
             visiblePoints === null
@@ -216,7 +219,10 @@ function handleKeyDown(event: KeyboardEvent): void {
       </template>
     </div>
 
-    <div v-if="isExpanded" class="flex flex-col gap-2 px-4 pb-4">
+    <div
+      v-if="isExpanded"
+      class="animate-in fade-in-0 slide-in-from-top-1 flex flex-col gap-2 px-4 pb-4 duration-(--dur-fast) motion-reduce:animate-none"
+    >
       <RoundScoreInput
         :id="inputId"
         v-model="points"

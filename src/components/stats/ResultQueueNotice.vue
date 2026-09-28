@@ -40,7 +40,7 @@ async function retry(): Promise<void> {
 <template>
   <section
     v-if="waitingCount > 0"
-    class="bg-muted border-border flex gap-3 rounded-lg border px-4 py-3 text-sm"
+    class="bg-muted border-border animate-in fade-in-0 flex gap-3 rounded-lg border px-4 py-3 text-sm duration-(--dur) motion-reduce:animate-none"
   >
     <CloudUpload aria-hidden="true" class="mt-0.5 size-5 shrink-0" />
     <div>
@@ -57,7 +57,7 @@ async function retry(): Promise<void> {
 
   <section
     v-if="failedCount > 0"
-    class="bg-muted border-border flex gap-3 rounded-lg border px-4 py-3 text-sm"
+    class="bg-muted border-border animate-in fade-in-0 flex gap-3 rounded-lg border px-4 py-3 text-sm duration-(--dur) motion-reduce:animate-none"
   >
     <TriangleAlert aria-hidden="true" class="text-destructive mt-0.5 size-5 shrink-0" />
     <div class="flex flex-col gap-3">

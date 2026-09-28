@@ -608,3 +608,14 @@ it is.
   pixels on the finished-game baselines), @vueuse 15, and minor and patch bumps across the rest.
   Two holds, both in TOOLCHAIN: TypeScript stays on 6 because vue-tsc 3.3.11 fails to load 7,
   and `@types/node` stays on 24 to match the runtime.
+- 2026-09-29 — Motion (owner's request): small, and none on reduced motion.
+  - Fireworks at a live finish on every phone (canvas-confetti, loaded only then, in the theme's
+    `--primary` and `--brand`), never when a finished room is reopened. Skipped entirely when the
+    phone asks for reduced motion; the visual snapshots run with reduced motion.
+  - Views fade in with an opacity-only keyframe (`.view-enter` in main.css). Not tw-animate-css
+    there: its keyframes always carry a transform, and a transformed view root broke the
+    keyboard-aware scroll of the score cards (caught by the touch e2e). Not a `<Transition>`: the
+    leaving view lingered with a second `#main-heading` and took the focus.
+  - Inside views tw-animate-css is fine: the score card's entry area slides open, the saved ✓ and
+    the winner banner pop in, notices and save errors fade in. Dialogs, sheets and popovers
+    already animated; the scoreboard already moves its rows on a reveal.

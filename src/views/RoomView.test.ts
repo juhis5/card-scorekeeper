@@ -33,6 +33,10 @@ vi.mock('@/composables/useGameConnectivity', () => ({
   }),
 }))
 
+// The finish's fireworks draw on a canvas; here only whether they were called matters.
+const { celebrate } = vi.hoisted(() => ({ celebrate: vi.fn() }))
+vi.mock('@/lib/platform/celebrate', () => ({ celebrate }))
+
 /** An in-memory stand-in for localStorage. */
 function makeMemoryStorage(): KeyValueStorage {
   const values = new Map<string, string>()
@@ -413,6 +417,29 @@ describe('RoomView moving to the next round', () => {
     expect(message).toContain('Round 2 of 5')
   })
 
+  it('sets off no fireworks when a finished game is reopened, only when it finishes live', async () => {
+    const seed = new LocalGameRepository({ now: () => '2026-01-01T00:00:00.000Z' })
+    const created = await seed.createGame({
+      hostDeviceUuid: 'device-host',
+      hostDisplayName: 'Host',
+    })
+    const aliceId = await seed.addPlayer({ name: 'Alice', deviceUuid: 'device-a' })
+    for (const round of [1, 2, 3, 4, 5] as const) {
+      await seed.setRoundScore({ playerId: created.hostPlayerId, round, points: 20 })
+      await seed.setRoundScore({ playerId: aliceId, round, points: 0 })
+      if (round < 5) await seed.advanceRound(round)
+    }
+    await seed.finishGame()
+    seed.leave()
+    celebrate.mockClear()
+
+    await renderRoom()
+    await flushPromises()
+
+    expect(screen.getAllByText('Alice wins!').length).toBeGreaterThan(0)
+    expect(celebrate).not.toHaveBeenCalled()
+  })
+
   it('announces nothing about results when a game in progress is reopened', async () => {
     const seed = new LocalGameRepository({ now: () => '2026-01-01T00:00:00.000Z' })
     const created = await seed.createGame({
@@ -602,8 +629,9 @@ describe('RoomView finishing the game', () => {
       await advanceOrFinish(round)
     }
 
-    // The banner shows it; the room's persistent live region says it.
+    // The banner shows it; the room's persistent live region says it; fireworks mark it.
     expect(screen.getAllByText('Alice wins!')).toHaveLength(2)
+    expect(celebrate).toHaveBeenCalledTimes(1)
     expect(container.querySelector('[aria-live="polite"]')?.textContent).toBe('Alice wins!')
     expect(document.activeElement?.id).toBe('main-heading')
   })
