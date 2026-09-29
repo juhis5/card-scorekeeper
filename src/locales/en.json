@@ -49,33 +49,7 @@
       },
       "after": "Then Rommi opens from your home screen like an app."
     },
-    "close": "Close",
-    "account": {
-      "signIn": "Sign in with Google",
-      "signInHint": "Keep your stats on all your devices",
-      "signedIn": "Signed in with Google",
-      "signOut": "Sign out",
-      "locked": "Finish or leave the game first",
-      "notices": {
-        "blocked": "The sign-in window was blocked. Allow pop-ups for Rommi and try again.",
-        "offline": "No connection. Try again when you're online.",
-        "failed": "Signing in didn't work. Try again.",
-        "switched": "This Google account was already in use on another device, so this device now shows its stats.",
-        "claimed": "The name is yours now.",
-        "taken": "Someone already claimed that name."
-      },
-      "claim": {
-        "badge": "Claimed name",
-        "yours": "Your name",
-        "hint": "Claim it and nobody else can join a game as {name}.",
-        "action": "Claim the name {name}",
-        "needsName": "Set your name on the home screen to claim it.",
-        "confirmTitle": "Claim {name} for good?",
-        "confirmBody": "Only you can then join games as {name}. You can't undo a claim yourself: the app's owner can release it.",
-        "confirm": "Claim",
-        "cancel": "Cancel"
-      }
-    }
+    "close": "Close"
   },
   "nav": {
     "stats": "Stats",
@@ -122,7 +96,7 @@
     "errors": {
       "nameRequired": "Enter your name to continue.",
       "startFailed": "Couldn't start the game. Try again.",
-      "nameClaimed": "{name} is a claimed name. If it's yours, sign in with Google from the menu; otherwise pick another name."
+      "nameClaimed": "{name} is a claimed name. If it's yours, sign in with Google on the Account page; otherwise pick another name."
     },
     "continue": {
       "heading": "Game in progress",
@@ -338,7 +312,7 @@
     "loading": "Loading your stats…",
     "caveats": {
       "heading": "About these stats",
-      "body": "Stats follow this device unless you sign in with Google from the menu: a new device or cleared browser storage starts fresh, and a shared device blends players. On an iPhone or a Mac, Safari clears a site's data after 7 days without a visit unless the app is installed on the home screen, so install it or sign in to keep your stats."
+      "body": "Stats follow this device unless you sign in with Google on the Account page: a new device or cleared browser storage starts fresh, and a shared device blends players. On an iPhone or a Mac, Safari clears a site's data after 7 days without a visit unless the app is installed on the home screen, so install it or sign in to keep your stats."
     },
     "empty": {
       "message": "No finished games yet — play a game!"
@@ -536,7 +510,7 @@
       },
       "account": {
         "title": "Google account (optional)",
-        "body": "If you sign in with Google, Google's Firebase stores your Google email address and account id, so your stats follow you to your other devices. The email is shown only to you, in the menu. Signing out stops using the account on this device. A name you claim is shown to other players as claimed."
+        "body": "If you sign in with Google, Google's Firebase stores your Google email address and account id, so your stats follow you to your other devices. The email is shown only to you, on the Account page. Signing out stops using the account on this device. A name you claim is shown to other players as claimed."
       },
       "public": {
         "title": "Highscores are public",
@@ -550,6 +524,47 @@
         "title": "Error reports",
         "body": "When something goes wrong, a report goes to Sentry in the EU. It can include a recording of the moment before the error, with all text masked. Names and room codes are left out."
       }
+    }
+  },
+  "account": {
+    "heading": "Account",
+    "lede": "Optional. Sign in with Google to keep your stats on all your devices and to claim your name.",
+    "google": {
+      "heading": "Google account",
+      "signIn": "Sign in with Google",
+      "signedInAs": "Signed in as",
+      "signOut": "Sign out",
+      "locked": "Finish or leave the game first: signing in or out would cost you your seat.",
+      "loading": "Loading…",
+      "unavailable": "Signing in isn't available right now. Check your connection.",
+      "retry": "Try again",
+      "privacyLink": "What is stored"
+    },
+    "name": {
+      "heading": "Your name",
+      "label": "Name in games",
+      "hint": "Used when you start or join a game.",
+      "save": "Save",
+      "saved": "Name saved.",
+      "required": "Enter a name.",
+      "badge": "Claimed name",
+      "claimedFor": "Claimed for you",
+      "moveHint": "Changing it moves your claim to the new name, and {name} becomes free for others.",
+      "claimHint": "Claim it and nobody else can join a game as {name}.",
+      "claim": "Claim {name}",
+      "signInToClaim": "Sign in with Google to claim your name, so nobody else can join a game under it.",
+      "moveTitle": "Move your claim to {name}?",
+      "moveBody": "{old} becomes free, and anyone can then claim it.",
+      "moveConfirm": "Move claim",
+      "cancel": "Cancel"
+    },
+    "notices": {
+      "blocked": "The sign-in window was blocked. Allow pop-ups for Rommi and try again.",
+      "offline": "No connection. Try again when you're online.",
+      "failed": "That didn't work. Try again.",
+      "switched": "This Google account was already in use on another device, so this device now shows its stats.",
+      "claimed": "The name is yours now.",
+      "taken": "Someone already claimed that name."
     }
   }
 }

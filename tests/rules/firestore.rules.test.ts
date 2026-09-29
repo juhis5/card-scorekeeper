@@ -2238,11 +2238,74 @@ describe('claimedNames: one name per Google account, first come', () => {
 
     await assertFails(updateDoc(doc(alice, `claimedNames/${key}`), { name: 'Alice' }))
     await assertFails(deleteDoc(doc(alice, `claimedNames/${key}`)))
+    // A move needs its new claim in the same batch (see the next describe).
     await assertFails(updateDoc(doc(alice, `claimOwners/${ALICE_UID}`), { nameKey: 'n_bob' }))
     await assertFails(deleteDoc(doc(alice, `claimOwners/${ALICE_UID}`)))
     await assertFails(getDocs(query(collection(alice, 'claimedNames'), limit(1))))
     await assertSucceeds(getDoc(doc(alice, `claimOwners/${ALICE_UID}`)))
     await assertFails(getDoc(doc(googleDb('bob-uid'), `claimOwners/${ALICE_UID}`)))
+  })
+})
+
+/** Moves a claim the way the app does: owner doc, new claim and old claim's delete in one batch. */
+function moveClaim(
+  db: TestFirestore,
+  uid: string,
+  from: string,
+  to: string,
+  { deleteOld = true, ownerUid = uid }: { deleteOld?: boolean; ownerUid?: string } = {},
+) {
+  const batch = writeBatch(db as unknown as Firestore)
+  batch.set(doc(db, `claimOwners/${uid}`), { nameKey: rulesNameKey(to) })
+  batch.set(doc(db, `claimedNames/${rulesNameKey(to)}`), { name: to, ownerUid })
+  if (deleteOld) batch.delete(doc(db, `claimedNames/${rulesNameKey(from)}`))
+  return batch.commit()
+}
+
+describe('claimedNames: an owner moves their claim to a new name', () => {
+  beforeEach(async () => {
+    await claimName(googleDb(ALICE_UID), ALICE_UID, 'Alice')
+  })
+
+  it('moves it in one batch, which frees the old name for anyone', async () => {
+    await assertSucceeds(moveClaim(googleDb(ALICE_UID), ALICE_UID, 'Alice', 'Alicia'))
+
+    await assertSucceeds(claimName(googleDb('bob-uid'), 'bob-uid', 'Alice'))
+    await assertFails(claimName(googleDb('bob-uid'), 'bob-uid', 'Alicia'))
+  })
+
+  it('denies keeping the old claim, so an account never holds two names', async () => {
+    await assertFails(
+      moveClaim(googleDb(ALICE_UID), ALICE_UID, 'Alice', 'Alicia', { deleteOld: false }),
+    )
+  })
+
+  it("denies moving onto someone else's claim, or giving the new claim away", async () => {
+    await claimName(googleDb('bob-uid'), 'bob-uid', 'Bob')
+
+    await assertFails(moveClaim(googleDb(ALICE_UID), ALICE_UID, 'Alice', 'Bob'))
+    await assertFails(
+      moveClaim(googleDb(ALICE_UID), ALICE_UID, 'Alice', 'Alicia', { ownerUid: 'bob-uid' }),
+    )
+  })
+
+  it("denies deleting a claim on its own, or another owner's", async () => {
+    await claimName(googleDb('bob-uid'), 'bob-uid', 'Bob')
+
+    await assertFails(deleteDoc(doc(googleDb(ALICE_UID), `claimedNames/${rulesNameKey('Alice')}`)))
+    await assertFails(deleteDoc(doc(googleDb(ALICE_UID), `claimedNames/${rulesNameKey('Bob')}`)))
+  })
+
+  it('denies an anonymous player, even the claim owner', async () => {
+    await assertFails(moveClaim(anonymousDb(ALICE_UID), ALICE_UID, 'Alice', 'Alicia'))
+  })
+
+  it('moves a claim the console already released, with nothing to delete', async () => {
+    await seed(async (db) => deleteDoc(doc(db(), `claimedNames/${rulesNameKey('Alice')}`)))
+
+    await assertSucceeds(
+      moveClaim(googleDb(ALICE_UID), ALICE_UID, 'Alice', 'Alicia', { deleteOld: false }),
+    )
   })
 })
 

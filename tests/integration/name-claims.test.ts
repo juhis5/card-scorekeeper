@@ -71,20 +71,23 @@ describe('claimed names, end-to-end against the emulators', () => {
     expect(await readNameClaim(other.db, name)).toEqual({ name, ownerUid: juho.uid })
   })
 
+  it('moves a claim to a new name, which frees the old one for the next player', async () => {
+    const [oldName, newName] = [freshName(), freshName()]
+    const juho = await googlePlayer()
+    await claimName(juho.db, juho.uid, oldName)
+
+    expect(await claimName(juho.db, juho.uid, newName)).toBe('claimed')
+    expect(await readOwnClaim(juho.db, juho.uid)).toBe(newName)
+
+    const other = await googlePlayer()
+    expect(await claimName(other.db, other.uid, oldName)).toBe('claimed')
+  })
+
   it('refuses an anonymous player', async () => {
     const { auth, db } = makeDevice()
     const { user } = await signInAnonymously(auth)
 
     await expect(claimName(db, user.uid, freshName())).rejects.toMatchObject({
-      code: 'permission-denied',
-    })
-  })
-
-  it('refuses a second name for the same account', async () => {
-    const juho = await googlePlayer()
-    await claimName(juho.db, juho.uid, freshName())
-
-    await expect(claimName(juho.db, juho.uid, freshName())).rejects.toMatchObject({
       code: 'permission-denied',
     })
   })

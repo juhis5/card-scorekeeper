@@ -4,6 +4,7 @@ import type { Firestore } from 'firebase/firestore'
 const docs = new Map<string, Record<string, unknown>>()
 const commit = vi.fn()
 const batchSets: [string, Record<string, unknown>][] = []
+const batchDeletes: string[] = []
 
 vi.mock('firebase/firestore', () => ({
   doc: (_db: unknown, collection: string, id: string) => `${collection}/${id}`,
@@ -11,6 +12,7 @@ vi.mock('firebase/firestore', () => ({
     Promise.resolve({ exists: () => docs.has(path), data: () => docs.get(path) }),
   writeBatch: () => ({
     set: (path: string, data: Record<string, unknown>) => batchSets.push([path, data]),
+    delete: (path: string) => batchDeletes.push(path),
     commit: () => commit(),
   }),
 }))
@@ -22,6 +24,7 @@ const db = {} as Firestore
 beforeEach(() => {
   docs.clear()
   batchSets.length = 0
+  batchDeletes.length = 0
   vi.clearAllMocks()
   commit.mockResolvedValue(undefined)
 })
@@ -87,5 +90,26 @@ describe('claimName', () => {
     const offline = Object.assign(new Error('offline'), { code: 'unavailable' })
     commit.mockRejectedValue(offline)
     await expect(claimName(db, 'uid-juho', 'Juho')).rejects.toBe(offline)
+  })
+
+  it("moves the account's claim to the new name, freeing the old one in the same batch", async () => {
+    docs.set('claimOwners/uid-juho', { nameKey: 'n_juho' })
+    docs.set('claimedNames/n_juho', { name: 'Juho', ownerUid: 'uid-juho' })
+
+    expect(await claimName(db, 'uid-juho', 'Jussi')).toBe('claimed')
+
+    expect(batchSets).toEqual([
+      ['claimOwners/uid-juho', { nameKey: 'n_jussi' }],
+      ['claimedNames/n_jussi', { name: 'Jussi', ownerUid: 'uid-juho' }],
+    ])
+    expect(batchDeletes).toEqual(['claimedNames/n_juho'])
+  })
+
+  it('deletes nothing when the console already released the old claim', async () => {
+    docs.set('claimOwners/uid-juho', { nameKey: 'n_juho' })
+
+    expect(await claimName(db, 'uid-juho', 'Jussi')).toBe('claimed')
+
+    expect(batchDeletes).toEqual([])
   })
 })

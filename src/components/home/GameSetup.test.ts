@@ -203,7 +203,7 @@ describe("GameSetup under someone else's claimed name", () => {
     await startAs('Juho')
 
     const message =
-      "Juho is a claimed name. If it's yours, sign in with Google from the menu; otherwise pick another name."
+      "Juho is a claimed name. If it's yours, sign in with Google on the Account page; otherwise pick another name."
     expect(screen.getByText(message)).toBeTruthy()
     expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('true')
     expect(localRepository).not.toHaveBeenCalled()

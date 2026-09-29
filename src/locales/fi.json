@@ -49,33 +49,7 @@
       },
       "after": "Sen jälkeen Rommi aukeaa aloitusnäytöltä kuin sovellus."
     },
-    "close": "Sulje",
-    "account": {
-      "signIn": "Kirjaudu Google-tilillä",
-      "signInHint": "Tilastosi mukana kaikilla laitteillasi",
-      "signedIn": "Kirjautunut Google-tilillä",
-      "signOut": "Kirjaudu ulos",
-      "locked": "Lopeta peli tai poistu siitä ensin",
-      "notices": {
-        "blocked": "Kirjautumisikkuna estettiin. Salli ponnahdusikkunat Rommille ja yritä uudelleen.",
-        "offline": "Ei yhteyttä. Yritä uudelleen, kun olet verkossa.",
-        "failed": "Kirjautuminen ei onnistunut. Yritä uudelleen.",
-        "switched": "Tämä Google-tili oli jo käytössä toisella laitteella, joten tässä näkyvät nyt sen tilastot.",
-        "claimed": "Nimi on nyt sinun.",
-        "taken": "Joku on jo varannut tämän nimen."
-      },
-      "claim": {
-        "badge": "Varattu nimi",
-        "yours": "Nimesi",
-        "hint": "Varaa nimi, niin kukaan muu ei voi liittyä peliin nimellä {name}.",
-        "action": "Varaa nimi {name}",
-        "needsName": "Anna nimesi etusivulla, niin voit varata sen.",
-        "confirmTitle": "Varataanko {name} pysyvästi?",
-        "confirmBody": "Sen jälkeen vain sinä voit liittyä peleihin nimellä {name}. Varausta ei voi itse perua: sovelluksen ylläpitäjä voi vapauttaa sen.",
-        "confirm": "Varaa",
-        "cancel": "Peruuta"
-      }
-    }
+    "close": "Sulje"
   },
   "nav": {
     "stats": "Tilastot",
@@ -122,7 +96,7 @@
     "errors": {
       "nameRequired": "Anna nimesi jatkaaksesi.",
       "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen.",
-      "nameClaimed": "{name} on varattu nimi. Jos se on sinun, kirjaudu valikosta Google-tilillä; muuten valitse toinen nimi."
+      "nameClaimed": "{name} on varattu nimi. Jos se on sinun, kirjaudu Google-tilillä Tili-sivulla; muuten valitse toinen nimi."
     },
     "continue": {
       "heading": "Peli kesken",
@@ -338,7 +312,7 @@
     "loading": "Ladataan tilastojasi…",
     "caveats": {
       "heading": "Tietoa tilastoista",
-      "body": "Tilastot seuraavat tätä laitetta, ellet kirjaudu valikosta Google-tilillä: uusi laite tai tyhjennetty selaimen tallennustila aloittaa alusta, ja jaettu laite sekoittaa pelaajien tilastot keskenään. iPhonessa ja Macissa Safari tyhjentää sivuston tiedot, jos sillä ei ole käyty 7 päivään, ellei sovellusta ole asennettu kotivalikkoon. Asenna se tai kirjaudu, niin tilastosi säilyvät."
+      "body": "Tilastot seuraavat tätä laitetta, ellet kirjaudu Google-tilillä Tili-sivulla: uusi laite tai tyhjennetty selaimen tallennustila aloittaa alusta, ja jaettu laite sekoittaa pelaajien tilastot keskenään. iPhonessa ja Macissa Safari tyhjentää sivuston tiedot, jos sillä ei ole käyty 7 päivään, ellei sovellusta ole asennettu kotivalikkoon. Asenna se tai kirjaudu, niin tilastosi säilyvät."
     },
     "empty": {
       "message": "Ei vielä päättyneitä pelejä — pelaa peli!"
@@ -536,7 +510,7 @@
       },
       "account": {
         "title": "Google-tili (vapaaehtoinen)",
-        "body": "Jos kirjaudut Google-tilillä, Googlen Firebase tallentaa Google-sähköpostiosoitteesi ja tilin tunnisteen, jotta tilastosi seuraavat sinua muille laitteillesi. Sähköposti näkyy vain sinulle, valikossa. Uloskirjautuminen lopettaa tilin käytön tällä laitteella. Varaamasi nimi näkyy muille pelaajille varattuna."
+        "body": "Jos kirjaudut Google-tilillä, Googlen Firebase tallentaa Google-sähköpostiosoitteesi ja tilin tunnisteen, jotta tilastosi seuraavat sinua muille laitteillesi. Sähköposti näkyy vain sinulle, Tili-sivulla. Uloskirjautuminen lopettaa tilin käytön tällä laitteella. Varaamasi nimi näkyy muille pelaajille varattuna."
       },
       "public": {
         "title": "Ennätykset ovat julkisia",
@@ -550,6 +524,47 @@
         "title": "Virheraportit",
         "body": "Kun sovelluksessa tapahtuu virhe, siitä lähtee raportti Sentry-palveluun EU:ssa. Raporttiin voi liittyä tallenne virhettä edeltäneestä hetkestä, jossa kaikki teksti on peitetty. Nimiä ja huonekoodeja ei lähetetä."
       }
+    }
+  },
+  "account": {
+    "heading": "Tili",
+    "lede": "Vapaaehtoinen. Kirjaudu Google-tilillä, niin tilastosi ovat mukana kaikilla laitteillasi ja voit varata nimesi.",
+    "google": {
+      "heading": "Google-tili",
+      "signIn": "Kirjaudu Google-tilillä",
+      "signedInAs": "Kirjautunut",
+      "signOut": "Kirjaudu ulos",
+      "locked": "Lopeta peli tai poistu siitä ensin: kirjautuminen sisään tai ulos veisi paikkasi pelissä.",
+      "loading": "Ladataan…",
+      "unavailable": "Kirjautuminen ei ole nyt käytettävissä. Tarkista yhteys.",
+      "retry": "Yritä uudelleen",
+      "privacyLink": "Mitä tallennetaan"
+    },
+    "name": {
+      "heading": "Nimesi",
+      "label": "Nimi peleissä",
+      "hint": "Käytetään, kun aloitat pelin tai liityt peliin.",
+      "save": "Tallenna",
+      "saved": "Nimi tallennettu.",
+      "required": "Anna nimi.",
+      "badge": "Varattu nimi",
+      "claimedFor": "Varattu sinulle",
+      "moveHint": "Jos vaihdat nimen, varaus siirtyy uuteen nimeen ja {name} vapautuu muille.",
+      "claimHint": "Varaa nimi, niin kukaan muu ei voi liittyä peliin nimellä {name}.",
+      "claim": "Varaa nimi {name}",
+      "signInToClaim": "Kirjaudu Google-tilillä varataksesi nimesi, niin kukaan muu ei voi käyttää sitä peleissä.",
+      "moveTitle": "Siirretäänkö varaus nimelle {name}?",
+      "moveBody": "{old} vapautuu, ja kuka tahansa voi sitten varata sen.",
+      "moveConfirm": "Siirrä varaus",
+      "cancel": "Peruuta"
+    },
+    "notices": {
+      "blocked": "Kirjautumisikkuna estettiin. Salli ponnahdusikkunat Rommille ja yritä uudelleen.",
+      "offline": "Ei yhteyttä. Yritä uudelleen, kun olet verkossa.",
+      "failed": "Se ei onnistunut. Yritä uudelleen.",
+      "switched": "Tämä Google-tili oli jo käytössä toisella laitteella, joten tässä näkyvät nyt sen tilastot.",
+      "claimed": "Nimi on nyt sinun.",
+      "taken": "Joku on jo varannut tämän nimen."
     }
   }
 }

@@ -19,6 +19,7 @@ declare module 'vue-router' {
       | 'stats.heading'
       | 'stats.highscores.heading'
       | 'privacy.heading'
+      | 'account.heading'
       | 'notFound.heading'
   }
 }
@@ -64,6 +65,12 @@ const router = createRouter({
       name: 'highscores',
       component: () => import('@/views/HighscoresView.vue'),
       meta: { announceKey: 'stats.highscores.heading' },
+    },
+    {
+      path: '/account',
+      name: 'account',
+      component: () => import('@/views/AccountView.vue'),
+      meta: { announceKey: 'account.heading' },
     },
     {
       path: '/privacy',

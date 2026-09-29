@@ -167,6 +167,20 @@ describe('useGameStore identity, host side', () => {
   })
 })
 
+describe('useGameStore.isRunning', () => {
+  it('is true from the start of a game until it ends, and false with no game', async () => {
+    const game = useGameStore()
+    expect(game.isRunning).toBe(false)
+    const repository = new FakeGameRepository()
+
+    await game.start(repository, HOST_CONFIG)
+    expect(game.isRunning).toBe(true)
+
+    await repository.abandonGame()
+    expect(game.isRunning).toBe(false)
+  })
+})
+
 describe('useGameStore.join', () => {
   const JOIN_CODE = 'ABCDE'
   const ALICE_INPUT: AddPlayerInput = { name: 'Alice', deviceUuid: 'device-a' }

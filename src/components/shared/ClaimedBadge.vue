@@ -10,11 +10,8 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <span
-    class="text-primary inline-flex shrink-0 items-center"
-    :title="t('app.account.claim.badge')"
-  >
+  <span class="text-primary inline-flex shrink-0 items-center" :title="t('account.name.badge')">
     <BadgeCheck aria-hidden="true" class="size-4" />
-    <span class="sr-only">{{ t('app.account.claim.badge') }}</span>
+    <span class="sr-only">{{ t('account.name.badge') }}</span>
   </span>
 </template>

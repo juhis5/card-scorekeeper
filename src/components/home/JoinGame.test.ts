@@ -176,7 +176,7 @@ describe('JoinGame with a name already in the room', () => {
 
     expect(
       screen.getByText(
-        "Juho is a claimed name. If it's yours, sign in with Google from the menu; otherwise pick another name.",
+        "Juho is a claimed name. If it's yours, sign in with Google on the Account page; otherwise pick another name.",
       ),
     ).toBeTruthy()
     expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('true')

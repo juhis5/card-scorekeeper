@@ -110,9 +110,10 @@ highscore entry must copy its stats row exactly. Accepted limit: a host can ente
 in their own game.
 
 A player signed in with Google may claim one name (`claimedNames/{nameKey}`, with a
-`claimOwners/{uid}` doc naming it, written together). First come and for good: nobody changes or
-deletes a claim from the app; the app's owner releases or reassigns one in the console by deleting
-both docs. Anyone signed in may read a claim, to say "claimed" and to badge its owner's name.
+`claimOwners/{uid}` doc naming it, written together). First come. Renaming on the Account page
+moves the claim in one batch (the new claim, the owner doc, the old claim's delete), which frees
+the old name; nobody else changes or deletes a claim from the app. The app's owner can release or
+reassign one in the console by deleting both docs. Anyone signed in may read a claim, to say "claimed" and to badge its owner's name.
 A phone takes a seat under a claimed name only if it is the owner's (the host's own seat
 included); a host's guest may use any name, and Play again carries a seat's name unchanged.
 Opening or joining under someone else's claimed name says so by the name field, pointing its
@@ -123,7 +124,8 @@ name per session).
 ## Stats & history
 
 - Keyed by the anonymous uid. Clearing browser storage or changing device starts a new identity,
-  and a shared phone shares one, unless the player signs in with Google from the menu (optional).
+  and a shared phone shares one, unless the player signs in with Google on the Account page
+  (optional; the menu links to it).
   That links the uid to the account, so it survives cleared storage and follows the player to
   other devices. Signing in on a second device moves it onto the account's uid, leaving that
   device's anonymous history behind. Signing in or out waits while a game is running, as it can
