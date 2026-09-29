@@ -7,13 +7,20 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Crown } from '@lucide/vue'
+import ClaimedBadge from '@/components/shared/ClaimedBadge.vue'
 import { Table, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CONTRACTS, TOTAL_ROUNDS } from '@/lib/game/rules'
 import type { BoardRow } from '@/lib/game/scoreboard'
 
-const { rows, completedRounds } = defineProps<{
+const {
+  rows,
+  completedRounds,
+  claimedPlayerIds = new Set(),
+} = defineProps<{
   rows: BoardRow[]
   completedRounds: number
+  /** Players shown under the name they claimed: they get the badge. */
+  claimedPlayerIds?: ReadonlySet<string>
 }>()
 
 const { t, n } = useI18n()
@@ -69,6 +76,7 @@ function isLeader(row: BoardRow): boolean {
           <div class="flex min-w-0 items-center gap-2">
             <Crown v-if="isLeader(row)" aria-hidden="true" class="text-brand size-4 shrink-0" />
             <span class="truncate">{{ row.player.name }}</span>
+            <ClaimedBadge v-if="claimedPlayerIds.has(row.player.id)" />
             <span
               v-if="row.player.isGuest"
               class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 text-xs"

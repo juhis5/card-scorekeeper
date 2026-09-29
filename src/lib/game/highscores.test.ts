@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { highscoresOfGame, rankAt } from './highscores'
+import { entryPlayerId, highscoresOfGame, rankAt } from './highscores'
 
 describe('rankAt', () => {
   it('gives equal values the rank of the first of them (1, 1, 3)', () => {
     const values = [0, 0, 15, 20, 20]
 
     expect(values.map((_, index) => rankAt(values, index))).toEqual([1, 1, 3, 4, 4])
+  })
+})
+
+describe('entryPlayerId', () => {
+  it("reads the player from a game-list entry's id, for a room and a local game", () => {
+    expect(entryPlayerId('ABCDE_Xk9uid')).toBe('Xk9uid')
+    expect(entryPlayerId('b3f0c2a4-5d6e-4f70-8a91-2b3c4d5e6f70_guest-1')).toBe('guest-1')
   })
 })
 
@@ -25,10 +32,10 @@ describe('highscoresOfGame', () => {
 
   it("lists this game's players on each list they made, with their shared rank and value", () => {
     expect(highscoresOfGame('ABCDE', lists)).toEqual([
-      { list: 'bestGames', rank: 1, displayName: 'Alice', value: 0 },
-      { list: 'bestGames', rank: 3, displayName: 'Host', value: 40 },
-      { list: 'worstGames', rank: 1, displayName: 'Host', value: 5000 },
-      { list: 'biggestRounds', rank: 1, displayName: 'Host', value: 1000 },
+      { list: 'bestGames', rank: 1, playerId: 'alice', displayName: 'Alice', value: 0 },
+      { list: 'bestGames', rank: 3, playerId: 'host', displayName: 'Host', value: 40 },
+      { list: 'worstGames', rank: 1, playerId: 'host', displayName: 'Host', value: 5000 },
+      { list: 'biggestRounds', rank: 1, playerId: 'host', displayName: 'Host', value: 1000 },
     ])
   })
 

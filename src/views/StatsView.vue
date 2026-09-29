@@ -11,6 +11,7 @@ import HeadToHeadList from '@/components/stats/HeadToHeadList.vue'
 import ResultQueueNotice from '@/components/stats/ResultQueueNotice.vue'
 import StatSummary from '@/components/stats/StatSummary.vue'
 import { Button } from '@/components/ui/button'
+import { useClaimedNames } from '@/composables/useClaimedNames'
 import { useResultQueueStore } from '@/stores/result-queue'
 import { useStatsStore } from '@/stores/stats'
 
@@ -18,6 +19,12 @@ const { t } = useI18n()
 const statsStore = useStatsStore()
 const { status, stats, opponents } = storeToRefs(statsStore)
 const resultQueue = useResultQueueStore()
+const claimedPlayerIds = useClaimedNames(() =>
+  opponents.value.map(({ opponentDeviceUuid, displayName }) => ({
+    playerId: opponentDeviceUuid,
+    name: displayName,
+  })),
+)
 
 async function uploadQueuedGames(): Promise<void> {
   if ((await resultQueue.upload()) > 0) void statsStore.load()
@@ -62,7 +69,7 @@ onMounted(() => {
     <template v-else-if="status === 'loaded'">
       <template v-if="stats">
         <StatSummary :stats="stats" />
-        <HeadToHeadList :opponents="opponents" />
+        <HeadToHeadList :opponents="opponents" :claimed-player-ids="claimedPlayerIds" />
       </template>
     </template>
   </main>

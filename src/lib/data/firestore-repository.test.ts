@@ -14,6 +14,11 @@ vi.mock('./firestore-stats', () => ({
   publishHighscores: (...args: unknown[]) => publishHighscoresMock(...args),
 }))
 
+const readNameClaimMock = vi.fn()
+vi.mock('./name-claims', () => ({
+  readNameClaim: (...args: unknown[]) => readNameClaimMock(...args),
+}))
+
 const collectionMock = vi.fn((_db: unknown, path: string) => ({ path }))
 const docMock = vi.fn((_db: unknown, path: string) => ({ path }))
 const getDocsMock = vi.fn()
@@ -46,7 +51,7 @@ vi.mock('firebase/firestore', () => ({
 }))
 
 const { FirestoreGameRepository } = await import('./firestore-repository')
-const { NameTakenError } = await import('../game/player-names')
+const { NameClaimedError, NameTakenError } = await import('../game/player-names')
 const { GameIncompleteError } = await import('../game/rules')
 const { isValidRoomCode } = await import('../game/room-code')
 
@@ -81,6 +86,7 @@ beforeEach(() => {
   setDocMock.mockResolvedValue(undefined)
   getDocMock.mockResolvedValue({ exists: () => false, data: () => undefined })
   onSnapshotMock.mockImplementation(() => () => undefined)
+  readNameClaimMock.mockResolvedValue(null)
 })
 
 function snapshot(data: Record<string, unknown> | undefined) {
@@ -266,6 +272,55 @@ describe('FirestoreGameRepository unique names', () => {
       `room/${ROOM_CODE}/names/n_juho`,
     ])
     expect(batchSetMock.mock.calls[0]?.[1]).toMatchObject({ name: 'Juho' })
+  })
+})
+
+describe('FirestoreGameRepository claimed names', () => {
+  function repository(uid: string) {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid } } as never,
+      roomCode: ROOM_CODE,
+      generateRoomCode: () => ROOM_CODE,
+    })
+  }
+
+  it("refuses to open a room under someone else's claimed name, before writing anything", async () => {
+    readNameClaimMock.mockResolvedValue({ name: 'Juho', ownerUid: BOB_UID })
+
+    const error = await repository(HOST_UID)
+      .createGame({ hostDeviceUuid: 'd', hostDisplayName: ' Juho ' })
+      .catch((caught: unknown) => caught)
+
+    expect(readNameClaimMock).toHaveBeenCalledWith(expect.anything(), 'Juho')
+    expect(error).toBeInstanceOf(NameClaimedError)
+    expect(setDocMock).not.toHaveBeenCalled()
+  })
+
+  it("opens the room under the host's own claimed name", async () => {
+    readNameClaimMock.mockResolvedValue({ name: 'Juho', ownerUid: HOST_UID })
+
+    await repository(HOST_UID).createGame({ hostDeviceUuid: 'd', hostDisplayName: 'Juho' })
+
+    expect(setDocMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("explains a refused seat under someone else's claimed name", async () => {
+    batchCommitMock.mockRejectedValueOnce(permissionDenied)
+    readNameClaimMock.mockResolvedValue({ name: 'Juho', ownerUid: BOB_UID })
+
+    const error = await repository(ALICE_UID)
+      .addPlayer({ name: 'juho', deviceUuid: 'd' })
+      .catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(NameClaimedError)
+    expect((error as InstanceType<typeof NameClaimedError>).playerName).toBe('juho')
+  })
+
+  it('reads no claim for a seat the rules accepted', async () => {
+    await repository(ALICE_UID).addPlayer({ name: 'Juho', deviceUuid: 'd' })
+
+    expect(readNameClaimMock).not.toHaveBeenCalled()
   })
 })
 

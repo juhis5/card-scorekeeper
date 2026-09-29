@@ -6,7 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { TopDoc, TopQuery } from '@/lib/data/stats-reads'
-import { rankAt } from '@/lib/game/highscores'
+import { entryPlayerId, rankAt } from '@/lib/game/highscores'
 import { reportHandledError } from '@/lib/platform/error-reporting'
 
 /** Also the most firestore.rules lets one query read. */
@@ -16,6 +16,8 @@ export interface HighscoreEntry {
   id: string
   /** Shared by tied entries: 1, 1, 3. */
   rank: number
+  /** Whose entry or totals it is: a uid, or a guest's id. */
+  playerId: string
   displayName: string
   value: number
   /** Game records: when the game finished. */
@@ -68,16 +70,20 @@ function isValidDate(value: unknown): value is string {
 function toEntries(docs: TopDoc[], list: ListQuery, uid: string): HighscoreEntry[] {
   const rows = list.positiveOnly ? docs.filter((doc) => Number(doc.data[list.field]) > 0) : docs
   const values = rows.map((row) => row.data[list.field])
-  return rows.map(({ id, data }, index) => ({
-    id,
-    rank: rankAt(values, index),
-    displayName: String(data.displayName),
-    value: Number(data[list.field]),
-    ...(isValidDate(data.finishedAt) && { finishedAt: data.finishedAt }),
-    ...(typeof data.gamesPlayed === 'number' && { gamesPlayed: data.gamesPlayed }),
+  return rows.map(({ id, data }, index) => {
     // A leaderboard entry is `{game}_{player}`; a totals doc is the player's own id.
-    isMine: list.collection === 'player_totals' ? id === uid : id.endsWith(`_${uid}`),
-  }))
+    const playerId = list.collection === 'player_totals' ? id : entryPlayerId(id)
+    return {
+      id,
+      rank: rankAt(values, index),
+      playerId,
+      displayName: String(data.displayName),
+      value: Number(data[list.field]),
+      ...(isValidDate(data.finishedAt) && { finishedAt: data.finishedAt }),
+      ...(typeof data.gamesPlayed === 'number' && { gamesPlayed: data.gamesPlayed }),
+      isMine: playerId === uid,
+    }
+  })
 }
 
 function emptyLists(): Record<HighscoreListName, HighscoreEntry[]> {

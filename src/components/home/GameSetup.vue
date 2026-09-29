@@ -4,7 +4,7 @@
  * local game; "This device only" skips the check. Other players are added in the room, so it asks
  * only for the name, which Home shares with "Liity".
  */
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useLocalStorage } from '@vueuse/core'
@@ -17,7 +17,7 @@ import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { LOCAL_GAME_ROUTE_CODE } from '@/lib/data/local-game-route'
 import { hasUnfinishedPersistedGame } from '@/lib/data/local-repository'
-import { cleanPlayerName } from '@/lib/game/player-names'
+import { cleanPlayerName, NameClaimedError } from '@/lib/game/player-names'
 import type { HostGameMode } from '@/lib/data/game-mode'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/game/rules'
 
@@ -41,7 +41,14 @@ let hasConfirmedReplace = false
 const keepPlayingButton = useTemplateRef<InstanceType<typeof Button>>('keepPlaying')
 
 const hostName = computed(() => cleanPlayerName(name.value))
-const isNameInvalid = computed(() => attemptedSubmit.value && hostName.value === '')
+/** Someone else's claimed name: online, only its owner may host under it. */
+const isNameClaimed = ref(false)
+const isNameMissing = computed(() => attemptedSubmit.value && hostName.value === '')
+const isNameInvalid = computed(() => isNameMissing.value || isNameClaimed.value)
+
+watch(name, () => {
+  isNameClaimed.value = false
+})
 
 async function startGame(mode: HostGameMode): Promise<void> {
   identity.setDisplayName(hostName.value)
@@ -66,7 +73,8 @@ async function startOrFallBack(mode: HostGameMode): Promise<void> {
   try {
     await startGame(mode)
   } catch (error) {
-    if (mode.kind !== 'online') throw error
+    // A claimed name is the player's to change: a local game would only hide the problem.
+    if (mode.kind !== 'online' || error instanceof NameClaimedError) throw error
     await startOrFallBack(localRepository())
   }
 }
@@ -93,6 +101,7 @@ async function replaceLocalGame(): Promise<void> {
 
 async function handleSubmit(): Promise<void> {
   attemptedSubmit.value = true
+  isNameClaimed.value = false
   if (isNameInvalid.value || isSubmitting.value) return
 
   isSubmitting.value = true
@@ -102,7 +111,11 @@ async function handleSubmit(): Promise<void> {
     const mode = isThisPhoneOnly.value ? localRepository() : await hostRepository()
     isCheckingConnection.value = false
     await startOrFallBack(mode)
-  } catch {
+  } catch (error) {
+    if (error instanceof NameClaimedError) {
+      isNameClaimed.value = true
+      return
+    }
     submitError.value = t('home.errors.startFailed')
   } finally {
     isSubmitting.value = false
@@ -127,7 +140,11 @@ async function handleSubmit(): Promise<void> {
         :aria-describedby="isNameInvalid ? 'host-name-error' : undefined"
       />
       <p v-if="isNameInvalid" id="host-name-error" class="text-destructive text-sm">
-        {{ t('home.errors.nameRequired') }}
+        {{
+          isNameMissing
+            ? t('home.errors.nameRequired')
+            : t('home.errors.nameClaimed', { name: hostName })
+        }}
       </p>
     </div>
     <label

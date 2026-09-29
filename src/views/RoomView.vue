@@ -21,6 +21,7 @@ import ScoreBoard from '@/components/room/ScoreBoard.vue'
 import WinnerBanner from '@/components/room/WinnerBanner.vue'
 import { winnerMessage } from '@/components/room/winner-message'
 import { Button } from '@/components/ui/button'
+import { useClaimedNames } from '@/composables/useClaimedNames'
 import { useConnectionStatus } from '@/composables/useConnectionStatus'
 import { useGameConnectivity } from '@/composables/useGameConnectivity'
 import { provideOpenCard } from '@/composables/useSingleOpenCard'
@@ -65,6 +66,12 @@ const {
 const { resumeRepository } = useGameConnectivity()
 // A blip in a live room, not the never-connected offline banner.
 const { isReconnecting } = useConnectionStatus()
+// A local game's players have no accounts, so only an online room looks their names up.
+const claimedPlayerIds = useClaimedNames(() =>
+  isOnline.value
+    ? standings.value.map(({ player }) => ({ playerId: player.id, name: player.name }))
+    : [],
+)
 
 const announcement = ref('')
 /** Why the last score, Next or Finish didn't save. Cleared by the next save that succeeds. */
@@ -554,7 +561,11 @@ onMounted(async () => {
 
       <ContractBanner :round="currentRound" :contract-key="currentContract.contractKey" />
 
-      <ScoreBoard :rows="board" :completed-rounds="completedRounds" />
+      <ScoreBoard
+        :rows="board"
+        :completed-rounds="completedRounds"
+        :claimed-player-ids="claimedPlayerIds"
+      />
 
       <WinnerBanner v-if="isFinished" :winners="winners" />
       <!-- Only online games reach the public lists. -->

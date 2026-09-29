@@ -759,6 +759,12 @@ describe('guest seats: players the host adds, without a phone', () => {
     })
   })
 
+  it('lets the host add a guest under a claimed name: guests are exempt', async () => {
+    await seedClaim('Mummo', 'someone-else-uid')
+
+    await assertSucceeds(seatGuest(hostDb()))
+  })
+
   it('lets the host seat a guest together with its name record', async () => {
     await assertSucceeds(seatGuest(hostDb()))
   })
@@ -1393,6 +1399,13 @@ describe('play again: the host brings everyone along to the next room', () => {
     })
 
     await assertFails(carry(ALICE_UID, { as: BOB_UID }))
+  })
+
+  it('carries a seat whose name someone claimed since: it keeps the name it had', async () => {
+    await seedRooms()
+    await seedClaim('Alice', 'someone-else-uid')
+
+    await assertSucceeds(carry(ALICE_UID))
   })
 
   it('denies someone who was not in the finished room', async () => {
@@ -2230,5 +2243,48 @@ describe('claimedNames: one name per Google account, first come', () => {
     await assertFails(getDocs(query(collection(alice, 'claimedNames'), limit(1))))
     await assertSucceeds(getDoc(doc(alice, `claimOwners/${ALICE_UID}`)))
     await assertFails(getDoc(doc(googleDb('bob-uid'), `claimOwners/${ALICE_UID}`)))
+  })
+})
+
+/** A claim as the console or an earlier claim left it. */
+async function seedClaim(name: string, ownerUid: string) {
+  await seed(async (db) => {
+    await setDoc(doc(db(), `claimedNames/${rulesNameKey(name)}`), { name, ownerUid })
+    await setDoc(doc(db(), `claimOwners/${ownerUid}`), { nameKey: rulesNameKey(name) })
+  })
+}
+
+describe('a claimed name: only its owner takes a seat under it', () => {
+  const JUHO_UID = 'juho-uid'
+
+  beforeEach(async () => {
+    await seed(async (db) => setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture()))
+    await seedClaim('Juho', JUHO_UID)
+  })
+
+  it('denies anyone else the name, in any case', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(seatWithName(alice, ALICE_UID, playerFixture(ALICE_UID, { name: 'Juho' })))
+    await assertFails(seatWithName(alice, ALICE_UID, playerFixture(ALICE_UID, { name: 'JUHO' })))
+  })
+
+  it('lets the owner sit under it, and anyone under a name nobody claimed', async () => {
+    const juho = testEnv.authenticatedContext(JUHO_UID).firestore()
+    await assertSucceeds(seatWithName(juho, JUHO_UID, playerFixture(JUHO_UID, { name: 'juho' })))
+
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+    await assertSucceeds(
+      seatWithName(alice, ALICE_UID, playerFixture(ALICE_UID, { name: 'Alice' })),
+    )
+  })
+
+  it('denies the host their own seat under it, as when opening a room', async () => {
+    await seed(async (db) =>
+      setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ hostUid: ALICE_UID })),
+    )
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+
+    await assertFails(seatWithName(alice, ALICE_UID, playerFixture(ALICE_UID, { name: 'Juho' })))
   })
 })

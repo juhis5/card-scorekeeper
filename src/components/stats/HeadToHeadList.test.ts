@@ -4,8 +4,26 @@ import HeadToHeadList from './HeadToHeadList.vue'
 import { i18n } from '@/i18n'
 import type { OpponentRecord } from '@/stores/stats'
 
-function renderList(opponents: OpponentRecord[]) {
-  return render(HeadToHeadList, { props: { opponents }, global: { plugins: [i18n] } })
+function renderList(opponents: OpponentRecord[], claimedPlayerIds?: ReadonlySet<string>) {
+  return render(HeadToHeadList, {
+    props: { opponents, claimedPlayerIds },
+    global: { plugins: [i18n] },
+  })
+}
+
+function opponent(opponentDeviceUuid: string, displayName: string): OpponentRecord {
+  return {
+    opponentDeviceUuid,
+    displayName,
+    record: {
+      deviceUuid: 'uid-me',
+      opponentDeviceUuid,
+      gamesPlayed: 1,
+      wins: 1,
+      losses: 0,
+      ties: 0,
+    },
+  }
 }
 
 describe('HeadToHeadList', () => {
@@ -71,5 +89,13 @@ describe('HeadToHeadList', () => {
     expect(screen.getByText('Carol')).toBeTruthy()
     expect(screen.getByText('1 W – 1 L – 0 T')).toBeTruthy()
     expect(screen.getByText('0 W – 0 L – 1 T')).toBeTruthy()
+  })
+
+  it('badges an opponent who goes by the name they claimed', () => {
+    renderList([opponent('uid-juho', 'Juho'), opponent('uid-other', 'Mari')], new Set(['uid-juho']))
+
+    const [, juho, mari] = screen.getAllByRole('row')
+    expect(juho?.textContent).toContain('Claimed name')
+    expect(mari?.textContent).not.toContain('Claimed name')
   })
 })

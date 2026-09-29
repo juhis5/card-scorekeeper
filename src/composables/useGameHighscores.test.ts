@@ -55,7 +55,7 @@ describe('useGameHighscores', () => {
 
     expect(listeners.size).toBe(3)
     expect(highscores.value).toEqual([
-      { list: 'bestGames', rank: 1, displayName: 'Alice', value: 0 },
+      { list: 'bestGames', rank: 1, playerId: 'alice', displayName: 'Alice', value: 0 },
     ])
   })
 

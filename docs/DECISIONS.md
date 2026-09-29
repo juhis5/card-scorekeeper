@@ -669,3 +669,11 @@ it is.
   emulator), rather than `sign_in_provider`. Releasing is the owner's console job: delete both
   docs. The badge marks a name only where its writer's uid is the claim's owner, so older
   entries by someone else with that name never look claimed.
+- 2026-09-29 — Seats honour claimed names; the badge (owner's request: "claimed names should
+  have some icon"). The rules check only a phone's own seat, so guests stay exempt and a carried
+  seat keeps its name. The host's room checks the claim before it's created: a refused host seat
+  would otherwise read as a room-code collision and retry. The host form doesn't fall back to a
+  local game on a claimed name, since that would only hide the problem. The badge is looked up
+  client-side from `claimedNames` by name and matched on the player id (seat id, entry id's
+  player part, totals id, head-to-head opponent), so no stored shape changed and old entries
+  under a claimed name stay unbadged unless they are the owner's own. Local games show none.

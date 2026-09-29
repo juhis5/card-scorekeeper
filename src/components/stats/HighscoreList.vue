@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import ClaimedBadge from '@/components/shared/ClaimedBadge.vue'
 import type { HighscoreEntry } from '@/stores/highscores'
 
 export type HighscoreValueKind = 'count' | 'percent' | 'average'
@@ -26,6 +27,7 @@ const {
   valueKind = 'count',
   entries,
   emptyText,
+  claimedPlayerIds = new Set(),
 } = defineProps<{
   id: string
   title: string
@@ -35,6 +37,8 @@ const {
   entries: HighscoreEntry[]
   /** Said when the list is empty; "no games yet" unless the list has a reason of its own. */
   emptyText?: string
+  /** Players listed under the name they claimed: they get the badge. */
+  claimedPlayerIds?: ReadonlySet<string>
 }>()
 
 const { t, locale } = useI18n()
@@ -75,6 +79,10 @@ const countFormat = computed(() => new Intl.NumberFormat(locale.value))
           </TableCell>
           <TableCell class="whitespace-normal">
             <span class="font-medium">{{ entry.displayName }}</span>
+            <ClaimedBadge
+              v-if="claimedPlayerIds.has(entry.playerId)"
+              class="ml-1 align-text-bottom"
+            />
             <span v-if="entry.isMine" class="text-primary text-sm">
               · {{ t('stats.highscores.you') }}
             </span>

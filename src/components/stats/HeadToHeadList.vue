@@ -13,10 +13,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import ClaimedBadge from '@/components/shared/ClaimedBadge.vue'
 import InfoPopover from '@/components/shared/InfoPopover.vue'
 import type { OpponentRecord } from '@/stores/stats'
 
-const { opponents } = defineProps<{ opponents: OpponentRecord[] }>()
+const { opponents, claimedPlayerIds = new Set() } = defineProps<{
+  opponents: OpponentRecord[]
+  /** Opponents shown under the name they claimed: they get the badge. */
+  claimedPlayerIds?: ReadonlySet<string>
+}>()
 
 const { t, n } = useI18n()
 </script>
@@ -46,7 +51,13 @@ const { t, n } = useI18n()
           {{ t('stats.headToHead.empty') }}
         </TableEmpty>
         <TableRow v-for="opponent in opponents" :key="opponent.opponentDeviceUuid">
-          <TableCell>{{ opponent.displayName }}</TableCell>
+          <TableCell>
+            {{ opponent.displayName }}
+            <ClaimedBadge
+              v-if="claimedPlayerIds.has(opponent.opponentDeviceUuid)"
+              class="ml-1 align-text-bottom"
+            />
+          </TableCell>
           <TableCell class="text-right">
             {{
               t('stats.headToHead.recordCompact', {

@@ -6,7 +6,7 @@ import { flushPromises } from '@vue/test-utils'
 import JoinGame from './JoinGame.vue'
 import { useGameStore } from '@/stores/game'
 import { i18n } from '@/i18n'
-import { NameTakenError } from '@/lib/game/player-names'
+import { NameClaimedError, NameTakenError } from '@/lib/game/player-names'
 import type { GameRepository } from '@/lib/data/repository'
 import type { GameState } from '@/lib/game/types'
 
@@ -164,6 +164,23 @@ describe('JoinGame with a name already in the room', () => {
         'The host already added a player with that name. Ask the host to remove them, then join.',
       ),
     ).toBeTruthy()
+  })
+
+  it('points the owner of a claimed name to signing in, and everyone else to another name', async () => {
+    const repo = makeFakeOnlineRepository()
+    repo.addPlayer = vi.fn().mockRejectedValue(new NameClaimedError('Juho'))
+    joinRepository.mockResolvedValue({ kind: 'online', repository: repo })
+    const router = renderJoinGame()
+
+    await fillAndSubmit('7K4RQ', 'Juho')
+
+    expect(
+      screen.getByText(
+        "Juho is a claimed name. If it's yours, sign in with Google from the menu; otherwise pick another name.",
+      ),
+    ).toBeTruthy()
+    expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('true')
+    expect(router.currentRoute.value.name).toBe('home')
   })
 
   it('clears the message once the name is changed', async () => {

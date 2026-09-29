@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import HighscoreList, { type HighscoreValueKind } from '@/components/stats/HighscoreList.vue'
 import { Button } from '@/components/ui/button'
 import SegmentedToggle from '@/components/shared/SegmentedToggle.vue'
+import { useClaimedNames } from '@/composables/useClaimedNames'
 import { QUALIFYING_GAMES } from '@/lib/game/stats'
 import { useHighscoresStore, type HighscoreListName } from '@/stores/highscores'
 
@@ -56,6 +57,11 @@ const shownLists = computed(
   () => GROUPS.find((group) => group.id === shownGroup.value)?.lists ?? [],
 )
 const { status, lists } = storeToRefs(highscores)
+const claimedPlayerIds = useClaimedNames(() =>
+  Object.values(lists.value)
+    .flat()
+    .map(({ playerId, displayName }) => ({ playerId, name: displayName })),
+)
 
 onMounted(() => {
   void highscores.load()
@@ -91,6 +97,7 @@ onMounted(() => {
         :value-kind="list.kind"
         :entries="lists[list.name]"
         :empty-text="emptyTextFor(list.name)"
+        :claimed-player-ids="claimedPlayerIds"
       />
     </template>
   </div>
