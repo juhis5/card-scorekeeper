@@ -661,3 +661,11 @@ it is.
   - The CSP allows `apis.google.com` scripts and both projects' `firebaseapp.com` frames.
   - Switching a second device is unit-tested only: the Auth emulator's "already linked" error
     leaves out the credential that Google's carries.
+- 2026-09-29 — Claimed names (owner's decisions: first come, the owner can release; old entries
+  stay; guests exempt). A player signed in with Google claims the name they play under, after a
+  confirm that says it's for good. One claim per account: `claimOwners/{uid}` is created with the
+  claim and never changes, so an account can't collect names. The rules check the token's
+  `firebase.identities['google.com']`, which a linked anonymous user carries (checked on the
+  emulator), rather than `sign_in_provider`. Releasing is the owner's console job: delete both
+  docs. The badge marks a name only where its writer's uid is the claim's owner, so older
+  entries by someone else with that name never look claimed.

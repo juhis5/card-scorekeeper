@@ -1,12 +1,14 @@
 <script setup lang="ts">
 /**
- * Single job: the menu's Google account row, to sign in or out. Signing in or out can change this
- * device's uid, which would cost the player their seat, so both wait while a game is running.
+ * Single job: the menu's Google account row, to sign in or out; ClaimNameRow sits below it.
+ * Signing in or out can change this device's uid, which would cost the player their seat, so both
+ * wait while a game is running.
  */
 import { computed, onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { LogIn } from '@lucide/vue'
+import ClaimNameRow from '@/components/menu/ClaimNameRow.vue'
 import { MENU_ROW_CLASS } from '@/components/menu/menu-row'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -59,6 +61,7 @@ onMounted(() => {
         {{ t('app.account.signOut') }}
       </Button>
     </div>
+    <ClaimNameRow v-if="status === 'signedIn'" :locked="locked" />
     <p aria-live="polite" class="text-muted-foreground px-4 pb-3 text-sm empty:hidden">
       <template v-if="notice">{{ t(`app.account.notices.${notice}`) }}</template>
     </p>

@@ -86,6 +86,47 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/room/$(gameId));
     }
 
+    /** Signed in with Google (optional accounts): an anonymous user who linked Google keeps its
+     * uid and gains this identity. */
+    function hasGoogleAccount() {
+      return isSignedIn() && 'google.com' in request.auth.token.firebase.identities;
+    }
+
+    function claimedNamePath(nameKey) {
+      return /databases/$(database)/documents/claimedNames/$(nameKey);
+    }
+
+    // Claimed names: a player signed in with Google may claim one name, keyed by nameKeyOf, so
+    // that nobody else takes a seat under it. First come: a claim is created once, with its
+    // owner's claimOwners doc, and never changes. The app's owner releases or reassigns one in the
+    // console. Anyone signed in may get one (to say "claimed", and to badge its owner's name).
+    match /claimedNames/{nameKey} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if hasGoogleAccount()
+        && request.resource.data.keys().hasOnly(['name', 'ownerUid'])
+        && request.resource.data.keys().hasAll(['name', 'ownerUid'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && isCleanPlayerName(request.resource.data.name)
+        && nameKey == nameKeyOf(request.resource.data.name)
+        && getAfter(/databases/$(database)/documents/claimOwners/$(request.auth.uid)).data.nameKey == nameKey;
+      allow update, delete: if false;
+    }
+
+    // One claim per account: created with the claim, in the same batch, and never changed, so an
+    // account can't claim a second name.
+    match /claimOwners/{ownerUid} {
+      allow get: if isSignedIn() && ownerUid == request.auth.uid;
+      allow list: if false;
+      allow create: if hasGoogleAccount()
+        && ownerUid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['nameKey'])
+        && request.resource.data.nameKey is string
+        && !exists(claimedNamePath(request.resource.data.nameKey))
+        && getAfter(claimedNamePath(request.resource.data.nameKey)).data.ownerUid == ownerUid;
+      allow update, delete: if false;
+    }
+
     match /room/{code} {
       // Anyone signed in may get a room by its code, to join. Only `get`, not `read`: `read` also
       // allows `list`, and any stranger could then enumerate every room.

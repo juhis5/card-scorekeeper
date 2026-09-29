@@ -60,7 +60,20 @@
         "blocked": "Kirjautumisikkuna estettiin. Salli ponnahdusikkunat Rommille ja yritä uudelleen.",
         "offline": "Ei yhteyttä. Yritä uudelleen, kun olet verkossa.",
         "failed": "Kirjautuminen ei onnistunut. Yritä uudelleen.",
-        "switched": "Tämä Google-tili oli jo käytössä toisella laitteella, joten tässä näkyvät nyt sen tilastot."
+        "switched": "Tämä Google-tili oli jo käytössä toisella laitteella, joten tässä näkyvät nyt sen tilastot.",
+        "claimed": "Nimi on nyt sinun.",
+        "taken": "Joku on jo varannut tämän nimen."
+      },
+      "claim": {
+        "badge": "Varattu nimi",
+        "yours": "Nimesi",
+        "hint": "Varaa nimi, niin kukaan muu ei voi liittyä peliin nimellä {name}.",
+        "action": "Varaa nimi {name}",
+        "needsName": "Anna nimesi etusivulla, niin voit varata sen.",
+        "confirmTitle": "Varataanko {name} pysyvästi?",
+        "confirmBody": "Sen jälkeen vain sinä voit liittyä peleihin nimellä {name}. Varausta ei voi itse perua: sovelluksen ylläpitäjä voi vapauttaa sen.",
+        "confirm": "Varaa",
+        "cancel": "Peruuta"
       }
     }
   },

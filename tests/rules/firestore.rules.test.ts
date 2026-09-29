@@ -2122,3 +2122,113 @@ describe('game_result/game_player create authorization for a room-backed game', 
     )
   })
 })
+
+/** A player who signed in with Google: the token lists the Google identity after linking. */
+function googleDb(uid: string) {
+  return testEnv
+    .authenticatedContext(uid, {
+      firebase: { sign_in_provider: 'google.com', identities: { 'google.com': [`google-${uid}`] } },
+    })
+    .firestore()
+}
+
+function anonymousDb(uid: string) {
+  return testEnv
+    .authenticatedContext(uid, { firebase: { sign_in_provider: 'anonymous', identities: {} } })
+    .firestore()
+}
+
+/** Claims a name the way the app does: the claim and its owner's claimOwners doc in one batch. */
+function claimName(
+  db: TestFirestore,
+  uid: string,
+  name: string,
+  { nameKey = rulesNameKey(name), ownerUid = uid }: { nameKey?: string; ownerUid?: string } = {},
+) {
+  const batch = writeBatch(db as unknown as Firestore)
+  batch.set(doc(db, `claimOwners/${uid}`), { nameKey })
+  batch.set(doc(db, `claimedNames/${nameKey}`), { name, ownerUid })
+  return batch.commit()
+}
+
+describe('claimedNames: one name per Google account, first come', () => {
+  it('lets a Google player claim a free name, which anyone signed in can then read', async () => {
+    await assertSucceeds(claimName(googleDb(ALICE_UID), ALICE_UID, 'Alice'))
+
+    const stranger = testEnv.authenticatedContext('stranger-uid').firestore()
+    const claim = await assertSucceeds(
+      getDoc(doc(stranger, `claimedNames/${rulesNameKey('Alice')}`)),
+    )
+    expect(claim.data()).toEqual({ name: 'Alice', ownerUid: ALICE_UID })
+  })
+
+  it('denies an anonymous player, and an unauthenticated one', async () => {
+    await assertFails(claimName(anonymousDb(ALICE_UID), ALICE_UID, 'Alice'))
+    await assertFails(claimName(testEnv.unauthenticatedContext().firestore(), ALICE_UID, 'Alice'))
+  })
+
+  it('denies a name someone already claimed, in any case', async () => {
+    await assertSucceeds(claimName(googleDb(ALICE_UID), ALICE_UID, 'Alice'))
+
+    await assertFails(claimName(googleDb('bob-uid'), 'bob-uid', 'Alice'))
+    await assertFails(claimName(googleDb('bob-uid'), 'bob-uid', 'ALICE'))
+  })
+
+  it('denies an account a second name', async () => {
+    await assertSucceeds(claimName(googleDb(ALICE_UID), ALICE_UID, 'Alice'))
+
+    await assertFails(claimName(googleDb(ALICE_UID), ALICE_UID, 'Alicia'))
+  })
+
+  it('denies a claim for someone else', async () => {
+    await assertFails(claimName(googleDb(ALICE_UID), ALICE_UID, 'Bob', { ownerUid: 'bob-uid' }))
+
+    const alice = googleDb(ALICE_UID)
+    const batch = writeBatch(alice as unknown as Firestore)
+    batch.set(doc(alice, 'claimOwners/bob-uid'), { nameKey: rulesNameKey('Bob') })
+    batch.set(doc(alice, `claimedNames/${rulesNameKey('Bob')}`), {
+      name: 'Bob',
+      ownerUid: 'bob-uid',
+    })
+    await assertFails(batch.commit())
+  })
+
+  it('denies a key that is not the name, and a name the app would not store', async () => {
+    await assertFails(claimName(googleDb(ALICE_UID), ALICE_UID, 'Alice', { nameKey: 'n_bob' }))
+    await assertFails(claimName(googleDb(ALICE_UID), ALICE_UID, ' Alice'))
+    await assertFails(claimName(googleDb(ALICE_UID), ALICE_UID, 'A'.repeat(41)))
+  })
+
+  it('denies the claim or the owner doc written alone, or with extra fields', async () => {
+    const alice = googleDb(ALICE_UID)
+    const key = rulesNameKey('Alice')
+
+    await assertFails(
+      setDoc(doc(alice, `claimedNames/${key}`), { name: 'Alice', ownerUid: ALICE_UID }),
+    )
+    await assertFails(setDoc(doc(alice, `claimOwners/${ALICE_UID}`), { nameKey: key }))
+
+    const batch = writeBatch(alice as unknown as Firestore)
+    batch.set(doc(alice, `claimOwners/${ALICE_UID}`), { nameKey: key })
+    batch.set(doc(alice, `claimedNames/${key}`), {
+      name: 'Alice',
+      ownerUid: ALICE_UID,
+      verified: true,
+    })
+    await assertFails(batch.commit())
+  })
+
+  it('never changes or lists a claim, and keeps an account private', async () => {
+    await claimName(googleDb(ALICE_UID), ALICE_UID, 'Alice')
+    const alice = googleDb(ALICE_UID)
+    const key = rulesNameKey('Alice')
+
+    await assertFails(updateDoc(doc(alice, `claimedNames/${key}`), { name: 'Alice' }))
+    await assertFails(deleteDoc(doc(alice, `claimedNames/${key}`)))
+    await assertFails(updateDoc(doc(alice, `claimOwners/${ALICE_UID}`), { nameKey: 'n_bob' }))
+    await assertFails(deleteDoc(doc(alice, `claimOwners/${ALICE_UID}`)))
+    await assertFails(getDocs(query(collection(alice, 'claimedNames'), limit(1))))
+    await assertSucceeds(getDoc(doc(alice, `claimOwners/${ALICE_UID}`)))
+    await assertFails(getDoc(doc(googleDb('bob-uid'), `claimOwners/${ALICE_UID}`)))
+  })
+})
