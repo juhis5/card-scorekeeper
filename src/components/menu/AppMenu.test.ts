@@ -6,19 +6,11 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import AppMenu from './AppMenu.vue'
 import { i18n, setLocale } from '@/i18n'
-import { LocalGameRepository } from '@/lib/data/local-repository'
-import { useGameStore } from '@/stores/game'
 
 // The service worker's virtual module only exists inside a Vite-built app.
 const needRefresh = ref(false)
 vi.mock('virtual:pwa-register/vue', () => ({
   useRegisterSW: () => ({ needRefresh, offlineReady: ref(false), updateServiceWorker: vi.fn() }),
-}))
-
-// Firebase restores an anonymous session: the menu offers Google sign-in.
-vi.mock('@/lib/data/firebase', () => ({
-  getFirebaseAuth: () => ({ currentUser: null, authStateReady: () => Promise.resolve() }),
-  getDb: () => ({}),
 }))
 
 function makeRouter() {
@@ -30,14 +22,15 @@ function makeRouter() {
       { path: '/highscores', name: 'highscores', component: { render: () => null } },
       { path: '/rules', name: 'rules', component: { render: () => null } },
       { path: '/privacy', name: 'privacy', component: { render: () => null } },
+      { path: '/account', name: 'account', component: { render: () => null } },
       { path: '/room/:code', name: 'room', component: { render: () => null } },
     ],
   })
 }
 
-async function renderMenu(path = '/room/ABCDE') {
+async function renderMenu() {
   const router = makeRouter()
-  await router.push(path)
+  await router.push('/room/ABCDE')
   render(AppMenu, { global: { plugins: [i18n, router] } })
   return router
 }
@@ -64,11 +57,11 @@ describe('AppMenu', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Stats' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Highscores' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Account' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Rules' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Privacy' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Language/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Theme/ })).toBeTruthy()
-    expect(await screen.findByRole('button', { name: /Sign in with Google/ })).toBeTruthy()
   })
 
   it('offers the waiting new version as a row, only while there is one', async () => {
@@ -111,24 +104,5 @@ describe('AppMenu', () => {
     await flushPromises()
 
     expect(screen.queryByRole('dialog')).toBeNull()
-  })
-
-  it('holds account changes while a game runs, even from Home, where it offers no exit', async () => {
-    const values = new Map<string, string>()
-    const storage = {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => void values.set(key, value),
-    }
-    await useGameStore().start(new LocalGameRepository({ storage }), {
-      hostDeviceUuid: 'd',
-      hostDisplayName: 'Juho',
-    })
-    await renderMenu('/')
-    await openMenu()
-
-    const signIn = await screen.findByRole('button', { name: /Sign in with Google/ })
-    expect((signIn as HTMLButtonElement).disabled).toBe(true)
-    expect(signIn.textContent).toContain('Finish or leave the game first')
-    expect(screen.queryByRole('list', { name: 'This game' })).toBeNull()
   })
 })

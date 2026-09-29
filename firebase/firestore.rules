@@ -104,9 +104,10 @@ service cloud.firestore {
     }
 
     // Claimed names: a player signed in with Google may claim one name, keyed by nameKeyOf, so
-    // that nobody else takes a seat under it. First come: a claim is created once, with its
-    // owner's claimOwners doc, and never changes. The app's owner releases or reassigns one in the
-    // console. Anyone signed in may get one (to say "claimed", and to badge its owner's name).
+    // that nobody else takes a seat under it. First come: a claim is created with its owner's
+    // claimOwners doc and never edited; its owner may move it to a new name, which frees the old
+    // one. The app's owner can also release or reassign one in the console. Anyone signed in may
+    // get one (to say "claimed", and to badge its owner's name).
     match /claimedNames/{nameKey} {
       allow get: if isSignedIn();
       allow list: if false;
@@ -117,21 +118,33 @@ service cloud.firestore {
         && isCleanPlayerName(request.resource.data.name)
         && nameKey == nameKeyOf(request.resource.data.name)
         && getAfter(/databases/$(database)/documents/claimOwners/$(request.auth.uid)).data.nameKey == nameKey;
-      allow update, delete: if false;
+      allow update: if false;
+      // Only as its owner moves the claim to another name (see claimOwners' update).
+      allow delete: if hasGoogleAccount()
+        && resource.data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/claimOwners/$(request.auth.uid)).data.nameKey != nameKey;
     }
 
-    // One claim per account: created with the claim, in the same batch, and never changed, so an
-    // account can't claim a second name.
+    // One claim per account: created with the claim, in the same batch. The owner may move it to
+    // a new name (a rename), in one batch that creates the new claim and deletes the old one, so an
+    // account never holds two names.
     match /claimOwners/{ownerUid} {
+      function takesNewClaim() {
+        return request.resource.data.keys().hasOnly(['nameKey'])
+          && request.resource.data.nameKey is string
+          && !exists(claimedNamePath(request.resource.data.nameKey))
+          && getAfter(claimedNamePath(request.resource.data.nameKey)).data.ownerUid == ownerUid;
+      }
+
       allow get: if isSignedIn() && ownerUid == request.auth.uid;
       allow list: if false;
-      allow create: if hasGoogleAccount()
+      allow create: if hasGoogleAccount() && ownerUid == request.auth.uid && takesNewClaim();
+      // The old claim goes in the same batch (or is already gone, released in the console).
+      allow update: if hasGoogleAccount()
         && ownerUid == request.auth.uid
-        && request.resource.data.keys().hasOnly(['nameKey'])
-        && request.resource.data.nameKey is string
-        && !exists(claimedNamePath(request.resource.data.nameKey))
-        && getAfter(claimedNamePath(request.resource.data.nameKey)).data.ownerUid == ownerUid;
-      allow update, delete: if false;
+        && takesNewClaim()
+        && !existsAfter(claimedNamePath(resource.data.nameKey));
+      allow delete: if false;
     }
 
     match /room/{code} {

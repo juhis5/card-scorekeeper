@@ -7,7 +7,6 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { ChevronRight, Menu, RefreshCw, X } from '@lucide/vue'
-import AccountRow from '@/components/menu/AccountRow.vue'
 import GameExitRow from '@/components/menu/GameExitRow.vue'
 import InstallAppRow from '@/components/menu/InstallAppRow.vue'
 import LocaleToggle from '@/components/menu/LocaleToggle.vue'
@@ -32,18 +31,15 @@ const install = useInstallStore()
 const appUpdate = useAppUpdateStore()
 const route = useRoute()
 const game = useGameStore()
-/** A game still going on this device, even when Home is showing it as "Continue game". */
-const hasRunningGame = computed(
-  () => game.gameId !== null && (game.status === 'waiting' || game.status === 'playing'),
-)
 /** In a room whose game is still going: the menu offers the way out of it. */
-const isInRunningGame = computed(() => route.name === 'room' && hasRunningGame.value)
+const isInRunningGame = computed(() => route.name === 'room' && game.isRunning)
 const isOpen = ref(false)
 
 const pages = [
   { name: 'home', labelKey: 'app.menu.home' },
   { name: 'stats', labelKey: 'nav.stats' },
   { name: 'highscores', labelKey: 'stats.highscores.heading' },
+  { name: 'account', labelKey: 'app.menu.account' },
   { name: 'rules', labelKey: 'rules.heading' },
   { name: 'privacy', labelKey: 'app.menu.privacy' },
 ] as const
@@ -86,10 +82,6 @@ function close(): void {
 
       <ul v-if="isInRunningGame" role="list" :aria-label="t('app.menu.thisGame')">
         <li class="border-border border-b"><GameExitRow @done="close" /></li>
-      </ul>
-
-      <ul role="list" :aria-label="t('app.menu.account')">
-        <li><AccountRow :locked="hasRunningGame" /></li>
       </ul>
 
       <ul role="list" :aria-label="t('app.menu.settings')">

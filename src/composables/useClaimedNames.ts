@@ -55,8 +55,8 @@ function ownerOf(name: string): Promise<string | null> {
   return owner
 }
 
-/** A claim this device just made, so its badge shows without a read. */
-export function rememberClaim(name: string, ownerUid: string): void {
+/** A claim this device just made (or moved away from, `null`), so badges follow without a read. */
+export function rememberClaim(name: string, ownerUid: string | null): void {
   ownersByNameKey.set(playerNameKey(name), Promise.resolve(ownerUid))
 }
 

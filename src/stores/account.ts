@@ -1,7 +1,7 @@
 /**
- * The Google account on this device and the name it claimed, for the menu. Firebase loads when the
- * menu opens, so the tap on "Sign in" reaches the popup with nothing left to load: phones only
- * open one soon after a tap.
+ * The Google account on this device and the name it claimed, for the Account page. Firebase loads
+ * when the page opens, so the tap on "Sign in" reaches the popup with nothing left to load:
+ * phones only open one soon after a tap.
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -19,8 +19,11 @@ export type AccountStatus = 'loading' | 'unavailable' | 'signedOut' | 'signedIn'
 /** `unknown` until the claim is read, and while it can't be (offline). */
 export type ClaimStatus = 'unknown' | 'unclaimed' | 'claimed'
 
-/** What the menu says after an attempt to sign in, sign out or claim a name. */
+/** What the Account page says after an attempt to sign in, sign out or claim a name. */
 export type AccountNotice = Exclude<SignInFailure, 'cancelled'> | 'switched' | 'claimed' | 'taken'
+
+/** Which action the notice is about, so it shows by the part of the page that caused it. */
+export type AccountAction = 'signIn' | 'signOut' | 'claim'
 
 interface Session {
   auth: Auth
@@ -36,6 +39,7 @@ export const useAccountStore = defineStore('account', () => {
   const claimedName = ref<string | null>(null)
   const isBusy = ref(false)
   const notice = ref<AccountNotice | null>(null)
+  const lastAction = ref<AccountAction | null>(null)
   let session: Session | null = null
 
   function showClaim(name: string | null): void {
@@ -93,10 +97,14 @@ export const useAccountStore = defineStore('account', () => {
   }
 
   /** Runs one account action at a time, clearing the last notice first. */
-  async function busyWith(action: (current: Session) => Promise<void>): Promise<void> {
+  async function busyWith(
+    name: AccountAction,
+    action: (current: Session) => Promise<void>,
+  ): Promise<void> {
     if (!session || isBusy.value) return
     isBusy.value = true
     notice.value = null
+    lastAction.value = name
     try {
       await action(session)
     } finally {
@@ -105,7 +113,7 @@ export const useAccountStore = defineStore('account', () => {
   }
 
   function signIn(): Promise<void> {
-    return busyWith(async ({ auth, google }) => {
+    return busyWith('signIn', async ({ auth, google }) => {
       try {
         const { account, switchedUser } = await google.signInWithGoogle(auth)
         show(account)
@@ -117,7 +125,7 @@ export const useAccountStore = defineStore('account', () => {
   }
 
   function signOut(): Promise<void> {
-    return busyWith(async ({ auth, google }) => {
+    return busyWith('signOut', async ({ auth, google }) => {
       try {
         await google.signOutOfGoogle(auth)
         show(null)
@@ -127,14 +135,16 @@ export const useAccountStore = defineStore('account', () => {
     })
   }
 
-  /** Claims `name` for this account, for good. */
+  /** Claims `name` for this account, or moves its claim there. */
   function claim(name: string): Promise<void> {
-    return busyWith(async ({ auth, getDb, claims }) => {
+    return busyWith('claim', async ({ auth, getDb, claims }) => {
       const uid = auth.currentUser?.uid
       if (status.value !== 'signedIn' || !uid) return
       try {
         const outcome = await claims.claimName(getDb(), uid, name)
         if (outcome === 'claimed') {
+          // A move frees the old name.
+          if (claimedName.value) rememberClaim(claimedName.value, null)
           showClaim(cleanPlayerName(name))
           rememberClaim(name, uid)
         }
@@ -157,6 +167,7 @@ export const useAccountStore = defineStore('account', () => {
     claimedName,
     isBusy,
     notice,
+    lastAction,
     load,
     signIn,
     signOut,

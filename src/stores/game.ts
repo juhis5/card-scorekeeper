@@ -77,6 +77,10 @@ export const useGameStore = defineStore('game', () => {
   const roundScores = computed(() => state.value.roundScores)
   /** Only an online repository returns a room code, so this means "a live multi-device room". */
   const isOnline = computed(() => roomCode.value !== null)
+  /** A game this device is in that hasn't ended, even while Home shows it as "Continue game". */
+  const isRunning = computed(
+    () => gameId.value !== null && (status.value === 'waiting' || status.value === 'playing'),
+  )
 
   /** Totals recomputed from `roundScores`, never the writable `totalScore` field: the rules can't
    * verify a sum, and with the low total winning, a faked total would pay off. */
@@ -268,6 +272,7 @@ export const useGameStore = defineStore('game', () => {
     isHost,
     myPlayerId,
     isOnline,
+    isRunning,
     connectionError,
     status,
     currentRound,

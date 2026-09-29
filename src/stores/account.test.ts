@@ -306,5 +306,16 @@ describe('useAccountStore', () => {
       expect(account.isBusy).toBe(false)
       expect(reportHandledError).toHaveBeenCalledWith(broken, 'claim-name')
     })
+
+    it('moves the claim, forgetting the old name, and marks the notice as a claim one', async () => {
+      readOwnClaim.mockResolvedValue('Juho')
+      const account = await signedIn()
+      claimName.mockResolvedValue('claimed')
+
+      await account.claim('Jussi')
+
+      expect(account.claimedName).toBe('Jussi')
+      expect(account.lastAction).toBe('claim')
+    })
   })
 })

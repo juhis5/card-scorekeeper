@@ -266,6 +266,18 @@
   /* A floating sheet with a field sits about mid-way in what a phone keyboard leaves visible. */
   --floating-sheet-top: 15dvh;
 }
+/* Google's sign-in button, in the colors its branding guidelines fix: the light button on light
+   themes, the dark one on dark themes. Not theme colors, so not in the themes above. */
+:root {
+  --google-button: #ffffff;
+  --google-button-border: #747775;
+  --google-button-foreground: #1f1f1f;
+}
+.dark {
+  --google-button: #131314;
+  --google-button-border: #8e918f;
+  --google-button-foreground: #e3e3e3;
+}
 @theme {
   --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
   /* The narrowest phones (360 px): the header drops words it can do without there. */

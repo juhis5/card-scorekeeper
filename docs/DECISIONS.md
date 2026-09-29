@@ -677,3 +677,11 @@ it is.
   client-side from `claimedNames` by name and matched on the player id (seat id, entry id's
   player part, totals id, head-to-head opponent), so no stored shape changed and old entries
   under a claimed name stay unbadged unless they are the owner's own. Local games show none.
+- 2026-09-29 — An Account page (owner: account things in the menu were poor UX). The menu links
+  to `/account`: the Google section with Google's own "Sign in with Google" button (drawn to
+  their branding guidelines, light or dark with the theme, 44 px tall for the tap target) and the
+  player's name, which is editable there. Renaming moves a claim (owner's decision, superseding
+  "for good" in the claimed-names entry): one batch creates the new claim, repoints
+  `claimOwners` and deletes the old claim, after a confirm that the old name frees up. The rules
+  allow a claim's delete only in such a move, so an account still never holds two names. A
+  respelling (same name key) keeps the claim as it is.
