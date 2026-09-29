@@ -24,7 +24,10 @@ vi.mock('firebase/firestore', () => ({
 
 const { checkBackendReachable } = await import('./firebase')
 
-const signedInAuth = { currentUser: { uid: 'uid-1' } } as never
+const signedInAuth = {
+  currentUser: { uid: 'uid-1' },
+  authStateReady: () => Promise.resolve(),
+} as never
 
 beforeEach(() => {
   vi.clearAllMocks()

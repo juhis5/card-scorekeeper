@@ -110,16 +110,17 @@ const signInPromises = new WeakMap<Auth, Promise<string>>()
 
 /** Every rule needs `request.auth`, so await this before the first write. Concurrent calls share
  * the sign-in in flight. */
-export function ensureSignedIn(authInstance: Auth = getFirebaseAuth()): Promise<string> {
-  if (authInstance.currentUser) return Promise.resolve(authInstance.currentUser.uid)
+export async function ensureSignedIn(authInstance: Auth = getFirebaseAuth()): Promise<string> {
+  // The saved session restores asynchronously, so until then there's no user even for a player
+  // who signed in with Google, and signInAnonymously would replace their account with a new one.
+  await authInstance.authStateReady()
+  if (authInstance.currentUser) return authInstance.currentUser.uid
   const existing = signInPromises.get(authInstance)
   if (existing) return existing
+  // Forgotten once settled: after a sign-out the next call signs in afresh.
   const promise = signInAnonymously(authInstance)
     .then((credential) => credential.user.uid)
-    .catch((error: unknown) => {
-      signInPromises.delete(authInstance)
-      throw error
-    })
+    .finally(() => signInPromises.delete(authInstance))
   signInPromises.set(authInstance, promise)
   return promise
 }

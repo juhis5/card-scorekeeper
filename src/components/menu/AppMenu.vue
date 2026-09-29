@@ -32,13 +32,12 @@ const install = useInstallStore()
 const appUpdate = useAppUpdateStore()
 const route = useRoute()
 const game = useGameStore()
-/** In a room whose game is still going: the menu offers the way out of it. */
-const isInRunningGame = computed(
-  () =>
-    route.name === 'room' &&
-    game.gameId !== null &&
-    (game.status === 'waiting' || game.status === 'playing'),
+/** A game still going on this device, even when Home is showing it as "Continue game". */
+const hasRunningGame = computed(
+  () => game.gameId !== null && (game.status === 'waiting' || game.status === 'playing'),
 )
+/** In a room whose game is still going: the menu offers the way out of it. */
+const isInRunningGame = computed(() => route.name === 'room' && hasRunningGame.value)
 const isOpen = ref(false)
 
 const pages = [
@@ -90,7 +89,7 @@ function close(): void {
       </ul>
 
       <ul role="list" :aria-label="t('app.menu.account')">
-        <li><AccountRow :locked="isInRunningGame" /></li>
+        <li><AccountRow :locked="hasRunningGame" /></li>
       </ul>
 
       <ul role="list" :aria-label="t('app.menu.settings')">
