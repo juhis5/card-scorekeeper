@@ -80,6 +80,8 @@ function reasonForStatus(status: number): PhotoCountFailureReason {
 export interface UsePhotoCountDeps {
   /** Defaults to the signed-in Firebase user's ID token; null when nobody is signed in. */
   getIdToken?: () => Promise<string | null>
+  /** Defaults to Firebase App Check's token; null while App Check is off. */
+  getAppCheckToken?: () => Promise<string | null>
   downscale?: (file: Blob) => Promise<{ base64: string; mimeType: string }>
   fetchImpl?: typeof fetch
   timeoutMs?: number
@@ -91,8 +93,14 @@ async function defaultGetIdToken(): Promise<string | null> {
   return user ? user.getIdToken() : null
 }
 
+async function defaultGetAppCheckToken(): Promise<string | null> {
+  const { getAppCheckToken } = await import('@/lib/data/firebase')
+  return getAppCheckToken()
+}
+
 export function usePhotoCount(deps: UsePhotoCountDeps = {}) {
   const getIdToken = deps.getIdToken ?? defaultGetIdToken
+  const getAppCheckToken = deps.getAppCheckToken ?? defaultGetAppCheckToken
   const downscale = deps.downscale ?? useImageDownscale().downscale
   const fetchImpl = deps.fetchImpl ?? fetch
   const timeoutMs = deps.timeoutMs ?? REQUEST_TIMEOUT_MS
@@ -105,13 +113,19 @@ export function usePhotoCount(deps: UsePhotoCountDeps = {}) {
 
     const image = await downscale(file).catch(() => null)
     if (!image) return { ok: false, reason: 'image-processing' }
+    // Without one the server refuses the request (once App Check is on), which reads as signed out.
+    const appCheckToken = await getAppCheckToken().catch(() => null)
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
       const response = await fetchImpl(COUNT_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idToken}`,
+          ...(appCheckToken && { 'X-Firebase-AppCheck': appCheckToken }),
+        },
         body: JSON.stringify({ roomCode, image: image.base64, mimeType: image.mimeType }),
         signal: controller.signal,
       })

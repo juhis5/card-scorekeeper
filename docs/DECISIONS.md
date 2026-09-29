@@ -703,3 +703,14 @@ it is.
     host. Now its result reaches them only when the invited player counts it; a declined or
     ignored invite never does. Its stats rows are written as before.
   - An abandoned or expired game's invite is shown as ended, and can be dismissed.
+- 2026-09-29 — App Check on everything, enforced without a monitoring period (owner's decision).
+  Firebase App Check with reCAPTCHA Enterprise (invisible) proves a request comes from the real
+  app: Firestore and Auth enforce it in the console, and `/api/count` checks the
+  `X-Firebase-AppCheck` token itself (`api/_lib/app-check-token.ts`, `jose`, against the project
+  number, which is the web config's messaging sender id). Free at this scale: 10,000 assessments
+  a month, one per token refresh, with a 12-hour token TTL. It closes the scripted-abuse gaps
+  accepted earlier (forged highscores from two scripted accounts, draining the Spark quota or the
+  Gemini budget). The site key is public config (`VITE_APP_CHECK_SITE_KEY`); unset, App Check is
+  off, so local, CI and the emulators run without it. Not monitored first: a friends' group
+  tests its own devices on staging instead. Vercel preview URLs aren't on the staging key's
+  domains, so online play on a preview deploy stops working while staging enforces.

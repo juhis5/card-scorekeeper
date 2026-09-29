@@ -9,4 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_DEPLOY_ENV: string
   /** The commit being deployed, which Sentry matches with the uploaded source maps. */
   readonly VITE_RELEASE: string
+  /** App Check's reCAPTCHA Enterprise site key (public); set per Firebase project in Vercel. */
+  readonly VITE_APP_CHECK_SITE_KEY?: string
+  /** Local only: a debug token registered in the console, for a dev build against staging. */
+  readonly VITE_APP_CHECK_DEBUG_TOKEN?: string
 }

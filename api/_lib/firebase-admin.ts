@@ -6,6 +6,7 @@ import { cert, getApps, initializeApp, type App, type ServiceAccount } from 'fir
 import { getFirestore, type Firestore } from 'firebase-admin/firestore'
 import { createRemoteJWKSet } from 'jose'
 import { toRoomSnapshot, type RoomSnapshot } from './gate.js'
+import { APP_CHECK_KEYS_URL, createAppCheckVerifier } from './app-check-token.js'
 import { createIdTokenVerifier, FIREBASE_ID_TOKEN_KEYS_URL } from './id-token.js'
 
 /** The downloaded key file's shape: `cert()` accepts it as is, and `project_id` names the
@@ -17,6 +18,7 @@ interface ServiceAccountKey extends ServiceAccount {
 let cachedServiceAccount: ServiceAccountKey | undefined
 let cachedApp: App | undefined
 let cachedVerifier: ((idToken: string) => Promise<{ uid: string }>) | undefined
+let cachedAppCheckVerifier: ((token: string) => Promise<void>) | undefined
 
 function readServiceAccount(): ServiceAccountKey {
   if (cachedServiceAccount) return cachedServiceAccount
@@ -65,6 +67,22 @@ export async function verifyIdToken(idToken: string): Promise<{ uid: string }> {
     })
   }
   return cachedVerifier(idToken)
+}
+
+/** Rejects unless the token proves the request comes from this project's own app. The project
+ * number is the web config's messaging sender id, which the function's env has anyway. */
+export async function verifyAppCheckToken(token: string): Promise<void> {
+  if (!cachedAppCheckVerifier) {
+    const projectNumber = process.env.VITE_FIREBASE_MESSAGING_SENDER_ID
+    if (!projectNumber) {
+      throw new Error('VITE_FIREBASE_MESSAGING_SENDER_ID is not set')
+    }
+    cachedAppCheckVerifier = createAppCheckVerifier({
+      projectNumber,
+      keys: createRemoteJWKSet(new URL(APP_CHECK_KEYS_URL)),
+    })
+  }
+  return cachedAppCheckVerifier(token)
 }
 
 function getAdminFirestore(): Firestore {

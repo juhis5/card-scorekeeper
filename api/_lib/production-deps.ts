@@ -4,7 +4,12 @@
  * cold starts: accepted for a friends' game (docs/DECISIONS.md).
  */
 import { createGeminiClient, DEFAULT_GEMINI_MODEL } from './gemini.js'
-import { getAdminApp, getRoomSnapshot, verifyIdToken } from './firebase-admin.js'
+import {
+  getAdminApp,
+  getRoomSnapshot,
+  verifyAppCheckToken,
+  verifyIdToken,
+} from './firebase-admin.js'
 import { InMemoryRateLimitStore } from './rate-limit.js'
 import type { CountHandlerDeps } from './handler.js'
 
@@ -22,6 +27,8 @@ export function createProductionDeps(): CountHandlerDeps {
   const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL
 
   return {
+    // On with the app's reCAPTCHA site key: then every real client sends a token.
+    ...(process.env.VITE_APP_CHECK_SITE_KEY && { verifyAppCheckToken }),
     verifyIdToken,
     getRoomSnapshot,
     rateLimitStore,

@@ -508,7 +508,7 @@
       },
       "online": {
         "title": "Verkkopelit",
-        "body": "Verkkopelissä huoneen koodi, pelaajien nimet ja pisteet tallentuvat Googlen Firebase-palveluun Suomessa (europe-north1). Huoneeseen pääsee koodilla kuusi tuntia sen avaamisesta."
+        "body": "Verkkopelissä huoneen koodi, pelaajien nimet ja pisteet tallentuvat Googlen Firebase-palveluun Suomessa (europe-north1). Huoneeseen pääsee koodilla kuusi tuntia sen avaamisesta. Jotta skriptit pysyvät poissa, Googlen reCAPTCHA tarkistaa taustalla, että sovelluksen verkkopyynnöt tulevat itse sovelluksesta. Se käyttää siihen selaimesi ja laitteesi tietoja."
       },
       "identity": {
         "title": "Tunnistus",
