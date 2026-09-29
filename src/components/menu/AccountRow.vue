@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { LogIn } from '@lucide/vue'
 import { MENU_ROW_CLASS } from '@/components/menu/menu-row'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { useAccountStore } from '@/stores/account'
 
 const props = defineProps<{
@@ -33,8 +34,7 @@ onMounted(() => {
     <button
       v-if="status === 'signedOut'"
       type="button"
-      :class="MENU_ROW_CLASS"
-      class="disabled:opacity-60"
+      :class="cn(MENU_ROW_CLASS, 'h-auto min-h-12 py-2 disabled:opacity-60')"
       :disabled="isDisabled"
       @click="account.signIn"
     >
