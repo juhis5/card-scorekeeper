@@ -35,6 +35,9 @@ export interface Player {
   totalScore: number
   /** Online only: a player without a phone, seated by the host, who scores for them. */
   isGuest?: boolean
+  /** Online only: a guest the host invited by their claimed name; the game counts for this
+   * account once they accept on their own phone. */
+  invitedUid?: string
 }
 
 /** 'abandoned': the host ended the game early; nothing about it is recorded. */
@@ -75,4 +78,7 @@ export interface GamePlayer {
   placement: number
   bestRound: number
   worstRound: number
+  /** An invited player's row: the guest seat it counts as theirs (that guest's row then drops out
+   * of every stats view). */
+  replacesGuestId?: string
 }

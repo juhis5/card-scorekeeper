@@ -7,14 +7,17 @@ import {
   readPendingResults,
 } from '@/lib/data/pending-results'
 import type { PendingResult } from '@/lib/data/pending-results'
+import { rememberAcceptedInvite } from '@/lib/data/accepted-invites'
 import { useResultQueueStore } from './result-queue'
 
 const uploadPendingResultsMock = vi.fn()
 const uploadPendingHighscoresMock = vi.fn().mockResolvedValue(undefined)
+const countAcceptedInvitesMock = vi.fn().mockResolvedValue(0)
 
 vi.mock('@/lib/data/reconnect-flush', () => ({
   uploadPendingResults: () => uploadPendingResultsMock(),
   uploadPendingHighscores: () => uploadPendingHighscoresMock(),
+  countAcceptedInvites: () => countAcceptedInvitesMock(),
 }))
 
 function queuedGame(gameId: string): PendingResult {
@@ -38,6 +41,7 @@ beforeEach(() => {
   vi.restoreAllMocks()
   uploadPendingResultsMock.mockReset().mockResolvedValue(0)
   uploadPendingHighscoresMock.mockReset().mockResolvedValue(undefined)
+  countAcceptedInvitesMock.mockReset().mockResolvedValue(0)
   setOnline(true)
 })
 
@@ -136,5 +140,16 @@ describe('useResultQueueStore', () => {
 
     expect(queue.failedCount).toBe(0)
     expect(localStorage.getItem(FAILED_RESULTS_STORAGE_KEY)).toBe('[]')
+  })
+
+  it('counts invites accepted mid-game even with nothing else waiting, and reports them', async () => {
+    setOnline(true)
+    rememberAcceptedInvite(localStorage, 'ABCDE_guest-1')
+    countAcceptedInvitesMock.mockResolvedValue(1)
+
+    const counted = await useResultQueueStore().upload()
+
+    expect(countAcceptedInvitesMock).toHaveBeenCalledTimes(1)
+    expect(counted).toBe(1)
   })
 })

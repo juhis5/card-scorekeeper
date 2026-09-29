@@ -54,6 +54,7 @@ vi.mock('@/composables/useClaimedNames', async () => {
 vi.mock('@/lib/data/reconnect-flush', () => ({
   uploadPendingResults: () => uploadPendingResultsMock(),
   uploadPendingHighscores: () => uploadPendingHighscoresMock(),
+  countAcceptedInvites: () => Promise.resolve(0),
 }))
 
 vi.mock('firebase/firestore', () => ({

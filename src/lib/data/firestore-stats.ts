@@ -78,10 +78,11 @@ export async function writeGameResult(
   db: Firestore,
   result: GameResult,
   players: GamePlayer[],
+  invitedUids: string[] = [],
 ): Promise<GameResult> {
   // The players' auth uids (what `deviceUuid` holds here), so firestore.rules shows a result
-  // only to the people who played it.
-  const participantUids = players.map((player) => player.deviceUuid)
+  // only to the people who played it, and to those invited to count it as theirs.
+  const participantUids = [...players.map((player) => player.deviceUuid), ...invitedUids]
   // Before the player rows, not batched: their rule checks this doc exists(), and a rule doesn't
   // see a sibling write in the same batch.
   const stored = await ensureGameResultWritten(db, result, participantUids)

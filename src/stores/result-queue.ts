@@ -5,6 +5,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { readAcceptedInvites } from '@/lib/data/accepted-invites'
 import { browserLocalStorage } from '@/lib/data/key-value-storage'
 import {
   discardFailedResults,
@@ -13,7 +14,11 @@ import {
   readPendingResults,
   retryFailedResults,
 } from '@/lib/data/pending-results'
-import { uploadPendingHighscores, uploadPendingResults } from '@/lib/data/reconnect-flush'
+import {
+  countAcceptedInvites,
+  uploadPendingHighscores,
+  uploadPendingResults,
+} from '@/lib/data/reconnect-flush'
 
 export const useResultQueueStore = defineStore('result-queue', () => {
   const waitingCount = ref(0)
@@ -28,16 +33,23 @@ export const useResultQueueStore = defineStore('result-queue', () => {
     failedCount.value = readFailedResults(storage).length
   }
 
-  /** Never throws. Resolves to how many games went up; a second call joins the one in flight.
-   * Also retries online games' highscore entries that failed to publish. */
+  /** Never throws. Resolves to how many games went up (counted invites included); a second call
+   * joins the one in flight. Also retries online games' highscore entries that failed to publish,
+   * and counts invites accepted mid-game whose game has since finished. */
   function upload(): Promise<number> {
     if (inFlight) return inFlight
     refresh()
-    const hasHighscores = readPendingHighscores(browserLocalStorage()).length > 0
-    if ((waitingCount.value === 0 && !hasHighscores) || !navigator.onLine) return Promise.resolve(0)
+    const storage = browserLocalStorage()
+    const hasOtherWork =
+      readPendingHighscores(storage).length > 0 || readAcceptedInvites(storage).length > 0
+    if ((waitingCount.value === 0 && !hasOtherWork) || !navigator.onLine) return Promise.resolve(0)
     isUploading.value = true
-    inFlight = Promise.all([uploadPendingResults(), uploadPendingHighscores()])
-      .then(([flushed]) => flushed)
+    inFlight = Promise.all([
+      uploadPendingResults(),
+      uploadPendingHighscores(),
+      countAcceptedInvites(),
+    ])
+      .then(([flushed, , counted]) => flushed + counted)
       .finally(() => {
         inFlight = null
         isUploading.value = false

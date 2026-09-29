@@ -117,7 +117,18 @@ reassign one in the console by deleting both docs. Anyone signed in may read a c
 A phone takes a seat under a claimed name only if it is the owner's (the host's own seat
 included); a host's guest may use any name, and Play again carries a seat's name unchanged.
 Opening or joining under someone else's claimed name says so by the name field, pointing its
-owner to signing in. The badge shows on the scoreboard, Ennätykset, the finish screen's lists
+owner to signing in.
+
+Invites: a host who adds a player without a phone under someone's claimed name invites that
+account. The seat plays as a guest ("Kutsuttu"), with `invites/{code}_{guestId}` written in the
+same batch; Play again invites them to the next game too. The invited player sees their open
+invites (several can wait) and accepts or declines each on their own phone. Accepting a finished
+game counts it at once: their own `game_player` row, a copy of the guest's (`replacesGuestId`), in
+the batch that marks the invite counted, then its public entry and totals. Accepted mid-game, it
+counts when the game has finished, from the same upload that sends results waiting on the device
+(launch, reconnect, Tilastot). The invited player is a participant of the game (so they can read
+it), and the guest row drops out of every stats view once replaced. An invited seat's result
+reaches the public lists only when its player counts it. The badge shows on the scoreboard, Ennätykset, the finish screen's lists
 and head-to-head, only where the player id is the claim's owner (`useClaimedNames`, one read per
 name per session).
 

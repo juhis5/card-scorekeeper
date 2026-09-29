@@ -685,3 +685,21 @@ it is.
   `claimOwners` and deletes the old claim, after a confirm that the old name frees up. The rules
   allow a claim's delete only in such a move, so an account still never holds two names. A
   respelling (same name key) keeps the claim as it is.
+- 2026-09-29 — Invite by name, confirm on the phone (owner's request, with several pending at a
+  time). A host can't seat someone's account: they could put anyone in made-up games. So the host
+  adds an *invited guest*: the seat is a guest the host scores, plus an invite to the claimed
+  name's owner; the game counts for that account only once they accept on their own phone.
+  - Counting copies the guest's row as theirs (`replacesGuestId`), checked field by field by the
+    rules against the guest row, in the batch that marks the invite counted. Only that branch
+    may name a replaced player, only a guest, and the stats drop a guest row only when a
+    player's row replaces it, so no row can hide anyone else's.
+  - Accepting mid-game counts later: the accepted invite waits in localStorage and the result
+    upload (launch, online, Tilastot) counts it once the game is finished, one invite at a time,
+    since each updates the same running totals. A failed public entry joins the pending-highscores
+    queue.
+  - Play again carries the invite to the next game; if the claim moved meanwhile, the player is
+    carried as a plain guest.
+  - Behaviour change: a guest under a claimed name used to reach the public lists through the
+    host. Now its result reaches them only when the invited player counts it; a declined or
+    ignored invite never does. Its stats rows are written as before.
+  - An abandoned or expired game's invite is shown as ended, and can be dismissed.

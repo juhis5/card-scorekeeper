@@ -8,6 +8,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
@@ -40,7 +41,7 @@ import {
   isGameOver,
   runningTotal,
 } from '../game/rules'
-import { gamePlayerRows } from '../game/stats'
+import { GUEST_ID_PREFIX, gamePlayerRows } from '../game/stats'
 import { withTimeout } from '../platform/timeout'
 import { isPermissionDenied } from './write-errors'
 import type {
@@ -88,6 +89,13 @@ interface PlayerDocData {
   totalScore: number
   joinOrder: number
   isGuest?: true
+  invitedUid?: string
+}
+
+/** An invited guest seat's invite: to whom, and the host's name to show them. */
+interface GuestInvite {
+  invitedUid: string
+  hostName: string
 }
 
 /** A seat's record under names/: a guest's also names its seat. */
@@ -107,11 +115,9 @@ function toPlayer(snapshot: QueryDocumentSnapshot): Player {
   const data = snapshot.data() as PlayerDocData
   const player: Player = { id: snapshot.id, name: data.name, totalScore: data.totalScore }
   if (data.isGuest === true) player.isGuest = true
+  if (data.invitedUid) player.invitedUid = data.invitedUid
   return player
 }
-
-/** firestore.rules only accepts this shape for a guest seat's id: never a uid. */
-const GUEST_ID_PREFIX = 'guest-'
 
 function toRoundScore(snapshot: QueryDocumentSnapshot): RoundScore {
   const data = snapshot.data() as RoundScoreDocData
@@ -264,16 +270,19 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
   }
 
   /** A player without a phone: a seat owned by the host, with a guest id and a name record
-   * naming the seat, in one batch like takeSeat (see firestore.rules' guest branches). */
+   * naming the seat, in one batch like takeSeat (see firestore.rules' guest branches). Under
+   * someone's claimed name, the seat invites them: the game counts for their account once they
+   * accept on their phone. */
   async addGuest(input: AddGuestInput): Promise<PlayerId> {
     await ensureSignedIn(this.auth)
     const hostUid = this.requireUid()
     const roomCode = this.requireRoomCode()
     const name = cleanPlayerName(input.name)
     const guestId = `${GUEST_ID_PREFIX}${this.newGuestId()}`
+    const invite = await this.inviteFor(roomCode, hostUid, name)
     try {
       await withTimeout(
-        this.seatGuest(roomCode, hostUid, guestId, { name, joinOrder: this.now() }),
+        this.seatGuest(roomCode, hostUid, guestId, { name, joinOrder: this.now(), invite }),
         this.writeTimeoutMs,
       )
     } catch (error) {
@@ -285,12 +294,34 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     return guestId
   }
 
+  /** Who a guest under `name` invites: the owner of that claimed name, unless it's the host. */
+  private async inviteFor(
+    roomCode: string,
+    hostUid: string,
+    name: string,
+  ): Promise<GuestInvite | null> {
+    const claim = await readNameClaim(this.db, name)
+    if (!claim || claim.ownerUid === hostUid) return null
+    return { invitedUid: claim.ownerUid, hostName: await this.hostName(roomCode, hostUid) }
+  }
+
+  /** The invite shows the host's name: the rules check it against the host's seat, which every
+   * room has from its creation. */
+  private async hostName(roomCode: string, hostUid: string): Promise<string> {
+    const seat = await withTimeout(
+      getDoc(doc(this.db, `room/${roomCode}/players/${hostUid}`)),
+      this.writeTimeoutMs,
+    )
+    return (seat.data() as PlayerDocData).name
+  }
+
   private seatGuest(
     roomCode: string,
     hostUid: string,
     guestId: string,
-    seat: { name: string; joinOrder: number },
+    seat: { name: string; joinOrder: number; invite?: GuestInvite | null },
   ): Promise<void> {
+    const { invite } = seat
     const batch = writeBatch(this.db)
     batch.set(doc(this.db, `room/${roomCode}/players/${guestId}`), {
       name: seat.name,
@@ -299,11 +330,24 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       totalScore: 0,
       joinOrder: seat.joinOrder,
       isGuest: true,
+      ...(invite && { invitedUid: invite.invitedUid }),
     } satisfies PlayerDocData)
     batch.set(doc(this.db, `room/${roomCode}/names/${playerNameKey(seat.name)}`), {
       ownerUid: hostUid,
       playerId: guestId,
     } satisfies NameRecordData)
+    if (invite) {
+      batch.set(doc(this.db, `invites/${roomCode}_${guestId}`), {
+        gameId: roomCode,
+        guestId,
+        invitedUid: invite.invitedUid,
+        hostUid,
+        hostName: invite.hostName,
+        name: seat.name,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      })
+    }
     return batch.commit()
   }
 
@@ -316,31 +360,43 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       getDocs(collection(this.db, `room/${this.previousRoomCode}/players`)),
       this.writeTimeoutMs,
     )
+    const carried = previousSeats.docs.filter((seat) => seat.id !== hostUid)
+    const hasInvites = carried.some((seat) => (seat.data() as PlayerDocData).invitedUid)
+    const hostName = hasInvites ? await this.hostName(roomCode, hostUid) : ''
     // Settled, not all: a seat that can't be taken is someone the host adds again in the room,
     // and their phone still has "Join the next game".
     await Promise.allSettled(
-      previousSeats.docs
-        .filter((seat) => seat.id !== hostUid)
-        .map((seat) =>
-          withTimeout(
-            this.carrySeat(roomCode, hostUid, seat.id, seat.data() as PlayerDocData),
-            this.writeTimeoutMs,
-          ),
+      carried.map((seat) =>
+        withTimeout(
+          this.carrySeat(roomCode, hostUid, seat.id, seat.data() as PlayerDocData, hostName),
+          this.writeTimeoutMs,
         ),
+      ),
     )
   }
 
   /** As it was in the finished room, zeroed: a guest keeps its id, so its stats stay together, and
-   * everyone keeps their place in the order. */
-  private carrySeat(
+   * everyone keeps their place in the order. An invited guest is invited to this game too, or
+   * carried as a plain guest if the invite is refused (the name's claim moved meanwhile). */
+  private async carrySeat(
     roomCode: string,
     hostUid: string,
     playerId: string,
     seat: PlayerDocData,
+    hostName: string,
   ): Promise<void> {
     const kept = { name: seat.name, joinOrder: seat.joinOrder }
-    if (seat.isGuest === true) return this.seatGuest(roomCode, hostUid, playerId, kept)
-    return this.takeSeat(roomCode, playerId, { ...kept, deviceUuid: seat.deviceUuid })
+    if (seat.isGuest !== true) {
+      return this.takeSeat(roomCode, playerId, { ...kept, deviceUuid: seat.deviceUuid })
+    }
+    if (!seat.invitedUid) return this.seatGuest(roomCode, hostUid, playerId, kept)
+    const invite = { invitedUid: seat.invitedUid, hostName }
+    try {
+      await this.seatGuest(roomCode, hostUid, playerId, { ...kept, invite })
+    } catch (error) {
+      if (!isPermissionDenied(error)) throw error
+      await this.seatGuest(roomCode, hostUid, playerId, kept)
+    }
   }
 
   /** One batch: the rules accept a seat only with its own record under names/, and refuse a
@@ -508,12 +564,14 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     }
     const roomCode = this.requireRoomCode()
     const seat = await getDoc(doc(this.db, `room/${roomCode}/players/${playerId}`))
-    const name = (seat.data() as PlayerDocData | undefined)?.name
+    const seatData = seat.data() as PlayerDocData | undefined
+    const name = seatData?.name
     // One batch, so the name is free again only with the seat gone. Deleting a score doc that was
     // never written is a no-op.
     const batch = writeBatch(this.db)
     batch.delete(doc(this.db, `room/${roomCode}/players/${playerId}`))
     if (name) batch.delete(doc(this.db, `room/${roomCode}/names/${playerNameKey(name)}`))
+    if (seatData?.invitedUid) batch.delete(doc(this.db, `invites/${roomCode}_${playerId}`))
     CONTRACTS.forEach(({ round }) => {
       batch.delete(doc(this.db, `room/${roomCode}/roundScores/${playerId}_${round}`))
     })
@@ -559,8 +617,10 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
     // Stats first: players may open Stats the moment the room is finished, and a finished room
     // refuses every write, so a failed stats write leaves Finish retryable.
     // A retry reuses what the first attempt stored: the rules match entries against it.
+    // An invited player may read the game, to count it as theirs once they accept.
+    const invitedUids = players.flatMap((player) => (player.invitedUid ? [player.invitedUid] : []))
     const stored = await withTimeout(
-      writeGameResult(this.db, result, gamePlayers),
+      writeGameResult(this.db, result, gamePlayers, invitedUids),
       this.writeTimeoutMs,
     )
     if (room.status !== 'finished') {
@@ -569,7 +629,10 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
         this.writeTimeoutMs,
       )
     }
-    const unpublished = await publishHighscores(this.db, stored, gamePlayers)
+    // An invited guest's result reaches the public lists only when its player counts it.
+    const invitedGuestIds = new Set(players.filter((p) => p.invitedUid).map((p) => p.id))
+    const published = gamePlayers.filter((row) => !invitedGuestIds.has(row.deviceUuid))
+    const unpublished = await publishHighscores(this.db, stored, published)
     if (unpublished.length > 0) {
       appendPendingHighscores(this.storage, { result: stored, players: unpublished })
     }

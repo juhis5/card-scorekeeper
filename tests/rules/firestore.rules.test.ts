@@ -22,6 +22,7 @@ import {
   limit,
   orderBy,
   query,
+  serverTimestamp,
   setDoc,
   updateDoc,
   where,
@@ -2349,5 +2350,258 @@ describe('a claimed name: only its owner takes a seat under it', () => {
     const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
 
     await assertFails(seatWithName(alice, ALICE_UID, playerFixture(ALICE_UID, { name: 'Juho' })))
+  })
+})
+
+describe('invites: the host adds an absent player by their claimed name', () => {
+  const JUHO_UID = 'juho-uid'
+  const GUEST_ID = 'guest-5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d'
+  const INVITE_ID = `${ROOM_CODE}_${GUEST_ID}`
+  const hostDb = () => testEnv.authenticatedContext(HOST_UID).firestore()
+  const juhoDb = () => testEnv.authenticatedContext(JUHO_UID).firestore()
+
+  beforeEach(async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db(), `room/${ROOM_CODE}`), roomFixture({ status: 'playing' }))
+      await setDoc(
+        doc(db(), `room/${ROOM_CODE}/players/${HOST_UID}`),
+        playerFixture(HOST_UID, { name: 'Host' }),
+      )
+      await setDoc(doc(db(), `room/${ROOM_CODE}/names/${rulesNameKey('Host')}`), {
+        ownerUid: HOST_UID,
+      })
+    })
+    await seedClaim('Juho', JUHO_UID)
+  })
+
+  function inviteFixture(overrides: Record<string, unknown> = {}) {
+    return {
+      gameId: ROOM_CODE,
+      guestId: GUEST_ID,
+      invitedUid: JUHO_UID,
+      hostUid: HOST_UID,
+      hostName: 'Host',
+      name: 'Juho',
+      status: 'pending',
+      createdAt: serverTimestamp(),
+      ...overrides,
+    }
+  }
+
+  /** The invited guest seat, its name record and its invite, in one batch, as the app writes them. */
+  function invite(
+    db: TestFirestore,
+    {
+      seat = {} as Record<string, unknown>,
+      invitation = {} as Record<string, unknown> | null,
+      name = 'Juho',
+    } = {},
+  ) {
+    const batch = writeBatch(db as unknown as Firestore)
+    batch.set(doc(db, `room/${ROOM_CODE}/players/${GUEST_ID}`), {
+      name,
+      ownerUid: HOST_UID,
+      deviceUuid: GUEST_ID,
+      totalScore: 0,
+      joinOrder: 1,
+      isGuest: true,
+      invitedUid: JUHO_UID,
+      ...seat,
+    })
+    batch.set(doc(db, `room/${ROOM_CODE}/names/${rulesNameKey(name)}`), {
+      ownerUid: HOST_UID,
+      playerId: GUEST_ID,
+    })
+    if (invitation) {
+      batch.set(doc(db, `invites/${INVITE_ID}`), inviteFixture({ name, ...invitation }))
+    }
+    return batch.commit()
+  }
+
+  it('lets the host invite the claim owner, who alone of the rest can read it', async () => {
+    await assertSucceeds(invite(hostDb()))
+
+    await assertSucceeds(getDoc(doc(juhoDb(), `invites/${INVITE_ID}`)))
+    await assertSucceeds(
+      getDocs(query(collection(juhoDb(), 'invites'), where('invitedUid', '==', JUHO_UID))),
+    )
+    await assertSucceeds(getDoc(doc(hostDb(), `invites/${INVITE_ID}`)))
+    const stranger = testEnv.authenticatedContext('stranger-uid').firestore()
+    await assertFails(getDoc(doc(stranger, `invites/${INVITE_ID}`)))
+    await assertFails(getDocs(collection(stranger, 'invites')))
+  })
+
+  it("denies inviting anyone but the name's owner, or under a name nobody claimed", async () => {
+    await assertFails(
+      invite(hostDb(), { seat: { invitedUid: 'bob-uid' }, invitation: { invitedUid: 'bob-uid' } }),
+    )
+    await assertFails(invite(hostDb(), { name: 'Mari' }))
+  })
+
+  it('denies an invite without its seat, or an invited seat without its invite', async () => {
+    await assertFails(setDoc(doc(hostDb(), `invites/${INVITE_ID}`), inviteFixture()))
+    await assertFails(invite(hostDb(), { invitation: null }))
+  })
+
+  it('denies anyone but the host, a false host name, or an invite not pending', async () => {
+    const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+    await assertFails(
+      invite(alice, { seat: { ownerUid: ALICE_UID }, invitation: { hostUid: ALICE_UID } }),
+    )
+    await assertFails(invite(hostDb(), { invitation: { hostName: 'Someone famous' } }))
+    await assertFails(invite(hostDb(), { invitation: { status: 'accepted' } }))
+  })
+
+  it('denies the host inviting themself', async () => {
+    await seedClaim('Hostname', HOST_UID)
+
+    await assertFails(
+      invite(hostDb(), {
+        name: 'Hostname',
+        seat: { invitedUid: HOST_UID },
+        invitation: { invitedUid: HOST_UID },
+      }),
+    )
+  })
+
+  it('lets the invited player accept or decline, and later decline an accepted one', async () => {
+    await invite(hostDb())
+    const ref = doc(juhoDb(), `invites/${INVITE_ID}`)
+
+    await assertSucceeds(updateDoc(ref, { status: 'accepted' }))
+    await assertSucceeds(updateDoc(ref, { status: 'declined' }))
+    await assertFails(updateDoc(ref, { status: 'accepted' }))
+  })
+
+  it('denies the host answering, and any change beyond the status', async () => {
+    await invite(hostDb())
+
+    await assertFails(updateDoc(doc(hostDb(), `invites/${INVITE_ID}`), { status: 'accepted' }))
+    await assertFails(
+      updateDoc(doc(juhoDb(), `invites/${INVITE_ID}`), { status: 'accepted', name: 'Jussi' }),
+    )
+    await assertFails(updateDoc(doc(juhoDb(), `invites/${INVITE_ID}`), { status: 'counted' }))
+  })
+
+  it('lets the host delete it only with its seat', async () => {
+    await invite(hostDb())
+
+    await assertFails(deleteDoc(doc(hostDb(), `invites/${INVITE_ID}`)))
+    const host = hostDb()
+    const batch = writeBatch(host as unknown as Firestore)
+    batch.delete(doc(host, `room/${ROOM_CODE}/players/${GUEST_ID}`))
+    batch.delete(doc(host, `invites/${INVITE_ID}`))
+    await assertSucceeds(batch.commit())
+  })
+
+  describe('counting a finished game', () => {
+    const PARTICIPANTS = [HOST_UID, GUEST_ID, JUHO_UID]
+    const guestRow = gamePlayerFixture(ROOM_CODE, GUEST_ID, {
+      participantUids: PARTICIPANTS,
+      displayName: 'Juho',
+      finalScore: 35,
+      placement: 1,
+      bestRound: 0,
+      worstRound: 20,
+    })
+
+    beforeEach(async () => {
+      await invite(hostDb())
+      await seed(async (db) => {
+        await updateDoc(doc(db(), `room/${ROOM_CODE}`), { status: 'finished', currentRound: 5 })
+        await setDoc(
+          doc(db(), `game_result/${ROOM_CODE}`),
+          gameResultFixture({ gameId: ROOM_CODE, participantUids: PARTICIPANTS }),
+        )
+        await setDoc(doc(db(), `game_player/${ROOM_CODE}_${GUEST_ID}`), guestRow)
+      })
+    })
+
+    /** The invited player's row and the counted invite, in one batch. */
+    function count(
+      db: TestFirestore,
+      uid: string,
+      { row = {} as Record<string, unknown>, status = 'counted' } = {},
+    ) {
+      const batch = writeBatch(db as unknown as Firestore)
+      batch.set(doc(db, `game_player/${ROOM_CODE}_${uid}`), {
+        ...guestRow,
+        deviceUuid: uid,
+        replacesGuestId: GUEST_ID,
+        ...row,
+      })
+      batch.update(doc(db, `invites/${INVITE_ID}`), { status })
+      return batch.commit()
+    }
+
+    it("counts the guest's result as the invited player's, who may then publish it", async () => {
+      await assertSucceeds(count(juhoDb(), JUHO_UID))
+
+      await assertSucceeds(
+        setDoc(doc(juhoDb(), `leaderboard/${ROOM_CODE}_${JUHO_UID}`), {
+          displayName: 'Juho',
+          finalScore: 35,
+          worstRound: 20,
+          finishedAt: '2026-01-01T00:00:00.000Z',
+        }),
+      )
+    })
+
+    it('counts an accepted invite too', async () => {
+      await updateDoc(doc(juhoDb(), `invites/${INVITE_ID}`), { status: 'accepted' })
+
+      await assertSucceeds(count(juhoDb(), JUHO_UID))
+    })
+
+    it('denies a result that differs from the guest row', async () => {
+      await assertFails(count(juhoDb(), JUHO_UID, { row: { finalScore: 0 } }))
+      await assertFails(count(juhoDb(), JUHO_UID, { row: { placement: 2 } }))
+      await assertFails(count(juhoDb(), JUHO_UID, { row: { displayName: 'Jussi' } }))
+    })
+
+    it('denies the row without the counted invite, and the invite without the row', async () => {
+      await assertFails(count(juhoDb(), JUHO_UID, { status: 'accepted' }))
+      await assertFails(updateDoc(doc(juhoDb(), `invites/${INVITE_ID}`), { status: 'counted' }))
+    })
+
+    it('denies anyone else counting it, and a declined invite', async () => {
+      const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+      await assertFails(count(alice, ALICE_UID))
+
+      await updateDoc(doc(juhoDb(), `invites/${INVITE_ID}`), { status: 'declined' })
+      await assertFails(count(juhoDb(), JUHO_UID))
+    })
+
+    it('lets no other row name a replaced player: not the host, not a local game', async () => {
+      await assertFails(
+        setDoc(
+          doc(hostDb(), `game_player/${ROOM_CODE}_${HOST_UID}`),
+          gamePlayerFixture(ROOM_CODE, HOST_UID, {
+            participantUids: PARTICIPANTS,
+            displayName: 'Host',
+            replacesGuestId: GUEST_ID,
+          }),
+        ),
+      )
+      await seed(async (db) =>
+        setDoc(
+          doc(db(), `game_result/${GAME_ID}`),
+          gameResultFixture({ participantUids: [ALICE_UID] }),
+        ),
+      )
+      const alice = testEnv.authenticatedContext(ALICE_UID).firestore()
+      await assertFails(
+        setDoc(
+          doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+          gamePlayerFixture(GAME_ID, ALICE_UID, { replacesGuestId: 'guest-x' }),
+        ),
+      )
+      await assertSucceeds(
+        setDoc(
+          doc(alice, `game_player/${GAME_ID}_${ALICE_UID}`),
+          gamePlayerFixture(GAME_ID, ALICE_UID),
+        ),
+      )
+    })
   })
 })
