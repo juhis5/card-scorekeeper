@@ -81,7 +81,7 @@ function isLeader(row: BoardRow): boolean {
               v-if="row.player.isGuest"
               class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 text-xs"
             >
-              {{ t('room.guest') }}
+              {{ row.player.invitedUid ? t('room.invited') : t('room.guest') }}
             </span>
             <span v-if="isLeader(row)" class="sr-only">{{ t('room.table.leaderLabel') }}</span>
           </div>

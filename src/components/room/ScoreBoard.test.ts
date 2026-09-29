@@ -94,4 +94,18 @@ describe('ScoreBoard', () => {
       expect(row.classList.contains('bg-muted')).toBe(false)
     }
   })
+
+  it("marks a host's guest, and an invited one as invited", () => {
+    const players: Player[] = [
+      { id: 'guest-1', name: 'Mummo', totalScore: 0, isGuest: true },
+      { id: 'guest-2', name: 'Juho', totalScore: 0, isGuest: true, invitedUid: 'uid-juho' },
+    ]
+    render(ScoreBoard, {
+      props: { rows: boardRows(players, [], 0), completedRounds: 0 },
+      global: { plugins: [i18n] },
+    })
+
+    expect(screen.getByRole('rowheader', { name: /Mummo/ }).textContent).toContain('guest')
+    expect(screen.getByRole('rowheader', { name: /Juho/ }).textContent).toContain('invited')
+  })
 })

@@ -189,7 +189,7 @@ function handleKeyDown(event: KeyboardEvent): void {
             aria-hidden="true"
             class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 text-xs"
           >
-            {{ t('room.guest') }}
+            {{ player.invitedUid ? t('room.invited') : t('room.guest') }}
           </span>
         </span>
         <span v-if="isMissedRound" class="text-muted-foreground shrink-0 text-sm">

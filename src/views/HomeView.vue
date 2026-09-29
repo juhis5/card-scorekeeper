@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import GameSetup from '@/components/home/GameSetup.vue'
+import InviteNotice from '@/components/home/InviteNotice.vue'
 import LeaveGameButton from '@/components/home/LeaveGameButton.vue'
 import SegmentedToggle from '@/components/shared/SegmentedToggle.vue'
 import JoinGame from '@/components/home/JoinGame.vue'
@@ -76,6 +77,7 @@ const canContinueLocalGame = computed(
         <LeaveGameButton @left="refreshGamesInProgress" />
       </div>
     </section>
+    <InviteNotice />
     <!-- One card: join or start a game, sharing one name field. -->
     <Card class="gap-4 px-4">
       <SegmentedToggle

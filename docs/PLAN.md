@@ -122,7 +122,9 @@ owner to signing in.
 Invites: a host who adds a player without a phone under someone's claimed name invites that
 account. The seat plays as a guest ("Kutsuttu"), with `invites/{code}_{guestId}` written in the
 same batch; Play again invites them to the next game too. The invited player sees their open
-invites (several can wait) and accepts or declines each on their own phone. Accepting a finished
+invites (several can wait) on the Account page, live, and accepts or declines each on their own
+phone, or accepts all at once; Home points a signed-in device to invites waiting for an answer.
+The host's add-player card says a claimed name brings an invite. Accepting a finished
 game counts it at once: their own `game_player` row, a copy of the guest's (`replacesGuestId`), in
 the batch that marks the invite counted, then its public entry and totals. Accepted mid-game, it
 counts when the game has finished, from the same upload that sends results waiting on the device

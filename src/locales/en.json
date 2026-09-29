@@ -102,6 +102,10 @@
       "heading": "Game in progress",
       "room": "Continue room {code}",
       "local": "Continue the game on this device"
+    },
+    "invites": {
+      "notice": "You have {count} game invite to answer. | You have {count} game invites to answer.",
+      "link": "Answer"
     }
   },
   "room": {
@@ -258,7 +262,8 @@
       "hint": "a player without a phone",
       "add": "Add",
       "nameRequired": "Enter the player's name.",
-      "failed": "Couldn't add {name}. Try again."
+      "failed": "Couldn't add {name}. Try again.",
+      "inviteHint": "If the name is someone's claimed name, they get an invite to add the game to their stats on their own phone."
     },
     "guest": "guest",
     "enterAll": {
@@ -301,7 +306,8 @@
       "heading": "Made the highscores",
       "line": "{name} · {list} · #{rank} · {value} points",
       "record": "New record!"
-    }
+    },
+    "invited": "invited"
   },
   "notFound": {
     "heading": "Page not found",
@@ -565,6 +571,32 @@
       "switched": "This Google account was already in use on another device, so this device now shows its stats.",
       "claimed": "The name is yours now.",
       "taken": "Someone already claimed that name."
+    },
+    "invites": {
+      "heading": "Game invites",
+      "lede": "A host added you to these games by your claimed name. The ones you accept go into your stats and the highscores.",
+      "game": {
+        "running": "The game is still on",
+        "finished": "The game has finished",
+        "ended": "The game ended without a result"
+      },
+      "acceptedWaiting": "Accepted: it goes into your stats when the game finishes.",
+      "accept": "Accept",
+      "decline": "Decline",
+      "cancel": "Cancel",
+      "dismiss": "Remove",
+      "acceptAll": "Accept all ({count})",
+      "empty": "No open invites.",
+      "loading": "Loading…",
+      "error": "Couldn't load your invites. Check your connection.",
+      "notices": {
+        "counted": "Added to your stats.",
+        "accepted": "Accepted. It goes into your stats when the game finishes.",
+        "declined": "Declined.",
+        "offline": "No connection. Try again when you're online.",
+        "failed": "That didn't work. Try again."
+      },
+      "from": "{host} added you as {name}"
     }
   }
 }
