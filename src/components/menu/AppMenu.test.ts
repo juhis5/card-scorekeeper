@@ -6,6 +6,8 @@ import { fireEvent, render, screen } from '@testing-library/vue'
 import { flushPromises } from '@vue/test-utils'
 import AppMenu from './AppMenu.vue'
 import { i18n, setLocale } from '@/i18n'
+import { LocalGameRepository } from '@/lib/data/local-repository'
+import { useGameStore } from '@/stores/game'
 
 // The service worker's virtual module only exists inside a Vite-built app.
 const needRefresh = ref(false)
@@ -33,9 +35,9 @@ function makeRouter() {
   })
 }
 
-async function renderMenu() {
+async function renderMenu(path = '/room/ABCDE') {
   const router = makeRouter()
-  await router.push('/room/ABCDE')
+  await router.push(path)
   render(AppMenu, { global: { plugins: [i18n, router] } })
   return router
 }
@@ -109,5 +111,24 @@ describe('AppMenu', () => {
     await flushPromises()
 
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('holds account changes while a game runs, even from Home, where it offers no exit', async () => {
+    const values = new Map<string, string>()
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+    }
+    await useGameStore().start(new LocalGameRepository({ storage }), {
+      hostDeviceUuid: 'd',
+      hostDisplayName: 'Juho',
+    })
+    await renderMenu('/')
+    await openMenu()
+
+    const signIn = await screen.findByRole('button', { name: /Sign in with Google/ })
+    expect((signIn as HTMLButtonElement).disabled).toBe(true)
+    expect(signIn.textContent).toContain('Finish or leave the game first')
+    expect(screen.queryByRole('list', { name: 'This game' })).toBeNull()
   })
 })

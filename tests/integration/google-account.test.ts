@@ -15,6 +15,7 @@ import {
   signInWithCredential,
   type Auth,
 } from 'firebase/auth'
+import { ensureSignedIn } from '@/lib/data/firebase'
 import {
   currentGoogleAccount,
   signInWithGoogle,
@@ -69,15 +70,19 @@ describe('Google sign-in, end-to-end against the Auth emulator', () => {
     expect(currentGoogleAccount(auth)).toEqual({ email: google.email })
   })
 
-  it('signs out to no session; the next sign-in starts a fresh anonymous uid', async () => {
+  it('keeps the Google session for later writes, and signs in afresh after signing out', async () => {
     const auth = makeDevice()
-    const { user: anonymous } = await signInAnonymously(auth)
+    const linkedUid = await ensureSignedIn(auth)
     await signInWithGoogle(auth, googleAccount())
+
+    await expect(ensureSignedIn(auth)).resolves.toBe(linkedUid)
+    expect(auth.currentUser?.isAnonymous).toBe(false)
 
     await signOutOfGoogle(auth)
     expect(auth.currentUser).toBeNull()
-    const { user: fresh } = await signInAnonymously(auth)
+    const freshUid = await ensureSignedIn(auth)
 
-    expect(fresh.uid).not.toBe(anonymous.uid)
+    expect(freshUid).not.toBe(linkedUid)
+    expect(auth.currentUser?.isAnonymous).toBe(true)
   })
 })
