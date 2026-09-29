@@ -2,12 +2,13 @@
  * Handles POST /api/count with every dependency injected, so tests use fakes. Cheapest first:
  *   1. method + request shape (no I/O)       → 405 / 400
  *   2. image size cap (no I/O)               → 413
- *   3. Firebase ID token                     → 401
- *   4. room live + caller seated             → 403
- *   5. per-room, then global rate limit      → 429
- *   6. Gemini call (timeout / busy / other)  → 504 / 503 / 502
- *   7. model output validation               → 422
- *   8. recomputed cards + total              → 200
+ *   3. App Check token, when enforced        → 401
+ *   4. Firebase ID token                     → 401
+ *   5. room live + caller seated             → 403
+ *   6. per-room, then global rate limit      → 429
+ *   7. Gemini call (timeout / busy / other)  → 504 / 503 / 502
+ *   8. model output validation               → 422
+ *   9. recomputed cards + total              → 200
  */
 import { parseBearerToken, parseCountRequestBody } from './request.js'
 import { authenticateRequest, evaluateRoomGate, type RoomSnapshot } from './gate.js'
@@ -40,6 +41,9 @@ export interface CountApiResult {
 }
 
 export interface CountHandlerDeps {
+  /** Set once App Check is on (a reCAPTCHA site key is configured): only the real app, not a
+   * script with a player's ID token, may spend the Gemini budget. */
+  verifyAppCheckToken?: (token: string) => Promise<void>
   verifyIdToken: (idToken: string) => Promise<{ uid: string }>
   getRoomSnapshot: (roomCode: string, uid: string) => Promise<RoomSnapshot>
   rateLimitStore: RateLimitStore
@@ -63,6 +67,10 @@ export async function handleCountRequest(
   // Before any I/O: an oversized body must cost no auth call, Firestore read or rate-limit slot.
   if (exceedsSizeCap(parsedBody.image)) {
     return { status: 413, body: { error: 'image_too_large' } }
+  }
+
+  if (deps.verifyAppCheckToken && !(await isAppCheckValid(req, deps.verifyAppCheckToken))) {
+    return { status: 401, body: { error: 'app_check_failed' } }
   }
 
   const token = parseBearerToken(req.headers.authorization)
@@ -130,4 +138,30 @@ function geminiFailureResult(error: unknown): CountApiResult {
     return { status: 503, body: { error: 'model_busy' } }
   }
   return { status: 502, body: { error: 'model_unavailable' } }
+}
+
+/** A bad or missing token is the caller's fault; a failed key fetch is ours, so it throws on. */
+async function isAppCheckValid(
+  req: CountApiRequest,
+  verify: (token: string) => Promise<void>,
+): Promise<boolean> {
+  const header = req.headers['x-firebase-appcheck']
+  if (typeof header !== 'string' || header === '') return false
+  try {
+    await verify(header)
+    return true
+  } catch (error) {
+    if (isRejectedToken(error)) return false
+    throw error
+  }
+}
+
+function isRejectedToken(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    error.code.startsWith('appCheck/')
+  )
 }

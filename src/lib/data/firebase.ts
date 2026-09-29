@@ -5,6 +5,12 @@
  */
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
+  getToken,
+  initializeAppCheck,
+  ReCaptchaEnterpriseProvider,
+  type AppCheck,
+} from 'firebase/app-check'
+import {
   connectFirestoreEmulator,
   doc,
   getDocFromServer,
@@ -35,11 +41,37 @@ const firebaseConfig = {
 
 const useEmulator = import.meta.env.VITE_USE_EMULATOR === 'true'
 
+/** App Check's reCAPTCHA Enterprise site key, public like the rest of the web config. Unset
+ * (local, CI, the emulators): App Check stays off, and so does its enforcement in `/api/count`. */
+const appCheckSiteKey = import.meta.env.VITE_APP_CHECK_SITE_KEY
+
 let cachedApp: FirebaseApp | undefined
+let cachedAppCheck: AppCheck | undefined
 
 function getFirebaseApp(): FirebaseApp {
-  cachedApp ??= initializeApp(firebaseConfig)
+  if (cachedApp) return cachedApp
+  cachedApp = initializeApp(firebaseConfig)
+  if (appCheckSiteKey && !useEmulator) {
+    // Before any Firestore or Auth call, so each of them carries a token. A development build
+    // against staging needs a debug token registered in the console (docs/RELEASE.md).
+    const debugToken = import.meta.env.VITE_APP_CHECK_DEBUG_TOKEN
+    if (debugToken) {
+      ;(globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
+        debugToken
+    }
+    cachedAppCheck = initializeAppCheck(cachedApp, {
+      provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    })
+  }
   return cachedApp
+}
+
+/** For our own backend (`/api/count`), which checks it itself. Null while App Check is off. */
+export async function getAppCheckToken(): Promise<string | null> {
+  getFirebaseApp()
+  if (!cachedAppCheck) return null
+  return (await getToken(cachedAppCheck)).token
 }
 
 /** A synchronous localStorage write is the best early sign that IndexedDB persistence will work.

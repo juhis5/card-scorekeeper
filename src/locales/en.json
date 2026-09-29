@@ -508,7 +508,7 @@
       },
       "online": {
         "title": "Online games",
-        "body": "In an online game the room code, the players' names and their scores are stored in Google's Firebase in Finland (europe-north1). A room can be joined with its code for six hours after it opens."
+        "body": "In an online game the room code, the players' names and their scores are stored in Google's Firebase in Finland (europe-north1). A room can be joined with its code for six hours after it opens. To keep scripts out, Google's reCAPTCHA checks in the background that the app's online requests come from the app itself, using signals from your browser and device."
       },
       "identity": {
         "title": "Identity",

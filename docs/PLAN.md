@@ -109,6 +109,10 @@ the host writes them, and only for seated players; a local result can only name 
 highscore entry must copy its stats row exactly. Accepted limit: a host can enter made-up scores
 in their own game.
 
+App Check (reCAPTCHA Enterprise, invisible) makes Firestore, Auth and `/api/count` accept only
+requests from the real app, so a script with the public config can't play fake games or spend
+the quotas. On when `VITE_APP_CHECK_SITE_KEY` is set; enforced in each project's console.
+
 A player signed in with Google may claim one name (`claimedNames/{nameKey}`, with a
 `claimOwners/{uid}` doc naming it, written together). First come. Renaming on the Account page
 moves the claim in one batch (the new claim, the owner doc, the old claim's delete), which frees

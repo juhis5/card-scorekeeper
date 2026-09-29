@@ -13,6 +13,9 @@ each other, so run them in this order. Only the owner says "release".
 - Vercel, Production scope: `VITE_SENTRY_DSN` and `SENTRY_AUTH_TOKEN` are set (not only
   Preview), and `GEMINI_API_KEY` is a key on a billed Google Cloud project with a budget alert and
   a hard quota cap (the Gemini API terms allow only paid services for EEA users).
+- Production App Check: Firebase console → App Check → Apps → the web app → **Register** with
+  reCAPTCHA Enterprise → **Create key** for `rommi.vercel.app`, token TTL 12 hours. Its site key
+  goes into Vercel as `VITE_APP_CHECK_SITE_KEY`, Production scope. Don't enforce yet (step 5).
 - Production Firebase console: Anonymous and Google sign-in are enabled; `rommi.vercel.app` is an
   authorized domain; the web API key's HTTP-referrer restrictions (if any) include it. Vercel's
   preview URLs aren't authorized domains, so Google sign-in works only on the two named sites.
@@ -63,6 +66,9 @@ against the new rules.
 - rommi.vercel.app loads, and a new game can be started.
 - Ennätykset shows the backfilled games.
 - Sentry shows events with environment `production` and readable (symbolicated) stack traces.
+- Then enforce App Check in the prod console (App Check → APIs → Cloud Firestore → **Enforce**,
+  and Authentication if listed), once the new app is live: the old one sends no tokens. A phone
+  still running an old cached version fails to reach online play until it updates.
 
 ## Rolling back
 

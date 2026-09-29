@@ -4,7 +4,11 @@ import { usePhotoCount } from './usePhotoCount'
 const { auth } = vi.hoisted(() => ({
   auth: { currentUser: null as { getIdToken: () => Promise<string> } | null },
 }))
-vi.mock('@/lib/data/firebase', () => ({ getFirebaseAuth: () => auth }))
+const getAppCheckTokenMock = vi.fn()
+vi.mock('@/lib/data/firebase', () => ({
+  getFirebaseAuth: () => auth,
+  getAppCheckToken: () => getAppCheckTokenMock(),
+}))
 
 afterEach(() => {
   auth.currentUser = null
@@ -50,6 +54,30 @@ describe('usePhotoCount().countCards, the happy path', () => {
       image: DOWNSCALED.base64,
       mimeType: DOWNSCALED.mimeType,
     })
+  })
+
+  it("sends App Check's token when App Check is on, and none when it's off or fails", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { cards: [], total: 0 }))
+    const headersSent = () =>
+      (fetchImpl.mock.calls.at(-1) as [string, RequestInit])[1].headers as Record<string, string>
+    const count = () =>
+      usePhotoCount({
+        getIdToken: async () => 'id-token-abc',
+        downscale: async () => DOWNSCALED,
+        fetchImpl,
+      }).countCards('ABCDE', makeFile())
+
+    getAppCheckTokenMock.mockResolvedValueOnce('app-check-token')
+    await count()
+    expect(headersSent()['X-Firebase-AppCheck']).toBe('app-check-token')
+
+    getAppCheckTokenMock.mockResolvedValueOnce(null)
+    await count()
+    expect(headersSent()).not.toHaveProperty('X-Firebase-AppCheck')
+
+    getAppCheckTokenMock.mockRejectedValueOnce(new Error('recaptcha blocked'))
+    await count()
+    expect(headersSent()).not.toHaveProperty('X-Firebase-AppCheck')
   })
 
   it('returns the parsed cards and total', async () => {

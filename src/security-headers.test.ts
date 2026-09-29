@@ -43,7 +43,7 @@ describe('security headers in vercel.json', () => {
     expect(scriptSrc).not.toContain("'unsafe-inline'")
   })
 
-  it("lets Google sign-in load its script and each Firebase project's auth frame, nothing wider", () => {
+  it("lets Google sign-in and App Check's reCAPTCHA load what they need, nothing wider", () => {
     const csp = header('Content-Security-Policy-Report-Only') ?? ''
     const directive = (name: string) =>
       csp
@@ -52,9 +52,12 @@ describe('security headers in vercel.json', () => {
         .find((part) => part.startsWith(`${name} `))
 
     expect(directive('script-src')).toContain('https://apis.google.com')
+    expect(directive('script-src')).toContain('https://www.google.com/recaptcha/')
+    expect(directive('script-src')).toContain('https://www.gstatic.com/recaptcha/')
     expect(directive('frame-src')).toBe(
-      'frame-src https://card-scorekeeper-staging.firebaseapp.com https://card-scorekeeper-prod-1673f.firebaseapp.com',
+      'frame-src https://card-scorekeeper-staging.firebaseapp.com https://card-scorekeeper-prod-1673f.firebaseapp.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/',
     )
+    expect(directive('connect-src')).toContain('https://content-firebaseappcheck.googleapis.com')
   })
 
   it('forbids framing, MIME sniffing and needless device access', () => {

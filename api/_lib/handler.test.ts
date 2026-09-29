@@ -67,6 +67,60 @@ describe('handleCountRequest', () => {
     expect(result.status).toBe(400)
   })
 
+  describe('with App Check on', () => {
+    const appCheckRequest = (appCheck?: string | string[]) =>
+      validRequest({
+        headers: {
+          authorization: 'Bearer a-valid-token',
+          ...(appCheck !== undefined && { 'x-firebase-appcheck': appCheck }),
+        },
+      })
+
+    it("serves the app's own request, checking its token before the ID token", async () => {
+      const verifyAppCheckToken = vi.fn().mockResolvedValue(undefined)
+      const deps = createDeps({ verifyAppCheckToken })
+
+      const result = await handleCountRequest(appCheckRequest('app-check-token'), deps)
+
+      expect(result.status).toBe(200)
+      expect(verifyAppCheckToken).toHaveBeenCalledWith('app-check-token')
+    })
+
+    it.each([
+      ['no App Check token', undefined],
+      ['an empty one', ''],
+      ['a repeated header', ['a', 'b']],
+    ])('refuses %s with 401, spending nothing on the ID token', async (_case, header) => {
+      const deps = createDeps({ verifyAppCheckToken: vi.fn() })
+
+      const result = await handleCountRequest(appCheckRequest(header), deps)
+
+      expect(result).toEqual({ status: 401, body: { error: 'app_check_failed' } })
+      expect(deps.verifyIdToken).not.toHaveBeenCalled()
+    })
+
+    it('refuses a token App Check rejects with 401', async () => {
+      const deps = createDeps({
+        verifyAppCheckToken: vi
+          .fn()
+          .mockRejectedValue(Object.assign(new Error('bad'), { code: 'appCheck/invalid-token' })),
+      })
+
+      const result = await handleCountRequest(appCheckRequest('forged'), deps)
+
+      expect(result.status).toBe(401)
+    })
+
+    it('passes on a failure to check the token, as a server error', async () => {
+      const failure = new Error('keys unreachable')
+      const deps = createDeps({ verifyAppCheckToken: vi.fn().mockRejectedValue(failure) })
+
+      await expect(handleCountRequest(appCheckRequest('token'), deps)).rejects.toBe(failure)
+      const other = createDeps({ verifyAppCheckToken: vi.fn().mockRejectedValue('odd') })
+      await expect(handleCountRequest(appCheckRequest('token'), other)).rejects.toBe('odd')
+    })
+  })
+
   it('rejects a request with no Authorization header with 401', async () => {
     const result = await handleCountRequest(validRequest({ headers: {} }), createDeps())
     expect(result.status).toBe(401)
