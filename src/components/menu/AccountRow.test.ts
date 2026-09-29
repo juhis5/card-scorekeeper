@@ -55,6 +55,15 @@ describe('AccountRow', () => {
     expect(signOut).toHaveBeenCalledTimes(1)
   })
 
+  it("shows the account's claimed name under it", async () => {
+    const { account } = renderRow('signedIn')
+    account.claimStatus = 'claimed'
+    account.claimedName = 'Juho'
+
+    expect(await screen.findByText('Juho')).toBeTruthy()
+    expect(screen.getByText('Claimed name')).toBeTruthy()
+  })
+
   it('waits while a game is running, saying why', () => {
     renderRow('signedOut', { locked: true })
     const row = screen.getByRole('button', { name: /Sign in with Google/ }) as HTMLButtonElement

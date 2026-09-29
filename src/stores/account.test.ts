@@ -8,9 +8,21 @@ const signInWithGoogle = vi.fn()
 const signOutOfGoogle = vi.fn()
 const signInFailure = vi.fn()
 const reportHandledError = vi.fn()
-const auth = { authStateReady: () => authStateReady() }
+const readOwnClaim = vi.fn()
+const claimName = vi.fn()
+const auth: { authStateReady: () => unknown; currentUser: { uid: string } | null } = {
+  authStateReady: () => authStateReady(),
+  currentUser: { uid: 'uid-me' },
+}
 
-vi.mock('@/lib/data/firebase', () => ({ getFirebaseAuth: () => getFirebaseAuth() }))
+vi.mock('@/lib/data/firebase', () => ({
+  getFirebaseAuth: () => getFirebaseAuth(),
+  getDb: () => 'db',
+}))
+vi.mock('@/lib/data/name-claims', () => ({
+  readOwnClaim: (...args: unknown[]) => readOwnClaim(...args),
+  claimName: (...args: unknown[]) => claimName(...args),
+}))
 vi.mock('@/lib/data/google-account', () => ({
   currentGoogleAccount: (...args: unknown[]) => currentGoogleAccount(...args),
   signInWithGoogle: (...args: unknown[]) => signInWithGoogle(...args),
@@ -29,6 +41,8 @@ beforeEach(() => {
   getFirebaseAuth.mockReturnValue(auth)
   authStateReady.mockResolvedValue(undefined)
   currentGoogleAccount.mockReturnValue(null)
+  readOwnClaim.mockResolvedValue(null)
+  auth.currentUser = { uid: 'uid-me' }
 })
 
 async function loaded() {
@@ -180,5 +194,117 @@ describe('useAccountStore', () => {
     await account.signOut()
 
     expect(signOutOfGoogle).not.toHaveBeenCalled()
+  })
+
+  describe('claimed name', () => {
+    const offline = Object.assign(new Error('offline'), { code: 'unavailable' })
+
+    async function signedIn() {
+      currentGoogleAccount.mockReturnValue({ email: 'juho@example.com' })
+      const account = await loaded()
+      await Promise.resolve()
+      return account
+    }
+
+    it("reads the account's claim once signed in", async () => {
+      readOwnClaim.mockResolvedValue('Juho')
+      const account = await signedIn()
+
+      expect(readOwnClaim).toHaveBeenCalledWith('db', 'uid-me')
+      expect(account.claimStatus).toBe('claimed')
+      expect(account.claimedName).toBe('Juho')
+    })
+
+    it('knows an account without a claim, and reads nothing when signed out', async () => {
+      expect((await signedIn()).claimStatus).toBe('unclaimed')
+
+      setActivePinia(createPinia())
+      readOwnClaim.mockClear()
+      currentGoogleAccount.mockReturnValue(null)
+      expect((await loaded()).claimStatus).toBe('unknown')
+      expect(readOwnClaim).not.toHaveBeenCalled()
+    })
+
+    it('leaves the claim unknown offline, reporting only a real failure', async () => {
+      readOwnClaim.mockRejectedValue(offline)
+      expect((await signedIn()).claimStatus).toBe('unknown')
+      expect(reportHandledError).not.toHaveBeenCalled()
+
+      setActivePinia(createPinia())
+      const broken = new Error('broken')
+      readOwnClaim.mockRejectedValue(broken)
+      expect((await signedIn()).claimStatus).toBe('unknown')
+      expect(reportHandledError).toHaveBeenCalledWith(broken, 'load-name-claim')
+    })
+
+    it('reads no claim without a user', async () => {
+      auth.currentUser = null
+      await signedIn()
+
+      expect(readOwnClaim).not.toHaveBeenCalled()
+    })
+
+    it('drops a claim read that lands after signing out', async () => {
+      let finish: (name: string) => void = () => {}
+      readOwnClaim.mockReturnValue(new Promise((resolve) => (finish = resolve)))
+      const account = await signedIn()
+      signOutOfGoogle.mockResolvedValue(undefined)
+      await account.signOut()
+
+      finish('Juho')
+      await Promise.resolve()
+
+      expect(account.claimStatus).toBe('unknown')
+      expect(account.claimedName).toBeNull()
+    })
+
+    it('claims the clean name for this account and says so', async () => {
+      const account = await signedIn()
+      claimName.mockResolvedValue('claimed')
+
+      await account.claim('  Juho ')
+
+      expect(claimName).toHaveBeenCalledWith('db', 'uid-me', '  Juho ')
+      expect(account.claimStatus).toBe('claimed')
+      expect(account.claimedName).toBe('Juho')
+      expect(account.notice).toBe('claimed')
+    })
+
+    it("says so when the name is someone else's", async () => {
+      const account = await signedIn()
+      claimName.mockResolvedValue('taken')
+
+      await account.claim('Juho')
+
+      expect(account.claimStatus).toBe('unclaimed')
+      expect(account.notice).toBe('taken')
+    })
+
+    it('claims nothing while signed out or without a user', async () => {
+      const account = await loaded()
+      await account.claim('Juho')
+
+      currentGoogleAccount.mockReturnValue({ email: 'juho@example.com' })
+      await account.load()
+      auth.currentUser = null
+      await account.claim('Juho')
+
+      expect(claimName).not.toHaveBeenCalled()
+    })
+
+    it('says offline when the claim cannot reach the server, and reports anything else', async () => {
+      const account = await signedIn()
+      claimName.mockRejectedValue(offline)
+      await account.claim('Juho')
+      expect(account.notice).toBe('offline')
+      expect(reportHandledError).not.toHaveBeenCalled()
+
+      const broken = new Error('broken')
+      claimName.mockRejectedValue(broken)
+      await account.claim('Juho')
+      expect(account.notice).toBe('failed')
+      expect(account.isBusy).toBe(false)
+      expect(reportHandledError).toHaveBeenCalledWith(broken, 'claim-name')
+    })
   })
 })

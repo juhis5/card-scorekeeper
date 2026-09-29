@@ -16,6 +16,7 @@ vi.mock('virtual:pwa-register/vue', () => ({
 // Firebase restores an anonymous session: the menu offers Google sign-in.
 vi.mock('@/lib/data/firebase', () => ({
   getFirebaseAuth: () => ({ currentUser: null, authStateReady: () => Promise.resolve() }),
+  getDb: () => ({}),
 }))
 
 function makeRouter() {

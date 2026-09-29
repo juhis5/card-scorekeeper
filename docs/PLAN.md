@@ -109,6 +109,11 @@ the host writes them, and only for seated players; a local result can only name 
 highscore entry must copy its stats row exactly. Accepted limit: a host can enter made-up scores
 in their own game.
 
+A player signed in with Google may claim one name (`claimedNames/{nameKey}`, with a
+`claimOwners/{uid}` doc naming it, written together). First come and for good: nobody changes or
+deletes a claim from the app; the app's owner releases or reassigns one in the console by deleting
+both docs. Anyone signed in may read a claim, to say "claimed" and to badge its owner's name.
+
 ## Stats & history
 
 - Keyed by the anonymous uid. Clearing browser storage or changing device starts a new identity,
