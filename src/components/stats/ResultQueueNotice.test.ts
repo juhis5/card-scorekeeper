@@ -18,6 +18,7 @@ const uploadPendingHighscoresMock = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/lib/data/reconnect-flush', () => ({
   uploadPendingResults: () => uploadPendingResultsMock(),
   uploadPendingHighscores: () => uploadPendingHighscoresMock(),
+  countAcceptedInvites: () => Promise.resolve(0),
 }))
 
 function queuedGame(gameId: string): PendingResult {

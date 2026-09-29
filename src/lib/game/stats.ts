@@ -170,3 +170,26 @@ export function gamePlayerRows(
     }
   })
 }
+
+/** A guest seat's id (never a uid): firestore.rules' isGuestId accepts only this shape. */
+export const GUEST_ID_PREFIX = 'guest-'
+
+function isGuestId(id: string): boolean {
+  return id.startsWith(GUEST_ID_PREFIX)
+}
+
+/**
+ * Drops each guest row that an invited player counted as their own (`replacesGuestId`): the same
+ * result, which would otherwise show twice, once as the guest. Only a guest can be replaced, and
+ * only by a player's row, so no row can hide anyone else's.
+ */
+export function withoutReplacedGuests(rows: readonly GamePlayer[]): GamePlayer[] {
+  const replaced = new Set(
+    rows.flatMap(({ gameId, deviceUuid, replacesGuestId }) =>
+      replacesGuestId && isGuestId(replacesGuestId) && !isGuestId(deviceUuid)
+        ? [`${gameId}_${replacesGuestId}`]
+        : [],
+    ),
+  )
+  return rows.filter(({ gameId, deviceUuid }) => !replaced.has(`${gameId}_${deviceUuid}`))
+}

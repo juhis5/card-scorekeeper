@@ -4,7 +4,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { headToHead, playerStats } from '@/lib/game/stats'
+import { headToHead, playerStats, withoutReplacedGuests } from '@/lib/game/stats'
 import type { HeadToHeadRecord, PlayerStats } from '@/lib/game/stats'
 import type { GamePlayer } from '@/lib/game/types'
 import { reportHandledError } from '@/lib/platform/error-reporting'
@@ -71,7 +71,10 @@ export const useStatsStore = defineStore('stats', () => {
         return
       }
       const { uid } = connection
-      const { rows, finishedAtByGameId } = await readPlayedGames(connection)
+      const played = await readPlayedGames(connection)
+      const { finishedAtByGameId } = played
+      // An invited player's counted game would show twice: as them and as the guest they were.
+      const rows = withoutReplacedGuests(played.rows)
       stats.value = playerStats(uid, rows)
       opponents.value = buildOpponentRecords(uid, rows, finishedAtByGameId)
       status.value = rows.length === 0 ? 'empty' : 'loaded'

@@ -106,6 +106,20 @@ describe('writeGameResult', () => {
     )
   })
 
+  it('names invited players as participants too, on the result and every row', async () => {
+    await writeGameResult(DB, RESULT, PLAYERS, ['uid-invited'])
+
+    const participants = ['device-a', 'device-b', 'uid-invited']
+    expect(setDocMock).toHaveBeenCalledWith(
+      { db: DB, path: 'game_result/g1' },
+      expect.objectContaining({ participantUids: participants }),
+    )
+    expect(setDocMock).toHaveBeenCalledWith(
+      { db: DB, path: 'game_player/g1_device-a' },
+      expect.objectContaining({ participantUids: participants }),
+    )
+  })
+
   it('writes the game_result doc before any game_player doc (sequential, not batched)', async () => {
     await writeGameResult(DB, RESULT, PLAYERS)
 

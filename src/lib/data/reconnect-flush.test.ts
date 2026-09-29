@@ -9,6 +9,16 @@ const publishHighscoresMock = vi.fn()
 const flushPendingHighscoresMock = vi.fn()
 const readPendingHighscoresMock = vi.fn()
 const reportHandledErrorMock = vi.fn()
+const appendPendingHighscoresMock = vi.fn()
+const readInviteMock = vi.fn()
+const readInviteGameMock = vi.fn()
+const countInviteMock = vi.fn()
+
+vi.mock('./invites', () => ({
+  readInvite: (...args: unknown[]) => readInviteMock(...args),
+  readInviteGame: (...args: unknown[]) => readInviteGameMock(...args),
+  countInvite: (...args: unknown[]) => countInviteMock(...args),
+}))
 
 vi.mock('../platform/error-reporting', () => ({
   reportHandledError: (...args: unknown[]) => reportHandledErrorMock(...args),
@@ -30,10 +40,16 @@ vi.mock('./pending-results', () => ({
   readPendingResults: (...args: unknown[]) => readPendingResultsMock(...args),
   flushPendingHighscores: (...args: unknown[]) => flushPendingHighscoresMock(...args),
   readPendingHighscores: (...args: unknown[]) => readPendingHighscoresMock(...args),
+  appendPendingHighscores: (...args: unknown[]) => appendPendingHighscoresMock(...args),
 }))
 
-const { uploadPendingHighscores, uploadPendingResults, UPLOAD_WRITE_TIMEOUT_MS } =
-  await import('./reconnect-flush')
+const {
+  countAcceptedInvites,
+  uploadPendingHighscores,
+  uploadPendingResults,
+  UPLOAD_WRITE_TIMEOUT_MS,
+} = await import('./reconnect-flush')
+const { readAcceptedInvites, rememberAcceptedInvite } = await import('./accepted-invites')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -190,5 +206,103 @@ describe('uploadPendingHighscores', () => {
 
     expect(flushPendingHighscoresMock).not.toHaveBeenCalled()
     expect(reportHandledErrorMock).toHaveBeenCalledWith(signInFailure, 'upload-pending-highscores')
+  })
+})
+
+describe('countAcceptedInvites', () => {
+  const invite = (id: string, status = 'accepted') => ({
+    id,
+    gameId: id.split('_')[0],
+    guestId: 'guest-1',
+    status,
+  })
+  const counted = (gameId: string) => ({
+    result: { gameId, finishedAt: 'x', totalRounds: 5 },
+    row: { gameId, deviceUuid: 'uid-juho' },
+  })
+
+  beforeEach(() => {
+    localStorage.clear()
+    ensureSignedInMock.mockResolvedValue('uid-juho')
+    publishHighscoresMock.mockResolvedValue([])
+  })
+
+  it('loads nothing with no invite waiting', async () => {
+    await expect(countAcceptedInvites()).resolves.toBe(0)
+    expect(ensureSignedInMock).not.toHaveBeenCalled()
+  })
+
+  it('counts and publishes finished games one at a time, keeping one still running', async () => {
+    rememberAcceptedInvite(localStorage, 'FINIS_guest-1')
+    rememberAcceptedInvite(localStorage, 'PLAYS_guest-1')
+    readInviteMock.mockImplementation((_db: unknown, id: string) => Promise.resolve(invite(id)))
+    readInviteGameMock.mockImplementation((_db: unknown, gameId: string) =>
+      Promise.resolve(gameId === 'FINIS' ? 'finished' : 'running'),
+    )
+    countInviteMock.mockResolvedValue(counted('FINIS'))
+
+    await expect(countAcceptedInvites()).resolves.toBe(1)
+
+    expect(countInviteMock).toHaveBeenCalledWith('db-instance', 'uid-juho', invite('FINIS_guest-1'))
+    expect(publishHighscoresMock).toHaveBeenCalledWith('db-instance', counted('FINIS').result, [
+      counted('FINIS').row,
+    ])
+    expect(readAcceptedInvites(localStorage)).toEqual(['PLAYS_guest-1'])
+  })
+
+  it('queues a public entry that failed to publish, to retry with the others', async () => {
+    rememberAcceptedInvite(localStorage, 'FINIS_guest-1')
+    readInviteMock.mockResolvedValue(invite('FINIS_guest-1'))
+    readInviteGameMock.mockResolvedValue('finished')
+    countInviteMock.mockResolvedValue(counted('FINIS'))
+    publishHighscoresMock.mockResolvedValue([counted('FINIS').row])
+
+    await countAcceptedInvites()
+
+    expect(appendPendingHighscoresMock).toHaveBeenCalledWith(expect.anything(), {
+      result: counted('FINIS').result,
+      players: [counted('FINIS').row],
+    })
+  })
+
+  it('drops an invite answered elsewhere, gone, or whose game ended without a result', async () => {
+    rememberAcceptedInvite(localStorage, 'GONE0_guest-1')
+    rememberAcceptedInvite(localStorage, 'DECLI_guest-1')
+    rememberAcceptedInvite(localStorage, 'ENDED_guest-1')
+    readInviteMock.mockImplementation((_db: unknown, id: string) =>
+      Promise.resolve(
+        id.startsWith('GONE0')
+          ? null
+          : invite(id, id.startsWith('DECLI') ? 'declined' : 'accepted'),
+      ),
+    )
+    readInviteGameMock.mockResolvedValue('ended')
+
+    await expect(countAcceptedInvites()).resolves.toBe(0)
+
+    expect(countInviteMock).not.toHaveBeenCalled()
+    expect(readAcceptedInvites(localStorage)).toEqual([])
+  })
+
+  it('keeps a finished game whose result has not landed yet', async () => {
+    rememberAcceptedInvite(localStorage, 'FINIS_guest-1')
+    readInviteMock.mockResolvedValue(invite('FINIS_guest-1'))
+    readInviteGameMock.mockResolvedValue('finished')
+    countInviteMock.mockResolvedValue(null)
+
+    await countAcceptedInvites()
+
+    expect(readAcceptedInvites(localStorage)).toEqual(['FINIS_guest-1'])
+  })
+
+  it('keeps everything waiting and reports it when a read fails', async () => {
+    rememberAcceptedInvite(localStorage, 'FINIS_guest-1')
+    const offline = new Error('offline')
+    readInviteMock.mockRejectedValue(offline)
+
+    await expect(countAcceptedInvites()).resolves.toBe(0)
+
+    expect(readAcceptedInvites(localStorage)).toEqual(['FINIS_guest-1'])
+    expect(reportHandledErrorMock).toHaveBeenCalledWith(offline, 'count-accepted-invites')
   })
 })

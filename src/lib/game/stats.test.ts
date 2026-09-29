@@ -6,6 +6,7 @@ import {
   nextPlayerTotals,
   playerStats,
   QUALIFYING_GAMES,
+  withoutReplacedGuests,
 } from './stats'
 import type { GamePlayer } from './types'
 
@@ -375,5 +376,40 @@ describe('gamePlayerRows', () => {
     const rows = gamePlayerRows('g1', players, [...tied])
 
     expect(rows.map((row) => row.placement)).toEqual([1, 2, 2])
+  })
+})
+
+describe('withoutReplacedGuests', () => {
+  const row = (gameId: string, deviceUuid: string, replacesGuestId?: string): GamePlayer => ({
+    gameId,
+    deviceUuid,
+    displayName: deviceUuid,
+    finalScore: 10,
+    placement: 1,
+    bestRound: 0,
+    worstRound: 10,
+    ...(replacesGuestId && { replacesGuestId }),
+  })
+
+  it('drops the guest row an invited player counted as theirs, in that game only', () => {
+    const rows = [
+      row('ABCDE', 'uid-host'),
+      row('ABCDE', 'guest-1'),
+      row('ABCDE', 'uid-juho', 'guest-1'),
+      row('FGHJK', 'guest-1'),
+    ]
+
+    expect(withoutReplacedGuests(rows)).toEqual([rows[0], rows[2], rows[3]])
+  })
+
+  it("never lets a row hide a player's own row, or a guest hide another guest", () => {
+    const rows = [
+      row('ABCDE', 'uid-alice'),
+      row('ABCDE', 'uid-host', 'uid-alice'),
+      row('ABCDE', 'guest-2'),
+      row('ABCDE', 'guest-3', 'guest-2'),
+    ]
+
+    expect(withoutReplacedGuests(rows)).toEqual(rows)
   })
 })

@@ -2,8 +2,10 @@
  * the real writer. Firebase loads lazily so an offline host never downloads it. */
 import { reportHandledError } from '../platform/error-reporting'
 import { withTimeout } from '../platform/timeout'
+import { forgetAcceptedInvite, readAcceptedInvites } from './accepted-invites'
 import { browserLocalStorage } from './key-value-storage'
 import {
+  appendPendingHighscores,
   flushPendingHighscores,
   flushPendingResults,
   readPendingHighscores,
@@ -59,4 +61,47 @@ export async function uploadPendingHighscores(): Promise<void> {
   } catch (error) {
     reportHandledError(error, 'upload-pending-highscores')
   }
+}
+
+/**
+ * Counts invites accepted while their game ran, once it has finished, one at a time (each updates
+ * the same running totals). One whose game ended without a result, or that was answered
+ * elsewhere, is dropped; one still running waits. Never throws. Resolves to how many counted.
+ */
+export async function countAcceptedInvites(): Promise<number> {
+  const storage = browserLocalStorage()
+  let countedGames = 0
+  try {
+    const waiting = readAcceptedInvites(storage)
+    if (waiting.length === 0) return 0
+    const [{ getDb, ensureSignedIn }, invites, { publishHighscores }] = await Promise.all([
+      import('./firebase'),
+      import('./invites'),
+      import('./firestore-stats'),
+    ])
+    const uid = await ensureSignedIn()
+    const db = getDb()
+    for (const inviteId of waiting) {
+      const invite = await invites.readInvite(db, inviteId)
+      if (!invite || invite.status !== 'accepted') {
+        forgetAcceptedInvite(storage, inviteId)
+        continue
+      }
+      const game = await invites.readInviteGame(db, invite.gameId)
+      if (game === 'running') continue
+      const counted = game === 'finished' ? await invites.countInvite(db, uid, invite) : null
+      if (game === 'finished' && !counted) continue
+      forgetAcceptedInvite(storage, inviteId)
+      if (!counted) continue
+      countedGames += 1
+      const unpublished = await publishHighscores(db, counted.result, [counted.row])
+      if (unpublished.length > 0) {
+        appendPendingHighscores(storage, { result: counted.result, players: unpublished })
+      }
+    }
+  } catch (error) {
+    // What didn't go through stays waiting for the next try.
+    reportHandledError(error, 'count-accepted-invites')
+  }
+  return countedGames
 }

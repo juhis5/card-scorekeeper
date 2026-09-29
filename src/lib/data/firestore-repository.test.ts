@@ -43,6 +43,7 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: (...args: unknown[]) => onSnapshotMock(...args),
   orderBy: vi.fn(),
   query: (...args: unknown[]) => args[0],
+  serverTimestamp: () => 'server-time',
   setDoc: (...args: unknown[]) => setDocMock(...args),
   Timestamp: { fromMillis: (ms: number) => ({ toMillis: () => ms }) },
   updateDoc: (...args: unknown[]) => updateDocMock(...args),
@@ -1296,5 +1297,172 @@ describe('FirestoreGameRepository.subscribe lifecycle', () => {
 
     expect(() => host.subscribe(() => undefined)).toThrow(/no room code/)
     expect(onSnapshotMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('FirestoreGameRepository invites', () => {
+  const GUEST_ID = 'guest-3f2b8c1e-9a4d-4e6f-8b7a-1c2d3e4f5a6b'
+  const JUHO_UID = 'juho-uid'
+  const INVITE_PATH = `invites/${ROOM_CODE}_${GUEST_ID}`
+
+  function hostRepository(roomCode: string | undefined = ROOM_CODE) {
+    return new FirestoreGameRepository({
+      db: {} as never,
+      auth: { currentUser: { uid: HOST_UID } } as never,
+      roomCode,
+      now: () => 1234,
+      newGuestId: () => GUEST_ID.slice('guest-'.length),
+      generateRoomCode: () => 'FGHJK',
+    })
+  }
+
+  function batchWrites(): [string, unknown][] {
+    return batchSetMock.mock.calls.map(([ref, data]) => [(ref as { path: string }).path, data])
+  }
+
+  function hostSeatIs(name: string) {
+    getDocMock.mockImplementation((ref: { path: string }) =>
+      Promise.resolve(
+        ref.path.endsWith(`/players/${HOST_UID}`)
+          ? snapshot({ name, ownerUid: HOST_UID })
+          : snapshot(undefined),
+      ),
+    )
+  }
+
+  it('invites the owner of a claimed name, with the seat, naming the host', async () => {
+    readNameClaimMock.mockResolvedValue({ name: 'Juho', ownerUid: JUHO_UID })
+    hostSeatIs('Host')
+
+    await hostRepository().addGuest({ name: 'Juho' })
+
+    expect(batchWrites()).toEqual([
+      [
+        `room/${ROOM_CODE}/players/${GUEST_ID}`,
+        expect.objectContaining({ name: 'Juho', isGuest: true, invitedUid: JUHO_UID }),
+      ],
+      [`room/${ROOM_CODE}/names/n_juho`, { ownerUid: HOST_UID, playerId: GUEST_ID }],
+      [
+        INVITE_PATH,
+        {
+          gameId: ROOM_CODE,
+          guestId: GUEST_ID,
+          invitedUid: JUHO_UID,
+          hostUid: HOST_UID,
+          hostName: 'Host',
+          name: 'Juho',
+          status: 'pending',
+          createdAt: 'server-time',
+        },
+      ],
+    ])
+  })
+
+  it("seats a plain guest under a name nobody claimed, or the host's own", async () => {
+    await hostRepository().addGuest({ name: 'Mummo' })
+    readNameClaimMock.mockResolvedValue({ name: 'Host', ownerUid: HOST_UID })
+    await hostRepository().addGuest({ name: 'Hostname' })
+
+    expect(batchWrites().map(([path]) => path)).not.toContain(INVITE_PATH)
+    expect(batchWrites()[0]?.[1]).not.toHaveProperty('invitedUid')
+  })
+
+  it("deletes an invited seat's invite with the seat", async () => {
+    getDocMock.mockResolvedValue(
+      snapshot({ name: 'Juho', ownerUid: HOST_UID, isGuest: true, invitedUid: JUHO_UID }),
+    )
+
+    await hostRepository().removePlayer(GUEST_ID)
+
+    expect(batchDeleteMock).toHaveBeenCalledWith({ path: INVITE_PATH })
+  })
+
+  it('lets the invited player read the finished game, and leaves the public lists to them', async () => {
+    getDocsMock.mockImplementation((ref: { path: string }) => {
+      if (ref.path === `room/${ROOM_CODE}/players`) {
+        return Promise.resolve({
+          docs: [
+            playerDoc(HOST_UID, 'Host', 'device-host'),
+            {
+              id: GUEST_ID,
+              data: () => ({
+                name: 'Juho',
+                ownerUid: HOST_UID,
+                deviceUuid: GUEST_ID,
+                totalScore: 0,
+                joinOrder: 1,
+                isGuest: true,
+                invitedUid: JUHO_UID,
+              }),
+            },
+          ],
+        })
+      }
+      return Promise.resolve({
+        docs: [1, 2, 3, 4, 5].flatMap((round) => [
+          roundScoreDoc(HOST_UID, round, 10),
+          roundScoreDoc(GUEST_ID, round, round === 1 ? 20 : 0),
+        ]),
+      })
+    })
+    getDocMock.mockResolvedValue(snapshot({ status: 'playing', currentRound: 5 }))
+
+    await hostRepository().finishGame()
+
+    expect(writeGameResultMock.mock.calls[0]?.[3]).toEqual([JUHO_UID])
+    const published = publishHighscoresMock.mock.calls[0]?.[2] as GamePlayer[]
+    expect(published.map((row) => row.deviceUuid)).toEqual([HOST_UID])
+  })
+
+  describe('Play again', () => {
+    const invitedSeat = {
+      id: GUEST_ID,
+      data: () => ({
+        name: 'Juho',
+        ownerUid: HOST_UID,
+        deviceUuid: GUEST_ID,
+        totalScore: 20,
+        joinOrder: 3,
+        isGuest: true,
+        invitedUid: JUHO_UID,
+      }),
+    }
+
+    /** `firstCarryFails`: how the carried seat's first batch fails, if it does. */
+    async function carryInvitedSeat(firstCarryFails?: Error) {
+      const repo = hostRepository(undefined)
+      await repo.createNextGame({ hostDeviceUuid: 'd', hostDisplayName: 'Host' }, ROOM_CODE)
+      if (firstCarryFails) batchCommitMock.mockRejectedValueOnce(firstCarryFails)
+      batchCommitMock.mockClear()
+      batchSetMock.mockClear()
+      getDocsMock.mockResolvedValue({ docs: [invitedSeat] })
+      hostSeatIs('Host')
+      await repo.carrySeats()
+    }
+
+    it('invites the player to the next game as well', async () => {
+      await carryInvitedSeat()
+
+      expect(batchWrites()).toContainEqual([
+        `invites/FGHJK_${GUEST_ID}`,
+        expect.objectContaining({ gameId: 'FGHJK', invitedUid: JUHO_UID, hostName: 'Host' }),
+      ])
+    })
+
+    it("carries a plain guest when the invite is refused, as when the name's claim moved", async () => {
+      await carryInvitedSeat(permissionDenied)
+
+      const lastSeat = batchWrites()
+        .filter(([path]) => path.endsWith(`/players/${GUEST_ID}`))
+        .at(-1)
+      expect(lastSeat?.[1]).not.toHaveProperty('invitedUid')
+      expect(batchCommitMock).toHaveBeenCalledTimes(2)
+    })
+
+    it('passes on any other failure of an invited seat', async () => {
+      await carryInvitedSeat(unavailable)
+
+      expect(batchCommitMock).toHaveBeenCalledTimes(1)
+    })
   })
 })
