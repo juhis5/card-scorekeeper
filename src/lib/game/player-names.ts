@@ -36,3 +36,15 @@ export class NameTakenError extends Error {
     this.isGuestSeat = isGuestSeat
   }
 }
+
+/** The name belongs to someone's account (a claimed name), and this device isn't signed in as
+ * them. */
+export class NameClaimedError extends Error {
+  readonly playerName: string
+
+  constructor(playerName: string) {
+    super(`"${playerName}" is a claimed name`)
+    this.name = 'NameClaimedError'
+    this.playerName = playerName
+  }
+}

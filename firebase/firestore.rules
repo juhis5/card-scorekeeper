@@ -96,6 +96,13 @@ service cloud.firestore {
       return /databases/$(database)/documents/claimedNames/$(nameKey);
     }
 
+    /** Nobody claimed the name, or the writer did. Only a phone's own seat is checked: a host's
+     * guest may use any name, and a carried seat keeps the name it already had. */
+    function isUnclaimedOrOwnName(name) {
+      let claim = claimedNamePath(nameKeyOf(name));
+      return !exists(claim) || get(claim).data.ownerUid == request.auth.uid;
+    }
+
     // Claimed names: a player signed in with Google may claim one name, keyed by nameKeyOf, so
     // that nobody else takes a seat under it. First come: a claim is created once, with its
     // owner's claimOwners doc, and never changes. The app's owner releases or reassigns one in the
@@ -207,7 +214,8 @@ service cloud.firestore {
         // Joining: seating yourself, under your own uid. The shape is exact: this doc is the
         // membership key other rules trust, and a seat without joinOrder would count as a member
         // yet be missing from the app's orderBy('joinOrder') list. The name must be clean, with
-        // your own names/ record in the same batch (getAfter sees it), to keep names unique.
+        // your own names/ record in the same batch (getAfter sees it), to keep names unique, and
+        // not a name someone else claimed.
         function isOwnSeat() {
           return isSignedIn()
             && playerUid == request.auth.uid
@@ -217,6 +225,7 @@ service cloud.firestore {
             && request.resource.data.keys().hasOnly(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
             && request.resource.data.keys().hasAll(['name', 'ownerUid', 'deviceUuid', 'totalScore', 'joinOrder'])
             && isCleanPlayerName(request.resource.data.name)
+            && isUnclaimedOrOwnName(request.resource.data.name)
             && getAfter(
               /databases/$(database)/documents/room/$(code)/names/$(nameKeyOf(request.resource.data.name))
             ).data.ownerUid == request.auth.uid

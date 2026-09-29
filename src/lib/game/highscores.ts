@@ -18,8 +18,16 @@ export type GameListName = keyof typeof GAME_LIST_FIELDS
 export interface GameHighscore {
   list: GameListName
   rank: number
+  /** Whose entry it is: a uid, or a guest's id. */
+  playerId: string
   displayName: string
   value: number
+}
+
+/** The player a game-list entry belongs to. Its id is `{gameId}_{player}`, and neither a room
+ * code, a local game's UUID nor a player id contains `_`. */
+export function entryPlayerId(entryId: string): string {
+  return entryId.slice(entryId.indexOf('_') + 1)
 }
 
 /** In a sorted list, the rank at `index`: equal values share the rank of the first (1, 1, 3). */
@@ -42,6 +50,7 @@ export function highscoresOfGame(
             {
               list,
               rank: rankAt(values, index),
+              playerId: entryPlayerId(doc.id),
               displayName: String(doc.data.displayName),
               value: Number(doc.data[field]),
             },

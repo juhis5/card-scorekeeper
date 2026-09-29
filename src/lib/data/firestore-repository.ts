@@ -18,9 +18,15 @@ import {
 import type { Auth } from 'firebase/auth'
 import { ensureSignedIn } from './firebase'
 import { publishHighscores, writeGameResult } from './firestore-stats'
+import { readNameClaim } from './name-claims'
 import { browserLocalStorage, type KeyValueStorage } from './key-value-storage'
 import { appendPendingHighscores } from './pending-results'
-import { cleanPlayerName, NameTakenError, playerNameKey } from '../game/player-names'
+import {
+  cleanPlayerName,
+  NameClaimedError,
+  NameTakenError,
+  playerNameKey,
+} from '../game/player-names'
 import {
   generateRoomCode as defaultGenerateRoomCode,
   isValidRoomCode,
@@ -176,6 +182,8 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
   ): Promise<CreatedOnlineGame> {
     await ensureSignedIn(this.auth)
     const hostUid = this.requireUid()
+    // Checked first: a refused host seat would read as a room-code collision below.
+    await this.refuseClaimedName(cleanPlayerName(config.hostDisplayName), hostUid)
     for (let attempt = 1; attempt < MAX_CREATE_GAME_ATTEMPTS; attempt += 1) {
       try {
         return await this.createRoomWithFreshCode(config, extraFields, hostUid)
@@ -243,9 +251,16 @@ export class FirestoreGameRepository implements ResumableGameRepository, Replaya
       // Your own record is a rejoin in progress, not a clash.
       const isTaken = record !== null && (record.ownerUid !== uid || record.playerId !== undefined)
       if (isTaken) throw new NameTakenError(name, { isGuestSeat: record.playerId !== undefined })
+      await this.refuseClaimedName(name, uid)
       throw error
     }
     return uid
+  }
+
+  /** Throws NameClaimedError when someone else claimed `name` (the rules refuse that seat). */
+  private async refuseClaimedName(name: string, uid: string): Promise<void> {
+    const claim = await readNameClaim(this.db, name)
+    if (claim && claim.ownerUid !== uid) throw new NameClaimedError(name)
   }
 
   /** A player without a phone: a seat owned by the host, with a guest id and a name record

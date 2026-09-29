@@ -40,6 +40,22 @@ vi.mock('@/composables/useGameHighscores', () => ({
   }),
 }))
 
+// Claims are read from Firestore; here Alice goes by the name she claimed, wherever she's looked up.
+vi.mock('@/composables/useClaimedNames', async () => {
+  const { computed } = await import('vue')
+  return {
+    useClaimedNames: (players: () => { playerId: string; name: string }[]) =>
+      computed(
+        () =>
+          new Set(
+            players()
+              .filter(({ name }) => name === 'Alice')
+              .map(({ playerId }) => playerId),
+          ),
+      ),
+  }
+})
+
 // The finish's fireworks draw on a canvas; here only whether they were called matters.
 const { celebrate } = vi.hoisted(() => ({ celebrate: vi.fn() }))
 vi.mock('@/lib/platform/celebrate', () => ({ celebrate }))
@@ -302,6 +318,8 @@ describe('RoomView score entry', () => {
         .find((row) => row.textContent?.includes('Alice'))
     expect(aliceRow()?.textContent).toContain('Entered')
     expect(aliceRow()?.textContent).not.toContain('10')
+    // A local game's players have no accounts: no claimed-name badge, whatever the name.
+    expect(aliceRow()?.textContent).not.toContain('Claimed name')
 
     await advanceOrFinish(1)
 
@@ -898,6 +916,19 @@ describe('RoomView online mode', () => {
         "Playing a local game on this device. Others can't join, and photo count is off.",
       ),
     ).toBeNull()
+  })
+
+  it('badges a name its player claimed on the scoreboard', async () => {
+    const { hostPinia } = await setUpOnlineRoom()
+    setActivePinia(hostPinia)
+
+    await renderAs(hostPinia)
+
+    const aliceRow = screen.getByRole('rowheader', { name: /Alice/ })
+    expect(aliceRow.textContent).toContain('Claimed name')
+    expect(screen.getByRole('rowheader', { name: /Host/ }).textContent).not.toContain(
+      'Claimed name',
+    )
   })
 
   it('shows the public lists the game made once an online game is finished', async () => {

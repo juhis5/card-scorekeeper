@@ -121,7 +121,8 @@
     },
     "errors": {
       "nameRequired": "Enter your name to continue.",
-      "startFailed": "Couldn't start the game. Try again."
+      "startFailed": "Couldn't start the game. Try again.",
+      "nameClaimed": "{name} is a claimed name. If it's yours, sign in with Google from the menu; otherwise pick another name."
     },
     "continue": {
       "heading": "Game in progress",
@@ -535,7 +536,7 @@
       },
       "account": {
         "title": "Google account (optional)",
-        "body": "If you sign in with Google, Google's Firebase stores your Google email address and account id, so your stats follow you to your other devices. The email is shown only to you, in the menu. Signing out stops using the account on this device."
+        "body": "If you sign in with Google, Google's Firebase stores your Google email address and account id, so your stats follow you to your other devices. The email is shown only to you, in the menu. Signing out stops using the account on this device. A name you claim is shown to other players as claimed."
       },
       "public": {
         "title": "Highscores are public",

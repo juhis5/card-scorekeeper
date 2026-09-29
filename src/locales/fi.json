@@ -121,7 +121,8 @@
     },
     "errors": {
       "nameRequired": "Anna nimesi jatkaaksesi.",
-      "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen."
+      "startFailed": "Peliä ei voitu aloittaa. Yritä uudelleen.",
+      "nameClaimed": "{name} on varattu nimi. Jos se on sinun, kirjaudu valikosta Google-tilillä; muuten valitse toinen nimi."
     },
     "continue": {
       "heading": "Peli kesken",
@@ -535,7 +536,7 @@
       },
       "account": {
         "title": "Google-tili (vapaaehtoinen)",
-        "body": "Jos kirjaudut Google-tilillä, Googlen Firebase tallentaa Google-sähköpostiosoitteesi ja tilin tunnisteen, jotta tilastosi seuraavat sinua muille laitteillesi. Sähköposti näkyy vain sinulle, valikossa. Uloskirjautuminen lopettaa tilin käytön tällä laitteella."
+        "body": "Jos kirjaudut Google-tilillä, Googlen Firebase tallentaa Google-sähköpostiosoitteesi ja tilin tunnisteen, jotta tilastosi seuraavat sinua muille laitteillesi. Sähköposti näkyy vain sinulle, valikossa. Uloskirjautuminen lopettaa tilin käytön tällä laitteella. Varaamasi nimi näkyy muille pelaajille varattuna."
       },
       "public": {
         "title": "Ennätykset ovat julkisia",

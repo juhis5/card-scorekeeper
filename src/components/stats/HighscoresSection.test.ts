@@ -6,10 +6,27 @@ import HighscoresSection from './HighscoresSection.vue'
 import { i18n, setLocale } from '@/i18n'
 import { useHighscoresStore, type HighscoreEntry } from '@/stores/highscores'
 
+// Claims are read from Firestore; here only the player 'uid-claimed' goes by a claimed name.
+vi.mock('@/composables/useClaimedNames', async () => {
+  const { computed } = await import('vue')
+  return {
+    useClaimedNames: (players: () => { playerId: string }[]) =>
+      computed(
+        () =>
+          new Set(
+            players()
+              .filter(({ playerId }) => playerId === 'uid-claimed')
+              .map(({ playerId }) => playerId),
+          ),
+      ),
+  }
+})
+
 function entry(overrides: Partial<HighscoreEntry>): HighscoreEntry {
   return {
     id: 'g_uid',
     rank: 1,
+    playerId: 'uid',
     displayName: 'Ripa',
     value: 45,
     finishedAt: '2026-09-14T18:00:00.000Z',
@@ -115,5 +132,23 @@ describe('HighscoresSection', () => {
     expect(screen.getByRole('alert').textContent).toContain("Couldn't load the highscores")
     await fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(store.load).toHaveBeenCalledTimes(2)
+  })
+
+  it('badges a name its player claimed', async () => {
+    await renderWith((store) => {
+      store.lists = {
+        ...store.lists,
+        mostGames: [
+          entry({ id: 'uid-claimed', playerId: 'uid-claimed', displayName: 'Juho' }),
+          entry({ id: 'uid-other', playerId: 'uid-other', displayName: 'Juho' }),
+        ],
+      }
+      store.status = 'loaded'
+    })
+
+    const table = screen.getByRole('region', { name: 'Most games played' })
+    const [, claimed, namesake] = within(table).getAllByRole('row')
+    expect(claimed?.textContent).toContain('Claimed name')
+    expect(namesake?.textContent).not.toContain('Claimed name')
   })
 })

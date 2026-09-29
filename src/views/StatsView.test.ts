@@ -35,6 +35,22 @@ const getDocsMock = vi.fn()
 const uploadPendingResultsMock = vi.fn()
 const uploadPendingHighscoresMock = vi.fn().mockResolvedValue(undefined)
 
+// Claims are read from Firestore; here Bob goes by the name he claimed.
+vi.mock('@/composables/useClaimedNames', async () => {
+  const { computed } = await import('vue')
+  return {
+    useClaimedNames: (players: () => { playerId: string; name: string }[]) =>
+      computed(
+        () =>
+          new Set(
+            players()
+              .filter(({ name }) => name === 'Bob')
+              .map(({ playerId }) => playerId),
+          ),
+      ),
+  }
+})
+
 vi.mock('@/lib/data/reconnect-flush', () => ({
   uploadPendingResults: () => uploadPendingResultsMock(),
   uploadPendingHighscores: () => uploadPendingHighscoresMock(),
@@ -181,7 +197,7 @@ describe('StatsView', () => {
     expect(await screen.findByText('Summary')).toBeTruthy()
     expect(screen.getByText('Games played')).toBeTruthy()
     expect(screen.getByText('Head-to-head')).toBeTruthy()
-    expect(screen.getByText('Bob')).toBeTruthy()
+    expect(screen.getByText('Bob').closest('tr')?.textContent).toContain('Claimed name')
   })
 
   it('shows a friendly empty message when this device has no finished games', async () => {

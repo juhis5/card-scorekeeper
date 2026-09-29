@@ -7,6 +7,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Auth } from 'firebase/auth'
 import type { Firestore } from 'firebase/firestore'
+import { rememberClaim } from '@/composables/useClaimedNames'
 import type { GoogleAccount, SignInFailure } from '@/lib/data/google-account'
 import { isUnavailable } from '@/lib/data/write-errors'
 import { cleanPlayerName } from '@/lib/game/player-names'
@@ -133,7 +134,10 @@ export const useAccountStore = defineStore('account', () => {
       if (status.value !== 'signedIn' || !uid) return
       try {
         const outcome = await claims.claimName(getDb(), uid, name)
-        if (outcome === 'claimed') showClaim(cleanPlayerName(name))
+        if (outcome === 'claimed') {
+          showClaim(cleanPlayerName(name))
+          rememberClaim(name, uid)
+        }
         notice.value = outcome
       } catch (error) {
         if (isUnavailable(error)) {

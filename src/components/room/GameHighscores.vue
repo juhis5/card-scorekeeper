@@ -3,12 +3,17 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Medal } from '@lucide/vue'
+import ClaimedBadge from '@/components/shared/ClaimedBadge.vue'
+import { useClaimedNames } from '@/composables/useClaimedNames'
 import { useGameHighscores } from '@/composables/useGameHighscores'
 
 const { gameId } = defineProps<{ gameId: string }>()
 
 const { t, n } = useI18n()
 const highscores = useGameHighscores(() => gameId)
+const claimedPlayerIds = useClaimedNames(() =>
+  highscores.value.map(({ playerId, displayName }) => ({ playerId, name: displayName })),
+)
 const lines = computed(() =>
   highscores.value.map((highscore) => ({
     key: `${highscore.list}-${highscore.displayName}`,
@@ -19,6 +24,7 @@ const lines = computed(() =>
       value: n(highscore.value),
     }),
     isRecord: highscore.rank === 1,
+    isClaimed: claimedPlayerIds.value.has(highscore.playerId),
   })),
 )
 </script>
@@ -35,6 +41,7 @@ const lines = computed(() =>
     </h2>
     <ul role="list" class="flex flex-col gap-1 text-sm">
       <li v-for="line in lines" :key="line.key">
+        <ClaimedBadge v-if="line.isClaimed" class="mr-1 align-text-bottom" />
         {{ line.text }}
         <span v-if="line.isRecord" class="text-primary font-semibold">
           {{ t('room.highscores.record') }}

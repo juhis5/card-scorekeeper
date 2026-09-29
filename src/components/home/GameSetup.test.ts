@@ -8,6 +8,7 @@ import GameSetup from './GameSetup.vue'
 import { useGameStore } from '@/stores/game'
 import { LocalGameRepository } from '@/lib/data/local-repository'
 import type { KeyValueStorage } from '@/lib/data/local-repository'
+import { NameClaimedError } from '@/lib/game/player-names'
 import { i18n } from '@/i18n'
 import type { GameRepository } from '@/lib/data/repository'
 import type { GameState } from '@/lib/game/types'
@@ -189,6 +190,27 @@ describe('GameSetup when the online room cannot be created', () => {
     await startAs('Juho')
 
     expect(router.currentRoute.value.params.code).toBe('local')
+  })
+})
+
+describe("GameSetup under someone else's claimed name", () => {
+  it('says so by the name instead of falling back to a local game, until the name changes', async () => {
+    const repository = makeFakeOnlineRepository('7K4RQ')
+    repository.createGame = vi.fn().mockRejectedValue(new NameClaimedError('Juho'))
+    hostRepository.mockResolvedValue({ kind: 'online', repository })
+    const router = renderGameSetup()
+
+    await startAs('Juho')
+
+    const message =
+      "Juho is a claimed name. If it's yours, sign in with Google from the menu; otherwise pick another name."
+    expect(screen.getByText(message)).toBeTruthy()
+    expect(screen.getByLabelText('Your name').getAttribute('aria-invalid')).toBe('true')
+    expect(localRepository).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('home')
+
+    await fireEvent.update(screen.getByLabelText('Your name'), 'Juho L')
+    expect(screen.queryByText(message)).toBeNull()
   })
 })
 

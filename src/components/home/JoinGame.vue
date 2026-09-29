@@ -14,7 +14,7 @@ import { isValidRoomCode, normalizeRoomCode } from '@/lib/game/room-code'
 import { useGameStore } from '@/stores/game'
 import { useIdentityStore } from '@/stores/identity'
 import { MAX_PLAYER_NAME_LENGTH } from '@/lib/game/rules'
-import { NameTakenError } from '@/lib/game/player-names'
+import { NameClaimedError, NameTakenError } from '@/lib/game/player-names'
 import { isPermanentWriteError } from '@/lib/data/write-errors'
 
 const { roomCode } = defineProps<{
@@ -45,12 +45,14 @@ const isCodeInvalid = computed(
   () => attemptedSubmit.value && !isValidRoomCode(normalizedCode.value),
 )
 const isNameMissing = computed(() => attemptedSubmit.value && trimmedName.value === '')
-/** The name is taken in the room: 'guest' when a host-added player has it, so the joiner asks
- * the host. */
-const nameTaken = ref<'player' | 'guest' | null>(null)
+/** The name is taken in the room ('guest' when a host-added player has it, so the joiner asks
+ * the host), or someone's claimed name. */
+const nameTaken = ref<'player' | 'guest' | 'claimed' | null>(null)
 const isNameInvalid = computed(() => isNameMissing.value || nameTaken.value !== null)
 const nameError = computed(() => {
   if (isNameMissing.value) return t('home.errors.nameRequired')
+  if (nameTaken.value === 'claimed')
+    return t('home.errors.nameClaimed', { name: trimmedName.value })
   return nameTaken.value === 'guest'
     ? t('home.join.errors.nameTakenByGuest')
     : t('home.join.errors.nameTaken')
@@ -84,6 +86,10 @@ async function handleSubmit(): Promise<void> {
     })
     await router.push({ name: 'room', params: { code: normalizedCode.value } })
   } catch (error) {
+    if (error instanceof NameClaimedError) {
+      nameTaken.value = 'claimed'
+      return
+    }
     if (error instanceof NameTakenError) {
       nameTaken.value = error.isGuestSeat ? 'guest' : 'player'
       return

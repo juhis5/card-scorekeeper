@@ -113,6 +113,12 @@ A player signed in with Google may claim one name (`claimedNames/{nameKey}`, wit
 `claimOwners/{uid}` doc naming it, written together). First come and for good: nobody changes or
 deletes a claim from the app; the app's owner releases or reassigns one in the console by deleting
 both docs. Anyone signed in may read a claim, to say "claimed" and to badge its owner's name.
+A phone takes a seat under a claimed name only if it is the owner's (the host's own seat
+included); a host's guest may use any name, and Play again carries a seat's name unchanged.
+Opening or joining under someone else's claimed name says so by the name field, pointing its
+owner to signing in. The badge shows on the scoreboard, Ennätykset, the finish screen's lists
+and head-to-head, only where the player id is the claim's owner (`useClaimedNames`, one read per
+name per session).
 
 ## Stats & history
 
