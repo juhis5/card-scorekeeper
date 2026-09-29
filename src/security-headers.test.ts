@@ -43,6 +43,20 @@ describe('security headers in vercel.json', () => {
     expect(scriptSrc).not.toContain("'unsafe-inline'")
   })
 
+  it("lets Google sign-in load its script and each Firebase project's auth frame, nothing wider", () => {
+    const csp = header('Content-Security-Policy-Report-Only') ?? ''
+    const directive = (name: string) =>
+      csp
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(`${name} `))
+
+    expect(directive('script-src')).toContain('https://apis.google.com')
+    expect(directive('frame-src')).toBe(
+      'frame-src https://card-scorekeeper-staging.firebaseapp.com https://card-scorekeeper-prod-1673f.firebaseapp.com',
+    )
+  })
+
   it('forbids framing, MIME sniffing and needless device access', () => {
     expect(header('X-Frame-Options')).toBe('DENY')
     expect(header('X-Content-Type-Options')).toBe('nosniff')

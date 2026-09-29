@@ -13,6 +13,11 @@ vi.mock('virtual:pwa-register/vue', () => ({
   useRegisterSW: () => ({ needRefresh, offlineReady: ref(false), updateServiceWorker: vi.fn() }),
 }))
 
+// Firebase restores an anonymous session: the menu offers Google sign-in.
+vi.mock('@/lib/data/firebase', () => ({
+  getFirebaseAuth: () => ({ currentUser: null, authStateReady: () => Promise.resolve() }),
+}))
+
 function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
@@ -60,6 +65,7 @@ describe('AppMenu', () => {
     expect(screen.getByRole('link', { name: 'Privacy' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Language/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Theme/ })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: /Sign in with Google/ })).toBeTruthy()
   })
 
   it('offers the waiting new version as a row, only while there is one', async () => {

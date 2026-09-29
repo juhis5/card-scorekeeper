@@ -34,7 +34,8 @@
       "language": "Kieli",
       "settings": "Asetukset",
       "thisGame": "Tämä peli",
-      "privacy": "Tietosuoja"
+      "privacy": "Tietosuoja",
+      "account": "Tili"
     },
     "install": {
       "label": "Asenna sovellus",
@@ -48,7 +49,20 @@
       },
       "after": "Sen jälkeen Rommi aukeaa aloitusnäytöltä kuin sovellus."
     },
-    "close": "Sulje"
+    "close": "Sulje",
+    "account": {
+      "signIn": "Kirjaudu Google-tilillä",
+      "signInHint": "Tilastosi mukana kaikilla laitteillasi",
+      "signedIn": "Kirjautunut Google-tilillä",
+      "signOut": "Kirjaudu ulos",
+      "locked": "Lopeta peli tai poistu siitä ensin",
+      "notices": {
+        "blocked": "Kirjautumisikkuna estettiin. Salli ponnahdusikkunat Rommille ja yritä uudelleen.",
+        "offline": "Ei yhteyttä. Yritä uudelleen, kun olet verkossa.",
+        "failed": "Kirjautuminen ei onnistunut. Yritä uudelleen.",
+        "switched": "Tämä Google-tili oli jo käytössä toisella laitteella, joten tässä näkyvät nyt sen tilastot."
+      }
+    }
   },
   "nav": {
     "stats": "Tilastot",
@@ -310,7 +324,7 @@
     "loading": "Ladataan tilastojasi…",
     "caveats": {
       "heading": "Tietoa tilastoista",
-      "body": "Tilastot seuraavat tätä laitetta: uusi laite tai tyhjennetty selaimen tallennustila aloittaa alusta; jaettu laite sekoittaa pelaajien tilastot keskenään; eivätkä tilastot synkronoidu laitteidesi välillä. iPhonessa ja Macissa Safari tyhjentää sivuston tiedot, jos sillä ei ole käyty 7 päivään, ellei sovellusta ole asennettu kotivalikkoon. Asenna se, niin tilastosi säilyvät."
+      "body": "Tilastot seuraavat tätä laitetta, ellet kirjaudu valikosta Google-tilillä: uusi laite tai tyhjennetty selaimen tallennustila aloittaa alusta, ja jaettu laite sekoittaa pelaajien tilastot keskenään. iPhonessa ja Macissa Safari tyhjentää sivuston tiedot, jos sillä ei ole käyty 7 päivään, ellei sovellusta ole asennettu kotivalikkoon. Asenna se tai kirjaudu, niin tilastosi säilyvät."
     },
     "empty": {
       "message": "Ei vielä päättyneitä pelejä — pelaa peli!"
@@ -492,7 +506,7 @@
   },
   "privacy": {
     "heading": "Tietosuoja",
-    "lede": "Mitä tietoja Rommi käsittelee ja missä. Sovelluksessa ei ole tiliä, sähköpostia eikä puhelinnumeroa.",
+    "lede": "Mitä tietoja Rommi käsittelee ja missä. Tili on vapaaehtoinen: ilman sitä ei tallenneta sähköpostia eikä puhelinnumeroa.",
     "sections": {
       "device": {
         "title": "Tällä laitteella",
@@ -505,6 +519,10 @@
       "identity": {
         "title": "Tunnistus",
         "body": "Jokainen laite saa nimettömän tunnisteen. Tilastosi ja pelisi liitetään siihen, ei nimeesi tai henkilöllisyyteesi."
+      },
+      "account": {
+        "title": "Google-tili (vapaaehtoinen)",
+        "body": "Jos kirjaudut Google-tilillä, Googlen Firebase tallentaa Google-sähköpostiosoitteesi ja tilin tunnisteen, jotta tilastosi seuraavat sinua muille laitteillesi. Sähköposti näkyy vain sinulle, valikossa. Uloskirjautuminen lopettaa tilin käytön tällä laitteella."
       },
       "public": {
         "title": "Ennätykset ovat julkisia",

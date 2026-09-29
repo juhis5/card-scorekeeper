@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 
-const SECTIONS = ['device', 'online', 'identity', 'public', 'photo', 'errors'] as const
+const SECTIONS = ['device', 'online', 'identity', 'account', 'public', 'photo', 'errors'] as const
 </script>
 
 <template>

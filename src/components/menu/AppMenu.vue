@@ -7,6 +7,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { ChevronRight, Menu, RefreshCw, X } from '@lucide/vue'
+import AccountRow from '@/components/menu/AccountRow.vue'
 import GameExitRow from '@/components/menu/GameExitRow.vue'
 import InstallAppRow from '@/components/menu/InstallAppRow.vue'
 import LocaleToggle from '@/components/menu/LocaleToggle.vue'
@@ -86,6 +87,10 @@ function close(): void {
 
       <ul v-if="isInRunningGame" role="list" :aria-label="t('app.menu.thisGame')">
         <li class="border-border border-b"><GameExitRow @done="close" /></li>
+      </ul>
+
+      <ul role="list" :aria-label="t('app.menu.account')">
+        <li><AccountRow :locked="isInRunningGame" /></li>
       </ul>
 
       <ul role="list" :aria-label="t('app.menu.settings')">

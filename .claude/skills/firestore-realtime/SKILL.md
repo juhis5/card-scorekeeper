@@ -47,7 +47,7 @@ Mirror docs/PLAN.md. Ephemeral game state (`room/{code}` with `players`, `names`
 
 - **The actor is the Firebase Anonymous Auth uid** (`request.auth.uid`, from `ensureSignedIn()`). Seats are `room/{code}/players/{uid}`, scores `roundScores/{uid}_{round}`, the room carries `hostUid`, and stats rows are keyed by the uid. The SDK keeps the anonymous session per browser, so the uid is the stable identity; the name is an editable label.
 - The identity store (`src/stores/identity.ts`, persisted) also holds a local `deviceUuid`. It only gates `requiresIdentity` routes and rides along on a seat; the rules never trust it for permissions. (The `deviceUuid` *field* on `game_player` / `leaderboard` rows holds the auth uid, or a guest's id.)
-- Document the known failure modes in the UI where stats show: new device / cleared storage = new identity; shared device = merged stats; no cross-device view. These are accepted trade-offs (no login), not bugs to fix.
+- Document the known failure modes in the UI where stats show: new device / cleared storage = new identity; shared device = merged stats. Optional Google sign-in (menu) links the anonymous uid to an account (`lib/data/google-account.ts`, same uid), which fixes both for players who use it; a second device signing in switches onto the account's uid. Anonymous play stays the default.
 
 ## Security rules (firebase/firestore.rules) — enforce, don't just hide in UI
 
