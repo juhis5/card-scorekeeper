@@ -83,9 +83,10 @@ for (const theme of THEMES) {
     test('menu and rules', async ({ page }) => {
       await openApp(page, theme)
       await page.getByRole('button', { name: 'Valikko' }).click()
-      await page.getByRole('button', { name: /^Teema/ }).click()
-      // The account row appears once Firebase has loaded.
+      // The account row appears once Firebase has loaded, pushing the rows below it down. Wait for
+      // it first: after the click, the shift would slide another row under the pointer's hover.
       await expect(page.getByRole('button', { name: /Kirjaudu Google-tilillä/ })).toBeVisible()
+      await page.getByRole('button', { name: /^Teema/ }).click()
       await expect(page).toHaveScreenshot(`menu-${theme}.png`)
       await page.getByRole('link', { name: 'Säännöt' }).click()
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
