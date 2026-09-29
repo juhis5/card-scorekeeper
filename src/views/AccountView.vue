@@ -1,9 +1,10 @@
 <script setup lang="ts">
-/** The Account page: Google sign-in and the name this device plays under, with its claim. */
+/** The Account page: Google sign-in, game invites and the name this device plays under. */
 import { onMounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import GoogleAccountCard from '@/components/account/GoogleAccountCard.vue'
+import InvitesSection from '@/components/account/InvitesSection.vue'
 import PlayerNameCard from '@/components/account/PlayerNameCard.vue'
 import { useAccountStore } from '@/stores/account'
 import { useGameStore } from '@/stores/game'
@@ -31,6 +32,7 @@ onMounted(() => {
       <p class="text-muted-foreground mt-1 text-sm">{{ t('account.lede') }}</p>
     </div>
     <GoogleAccountCard :locked="isRunning" />
+    <InvitesSection v-if="status === 'signedIn'" />
     <PlayerNameCard />
   </main>
 </template>

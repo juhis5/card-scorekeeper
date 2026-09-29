@@ -179,7 +179,7 @@ function skip(): void {
             v-if="current.isGuest"
             class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 text-xs"
           >
-            {{ t('room.guest') }}
+            {{ current.invitedUid ? t('room.invited') : t('room.guest') }}
           </span>
         </p>
         <RoundScoreInput

@@ -114,6 +114,9 @@ async function add(): Promise<void> {
           {{ t('room.addPlayer.hint') }}
         </span>
       </p>
+      <p v-if="isOnline" class="text-muted-foreground text-sm">
+        {{ t('room.addPlayer.inviteHint') }}
+      </p>
       <div class="flex gap-2">
         <Label for="add-player-name" class="sr-only">{{ t('room.addPlayer.nameLabel') }}</Label>
         <Input

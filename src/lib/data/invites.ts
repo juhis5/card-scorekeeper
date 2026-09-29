@@ -8,6 +8,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   query,
   where,
@@ -89,6 +90,17 @@ export function watchInvites(
     },
     onError,
   )
+}
+
+/** How many invites wait for this player's answer, once. */
+export async function countPendingInvites(db: Firestore, uid: string): Promise<number> {
+  const pending = query(
+    collection(db, 'invites'),
+    where('invitedUid', '==', uid),
+    where('status', '==', 'pending'),
+  )
+  const snapshot = await withTimeout(getDocs(pending), INVITE_TIMEOUT_MS)
+  return snapshot.size
 }
 
 export async function readInvite(db: Firestore, inviteId: string): Promise<Invite | null> {

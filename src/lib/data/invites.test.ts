@@ -3,6 +3,7 @@ import type { Firestore } from 'firebase/firestore'
 
 const docs = new Map<string, Record<string, unknown>>()
 const updateDoc = vi.fn()
+const getDocs = vi.fn()
 const commit = vi.fn()
 const batchOps: [string, string, unknown][] = []
 let snapshotListener: ((snapshot: unknown) => void) | null = null
@@ -12,6 +13,7 @@ const queries: unknown[] = []
 vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, path: string) => ({ path }),
   doc: (_db: unknown, collection: string, id: string) => `${collection}/${id}`,
+  getDocs: (query: unknown) => getDocs(query),
   getDoc: (path: string) =>
     Promise.resolve({
       id: path.split('/')[1],
@@ -38,7 +40,7 @@ vi.mock('firebase/firestore', () => ({
   }),
 }))
 
-const { answerInvite, countInvite, readInvite, readInviteGame, watchInvites } =
+const { answerInvite, countInvite, countPendingInvites, readInvite, readInviteGame, watchInvites } =
   await import('./invites')
 
 const db = {} as Firestore
@@ -91,6 +93,19 @@ describe('watchInvites', () => {
 
     errorListener?.(new Error('denied'))
     expect(onError).toHaveBeenCalled()
+  })
+})
+
+describe('countPendingInvites', () => {
+  it("counts this player's invites waiting for an answer", async () => {
+    getDocs.mockResolvedValue({ size: 3 })
+
+    expect(await countPendingInvites(db, 'uid-juho')).toBe(3)
+    expect(getDocs).toHaveBeenCalledWith([
+      { path: 'invites' },
+      { field: 'invitedUid', op: '==', value: 'uid-juho' },
+      { field: 'status', op: '==', value: 'pending' },
+    ])
   })
 })
 

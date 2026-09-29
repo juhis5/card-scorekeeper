@@ -102,6 +102,10 @@
       "heading": "Peli kesken",
       "room": "Jatka huonetta {code}",
       "local": "Jatka tämän laitteen peliä"
+    },
+    "invites": {
+      "notice": "Sinulla on {count} kutsu peliin vastattavana. | Sinulla on {count} kutsua peleihin vastattavana.",
+      "link": "Vastaa"
     }
   },
   "room": {
@@ -258,7 +262,8 @@
       "hint": "pelaaja ilman omaa puhelinta",
       "add": "Lisää",
       "nameRequired": "Syötä pelaajan nimi.",
-      "failed": "Pelaajaa {name} ei voitu lisätä. Yritä uudelleen."
+      "failed": "Pelaajaa {name} ei voitu lisätä. Yritä uudelleen.",
+      "inviteHint": "Jos nimi on jonkun varaama, hän saa kutsun lisätä pelin tilastoihinsa omalla puhelimellaan."
     },
     "guest": "vieras",
     "enterAll": {
@@ -301,7 +306,8 @@
       "heading": "Pääsi ennätyksiin",
       "line": "{name} · {list} · #{rank} · {value} pistettä",
       "record": "Uusi ennätys!"
-    }
+    },
+    "invited": "kutsuttu"
   },
   "notFound": {
     "heading": "Sivua ei löytynyt",
@@ -565,6 +571,32 @@
       "switched": "Tämä Google-tili oli jo käytössä toisella laitteella, joten tässä näkyvät nyt sen tilastot.",
       "claimed": "Nimi on nyt sinun.",
       "taken": "Joku on jo varannut tämän nimen."
+    },
+    "invites": {
+      "heading": "Kutsut peleihin",
+      "lede": "Isäntä lisäsi sinut näihin peleihin varatulla nimelläsi. Hyväksymäsi pelit menevät tilastoihisi ja ennätyksiin.",
+      "game": {
+        "running": "Peli on kesken",
+        "finished": "Peli on päättynyt",
+        "ended": "Peli päättyi ilman tulosta"
+      },
+      "acceptedWaiting": "Hyväksytty: peli menee tilastoihisi, kun se päättyy.",
+      "accept": "Hyväksy",
+      "decline": "Hylkää",
+      "cancel": "Peru",
+      "dismiss": "Poista",
+      "acceptAll": "Hyväksy kaikki ({count})",
+      "empty": "Ei avoimia kutsuja.",
+      "loading": "Ladataan…",
+      "error": "Kutsuja ei saatu ladattua. Tarkista yhteys.",
+      "notices": {
+        "counted": "Lisätty tilastoihisi.",
+        "accepted": "Hyväksytty. Peli menee tilastoihisi, kun se päättyy.",
+        "declined": "Hylätty.",
+        "offline": "Ei yhteyttä. Yritä uudelleen, kun olet verkossa.",
+        "failed": "Se ei onnistunut. Yritä uudelleen."
+      },
+      "from": "{host} lisäsi sinut nimellä {name}"
     }
   }
 }
