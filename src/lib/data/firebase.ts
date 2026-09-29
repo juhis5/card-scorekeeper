@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore'
 import {
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   connectAuthEmulator,
   indexedDBLocalPersistence,
   initializeAuth,
@@ -91,11 +92,12 @@ let cachedAuth: Auth | undefined
 
 export function getFirebaseAuth(): Auth {
   if (cachedAuth) return cachedAuth
-  // Not getAuth(): that adds the popup/redirect resolver, which loads Google's gapi script and an
-  // auth iframe on phones and Safari. Sign-in here is anonymous only, and an enforcing CSP would
-  // block both. Same persistence as getAuth's default, minus the resolver.
+  // getAuth's defaults, spelled out. The resolver is what Google sign-in's popup needs. Phones and
+  // Safari only open a popup soon after the tap, so on those the SDK loads Google's script and auth
+  // iframe here, up front. If they fail to load, anonymous sign-in carries on without them.
   cachedAuth = initializeAuth(getFirebaseApp(), {
     persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver,
   })
   if (useEmulator) {
     connectAuthEmulator(cachedAuth, 'http://localhost:9299', { disableWarnings: true })

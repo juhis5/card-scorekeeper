@@ -112,7 +112,11 @@ in their own game.
 ## Stats & history
 
 - Keyed by the anonymous uid. Clearing browser storage or changing device starts a new identity,
-  and a shared phone shares one. Safari (iPhone, Mac) clears a site's storage after 7 days
+  and a shared phone shares one, unless the player signs in with Google from the menu (optional).
+  That links the uid to the account, so it survives cleared storage and follows the player to
+  other devices. Signing in on a second device moves it onto the account's uid, leaving that
+  device's anonymous history behind. Signing in or out waits while a game is running, as it can
+  change the uid that owns the seat. Safari (iPhone, Mac) clears a site's storage after 7 days
   without a visit unless the app is installed, which resets the identity and drops any result
   still waiting to upload; Tilastot's ⓘ and the privacy page say so and suggest installing.
 - Tilastot (this device) shows games played, wins and win rate, best and worst final score, best and worst round,

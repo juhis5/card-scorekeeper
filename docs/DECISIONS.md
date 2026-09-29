@@ -644,3 +644,20 @@ it is.
   quota cap; the per-room and global limits in `/api/count` keep use small. No code change: the
   key is swapped in Vercel's Production env. (Supersedes "the no-billing key's free quota" in the
   2026-09-27 review round 5 entry.)
+- 2026-09-29 — Optional Google sign-in (owner's decision; the first of three account PRs, then
+  claimed names and seats honouring them). It links Google to the anonymous user
+  (`linkWithPopup`), so the uid and everything keyed by it stay. A Google account already linked
+  elsewhere can't be linked again: that device signs in with the account's credential and
+  switches uid, and its anonymous history stays behind (the menu says so). Signing in or out
+  waits while a game is running, as the seat belongs to the current uid.
+  - Popup, not redirect: a redirect reads its result through the `firebaseapp.com` frame, which
+    browsers that block third-party storage break unless `/__/auth` is proxied on our own domain.
+    If the installed iPhone app can't complete the popup, that proxy is the follow-up.
+  - The popup resolver is back in `initializeAuth` (removed 2026-09-28 when sign-in was
+    anonymous only). Phones and Safari open a popup only soon after the tap, and the SDK readies
+    Google's script and frame only at auth start-up (no public way to warm it up later), so the
+    SDK now loads them there on those browsers. A failure doesn't stop auth, and the 8 s
+    reachability probe still bounds sign-in, so an offline host still gets a local game.
+  - The CSP allows `apis.google.com` scripts and both projects' `firebaseapp.com` frames.
+  - Switching a second device is unit-tested only: the Auth emulator's "already linked" error
+    leaves out the credential that Google's carries.

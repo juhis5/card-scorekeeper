@@ -84,6 +84,8 @@ for (const theme of THEMES) {
       await openApp(page, theme)
       await page.getByRole('button', { name: 'Valikko' }).click()
       await page.getByRole('button', { name: /^Teema/ }).click()
+      // The account row appears once Firebase has loaded.
+      await expect(page.getByRole('button', { name: /Kirjaudu Google-tilillä/ })).toBeVisible()
       await expect(page).toHaveScreenshot(`menu-${theme}.png`)
       await page.getByRole('link', { name: 'Säännöt' }).click()
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()

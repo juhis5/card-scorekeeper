@@ -34,7 +34,8 @@
       "language": "Language",
       "settings": "Settings",
       "thisGame": "This game",
-      "privacy": "Privacy"
+      "privacy": "Privacy",
+      "account": "Account"
     },
     "install": {
       "label": "Install the app",
@@ -48,7 +49,20 @@
       },
       "after": "Then Rommi opens from your home screen like an app."
     },
-    "close": "Close"
+    "close": "Close",
+    "account": {
+      "signIn": "Sign in with Google",
+      "signInHint": "Keep your stats on all your devices",
+      "signedIn": "Signed in with Google",
+      "signOut": "Sign out",
+      "locked": "Finish or leave the game first",
+      "notices": {
+        "blocked": "The sign-in window was blocked. Allow pop-ups for Rommi and try again.",
+        "offline": "No connection. Try again when you're online.",
+        "failed": "Signing in didn't work. Try again.",
+        "switched": "This Google account was already in use on another device, so this device now shows its stats."
+      }
+    }
   },
   "nav": {
     "stats": "Stats",
@@ -310,7 +324,7 @@
     "loading": "Loading your stats…",
     "caveats": {
       "heading": "About these stats",
-      "body": "Stats follow this device: a new device or cleared browser storage starts fresh; a shared device blends players; and stats don't sync across your devices. On an iPhone or a Mac, Safari clears a site's data after 7 days without a visit unless the app is installed on the home screen, so install it to keep your stats."
+      "body": "Stats follow this device unless you sign in with Google from the menu: a new device or cleared browser storage starts fresh, and a shared device blends players. On an iPhone or a Mac, Safari clears a site's data after 7 days without a visit unless the app is installed on the home screen, so install it or sign in to keep your stats."
     },
     "empty": {
       "message": "No finished games yet — play a game!"
@@ -492,7 +506,7 @@
   },
   "privacy": {
     "heading": "Privacy",
-    "lede": "What Rommi handles and where. There's no account, email address or phone number.",
+    "lede": "What Rommi handles and where. An account is optional: without one there's no email address or phone number.",
     "sections": {
       "device": {
         "title": "On this device",
@@ -505,6 +519,10 @@
       "identity": {
         "title": "Identity",
         "body": "Each device gets an anonymous id. Your stats and games are tied to it, not to your name or who you are."
+      },
+      "account": {
+        "title": "Google account (optional)",
+        "body": "If you sign in with Google, Google's Firebase stores your Google email address and account id, so your stats follow you to your other devices. The email is shown only to you, in the menu. Signing out stops using the account on this device."
       },
       "public": {
         "title": "Highscores are public",

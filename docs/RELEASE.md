@@ -13,8 +13,9 @@ each other, so run them in this order. Only the owner says "release".
 - Vercel, Production scope: `VITE_SENTRY_DSN` and `SENTRY_AUTH_TOKEN` are set (not only
   Preview), and `GEMINI_API_KEY` is a key on a billed Google Cloud project with a budget alert and
   a hard quota cap (the Gemini API terms allow only paid services for EEA users).
-- Production Firebase console: Anonymous sign-in is enabled; `rommi.vercel.app` is an authorized
-  domain; the web API key's HTTP-referrer restrictions (if any) include it.
+- Production Firebase console: Anonymous and Google sign-in are enabled; `rommi.vercel.app` is an
+  authorized domain; the web API key's HTTP-referrer restrictions (if any) include it. Vercel's
+  preview URLs aren't authorized domains, so Google sign-in works only on the two named sites.
 
 ## 2. Rules and indexes first
 
@@ -74,7 +75,9 @@ against the new rules.
 ## After the release
 
 - Switch the CSP from Report-Only to enforcing, once a Report-Only period shows no violations
-  on phones (Firebase Auth no longer loads Google's gapi script; add a report endpoint first).
+  on phones (add a report endpoint first). The CSP allows Google sign-in's script
+  (`apis.google.com`) and each project's `*.firebaseapp.com` auth frame; check those against real
+  reports on both sites before enforcing.
 - Remove the permission-denied fallback in `FirestoreGameRepository.isSeated`, which only
   covered the rules production ran before this release.
 - Decide on App Check (see docs/DECISIONS.md, 2026-09-28).
