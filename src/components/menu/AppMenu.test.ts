@@ -23,6 +23,7 @@ function makeRouter() {
       { path: '/rules', name: 'rules', component: { render: () => null } },
       { path: '/privacy', name: 'privacy', component: { render: () => null } },
       { path: '/account', name: 'account', component: { render: () => null } },
+      { path: '/settings', name: 'settings', component: { render: () => null } },
       { path: '/room/:code', name: 'room', component: { render: () => null } },
     ],
   })
@@ -60,8 +61,7 @@ describe('AppMenu', () => {
     expect(screen.getByRole('link', { name: 'Account' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Rules' })).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Privacy' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^Language/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /^Theme/ })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeTruthy()
   })
 
   it('offers the waiting new version as a row, only while there is one', async () => {
@@ -85,15 +85,6 @@ describe('AppMenu', () => {
 
     expect(router.currentRoute.value.name).toBe('stats')
     expect(screen.queryByRole('dialog')).toBeNull()
-  })
-
-  it('switches the language from inside the panel', async () => {
-    await renderMenu()
-    await openMenu()
-
-    await fireEvent.click(screen.getByRole('button', { name: /^Language/ }))
-
-    expect(screen.getByRole('link', { name: 'Tilastot' })).toBeTruthy()
   })
 
   it('closes with its close button', async () => {

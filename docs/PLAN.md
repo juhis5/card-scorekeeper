@@ -36,10 +36,12 @@ photo count reads a picture of the cards left in a hand and suggests the points.
   kaikki", a sheet for everyone still missing a score. After Finish: the winner and Play again.
 - **Join** (`/join/CODE`): what an invite link or QR code opens. It asks only for a name, and
   says so first when the room has finished, expired or doesn't exist.
-- **Stats** (`/stats`), **Rules** (`/rules`) and a 404 page.
+- **Stats** (`/stats`), **Rules** (`/rules`), **Account** (`/account`), **Settings**
+  (`/settings`: Kieli and Teema, eight themes) and a 404 page.
 - **Header**, sticky: Back (not on Home), the room code with copy and Kutsu (a sheet with a QR
-  code and a share link) in an online room, and the menu: Tilastot, Ennätykset, Säännöt, Tietosuoja, Kieli,
-  Teema (eight themes), Asenna sovellus, and Päivitä sovellus when a new version is waiting.
+  code and a share link) in an online room, and the menu: Etusivu, Tilastot, Ennätykset, Tili,
+  Asetukset, Säännöt, Tietosuoja, Asenna sovellus, and Päivitä sovellus when a new version is
+  waiting. The menu panel scrolls when taller than the screen.
 
 One score card is open at a time and saves only on ✓ or Enter; a tap outside drops the typed
 number. The scoreboard has five round columns and a total. During a round it shows only who has

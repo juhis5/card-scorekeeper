@@ -80,6 +80,14 @@ for (const theme of THEMES) {
       await expect(page).toHaveScreenshot(`room-finished-${theme}.png`, { fullPage: true })
     })
 
+    test('settings', async ({ page }) => {
+      await openApp(page, theme)
+      await page.getByRole('button', { name: 'Valikko' }).click()
+      await page.getByRole('link', { name: 'Asetukset' }).click()
+      await expect(page.getByRole('heading', { level: 1, name: 'Asetukset' })).toBeVisible()
+      await expect(page).toHaveScreenshot(`settings-${theme}.png`, { fullPage: true })
+    })
+
     test('account', async ({ page }) => {
       await openApp(page, theme)
       await page.getByRole('button', { name: 'Valikko' }).click()
@@ -92,7 +100,6 @@ for (const theme of THEMES) {
     test('menu and rules', async ({ page }) => {
       await openApp(page, theme)
       await page.getByRole('button', { name: 'Valikko' }).click()
-      await page.getByRole('button', { name: /^Teema/ }).click()
       await expect(page).toHaveScreenshot(`menu-${theme}.png`)
       await page.getByRole('link', { name: 'Säännöt' }).click()
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible()

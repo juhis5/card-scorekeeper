@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * Single job: the app menu, a side panel with what the header has no room for: the app's name,
- * pages, settings and install. Reka's dialog traps focus and returns it to the menu button.
+ * pages (Settings among them), an update waiting and install. Reka's dialog traps focus and returns it to the menu button.
  */
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,9 +9,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { ChevronRight, Menu, RefreshCw, X } from '@lucide/vue'
 import GameExitRow from '@/components/menu/GameExitRow.vue'
 import InstallAppRow from '@/components/menu/InstallAppRow.vue'
-import LocaleToggle from '@/components/menu/LocaleToggle.vue'
 import { MENU_ROW_CLASS } from '@/components/menu/menu-row'
-import ThemePicker from '@/components/menu/ThemePicker.vue'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -40,6 +38,7 @@ const pages = [
   { name: 'stats', labelKey: 'nav.stats' },
   { name: 'highscores', labelKey: 'stats.highscores.heading' },
   { name: 'account', labelKey: 'app.menu.account' },
+  { name: 'settings', labelKey: 'app.menu.settings' },
   { name: 'rules', labelKey: 'rules.heading' },
   { name: 'privacy', labelKey: 'app.menu.privacy' },
 ] as const
@@ -56,7 +55,8 @@ function close(): void {
         <Menu aria-hidden="true" class="size-5" />
       </Button>
     </SheetTrigger>
-    <SheetContent side="right" :show-close-button="false" class="gap-0 p-0">
+    <!-- Scrolls when taller than the screen, as on a phone held sideways. -->
+    <SheetContent side="right" :show-close-button="false" class="gap-0 overflow-y-auto p-0">
       <SheetHeader
         class="border-border flex-row items-center justify-between border-b py-1 pr-1 pl-4"
       >
@@ -84,7 +84,7 @@ function close(): void {
         <li class="border-border border-b"><GameExitRow @done="close" /></li>
       </ul>
 
-      <ul role="list" :aria-label="t('app.menu.settings')">
+      <ul role="list" :aria-label="t('app.menu.app')">
         <li v-if="appUpdate.needRefresh" class="border-border border-b">
           <button type="button" :class="MENU_ROW_CLASS" @click="appUpdate.reload">
             <span class="flex flex-col">
@@ -94,8 +94,6 @@ function close(): void {
             <RefreshCw aria-hidden="true" class="text-primary size-4" />
           </button>
         </li>
-        <li class="border-border border-b"><LocaleToggle /></li>
-        <li class="border-border border-b"><ThemePicker /></li>
         <li v-if="install.isAvailable" class="border-border border-b"><InstallAppRow /></li>
       </ul>
     </SheetContent>

@@ -1,20 +1,15 @@
 <script setup lang="ts">
 /**
- * Single job: the menu's Teema row, opening to a radio per theme. Each swatch wears its theme's
+ * Single job: the Settings page's theme choice, a radio per theme. Each swatch wears its theme's
  * class, so it shows that palette's own background and accent.
  */
-import { ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown } from '@lucide/vue'
-import { MENU_ROW_CLASS } from '@/components/menu/menu-row'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useTheme } from '@/composables/useTheme'
 import { isDarkTheme, paletteClass, parseTheme, THEMES, type Theme } from '@/lib/platform/themes'
 
 const { t } = useI18n()
 const { theme, setTheme } = useTheme()
-const listId = useId()
-const isOpen = ref(false)
 
 function swatchClass(option: Theme): string {
   return paletteClass(option) ?? (isDarkTheme(option) ? 'dark' : 'theme-light')
@@ -26,30 +21,17 @@ function handleChange(value: unknown): void {
 </script>
 
 <template>
-  <div>
-    <button
-      type="button"
-      :class="MENU_ROW_CLASS"
-      :aria-expanded="isOpen"
-      :aria-controls="listId"
-      @click="isOpen = !isOpen"
-    >
-      <span>{{ t('app.theme.label') }}</span>
-      <span class="text-muted-foreground flex items-center gap-2 text-sm">
-        {{ t(`app.theme.names.${theme}`) }}
-        <ChevronDown
-          aria-hidden="true"
-          class="size-4 transition-transform duration-(--dur) motion-reduce:transition-none"
-          :class="{ 'rotate-180': isOpen }"
-        />
-      </span>
-    </button>
+  <section
+    aria-labelledby="settings-theme-heading"
+    class="bg-card border-border flex flex-col gap-1 rounded-lg border py-3"
+  >
+    <h2 id="settings-theme-heading" class="px-4 pb-1 text-lg font-semibold">
+      {{ t('app.theme.label') }}
+    </h2>
     <RadioGroup
-      v-if="isOpen"
-      :id="listId"
       :model-value="theme"
       :aria-label="t('app.theme.label')"
-      class="gap-0 pb-2"
+      class="gap-0"
       @update:model-value="handleChange"
     >
       <label
@@ -70,5 +52,5 @@ function handleChange(value: unknown): void {
         </span>
       </label>
     </RadioGroup>
-  </div>
+  </section>
 </template>

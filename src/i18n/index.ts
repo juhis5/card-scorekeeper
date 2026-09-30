@@ -8,7 +8,7 @@ export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number]
 
 const LOCALE_STORAGE_KEY = 'locale'
 
-function isSupportedLocale(value: string | null): value is SupportedLocale {
+export function isSupportedLocale(value: string | null): value is SupportedLocale {
   return SUPPORTED_LOCALES.includes(value as SupportedLocale)
 }
 
