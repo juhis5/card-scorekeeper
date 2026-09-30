@@ -714,3 +714,7 @@ it is.
   off, so local, CI and the emulators run without it. Not monitored first: a friends' group
   tests its own devices on staging instead. Vercel preview URLs aren't on the staging key's
   domains, so online play on a preview deploy stops working while staging enforces.
+- 2026-09-30 — A Settings page (owner: on a phone the menu couldn't scroll to reach Nord in the
+  open theme list). Language and theme moved to `/settings`, both as plain radio lists (each
+  language named in itself, Finnish first); the menu links to it and now scrolls when taller than
+  the screen.

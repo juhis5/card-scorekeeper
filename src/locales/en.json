@@ -15,8 +15,10 @@
       }
     },
     "locale": {
-      "name": "English",
-      "switchHint": "tap to switch"
+      "names": {
+        "fi": "Suomi",
+        "en": "English"
+      }
     },
     "update": {
       "available": "A new version is available.",
@@ -35,7 +37,8 @@
       "settings": "Settings",
       "thisGame": "This game",
       "privacy": "Privacy",
-      "account": "Account"
+      "account": "Account",
+      "app": "App"
     },
     "install": {
       "label": "Install the app",
@@ -598,5 +601,9 @@
       },
       "from": "{host} added you as {name}"
     }
+  },
+  "settings": {
+    "heading": "Settings",
+    "lede": "Theme and language for this device."
   }
 }

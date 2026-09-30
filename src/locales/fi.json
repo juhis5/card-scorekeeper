@@ -15,8 +15,10 @@
       }
     },
     "locale": {
-      "name": "Suomi",
-      "switchHint": "vaihda napauttamalla"
+      "names": {
+        "fi": "Suomi",
+        "en": "English"
+      }
     },
     "update": {
       "available": "Uusi versio on saatavilla.",
@@ -35,7 +37,8 @@
       "settings": "Asetukset",
       "thisGame": "Tämä peli",
       "privacy": "Tietosuoja",
-      "account": "Tili"
+      "account": "Tili",
+      "app": "Sovellus"
     },
     "install": {
       "label": "Asenna sovellus",
@@ -598,5 +601,9 @@
       },
       "from": "{host} lisäsi sinut nimellä {name}"
     }
+  },
+  "settings": {
+    "heading": "Asetukset",
+    "lede": "Tämän laitteen teema ja kieli."
   }
 }
