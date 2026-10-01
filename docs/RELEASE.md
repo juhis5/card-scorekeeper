@@ -86,4 +86,3 @@ against the new rules.
   reports on both sites before enforcing.
 - Remove the permission-denied fallback in `FirestoreGameRepository.isSeated`, which only
   covered the rules production ran before this release.
-- Decide on App Check (see docs/DECISIONS.md, 2026-09-28).
