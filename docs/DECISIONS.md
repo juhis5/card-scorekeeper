@@ -718,3 +718,9 @@ it is.
   open theme list). Language and theme moved to `/settings`, both as plain radio lists (each
   language named in itself, Finnish first); the menu links to it and now scrolls when taller than
   the screen.
+- 2026-10-01 — Released `develop` (a147848) to production. Prod rules and indexes deployed
+  first, then `main` fast-forwarded. The highscore backfill was skipped (owner's call: no
+  production games worth carrying over), so Ennätykset starts from this release. App Check is
+  enforced for Cloud Firestore in production after the new app went live (94% verified; the rest
+  were the old version's requests, none of unknown origin). Photo count stays on the old key
+  until the billed Gemini key is set in Vercel's Production scope and production is redeployed.
